@@ -583,7 +583,7 @@ export default function Users() {
                   <FormItem>
                     <FormLabel>Логин</FormLabel>
                     <FormControl>
-                      <Input placeholder="Логин" {...field} disabled />
+                      <Input placeholder="Логин" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
