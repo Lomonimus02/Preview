@@ -31,7 +31,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
   const roleAccess = {
     [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "analytics", "messages", "notifications", "settings", "support"],
     [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "schedule", "homework", "grades", "analytics", "messages", "notifications", "settings", "support"],
-    [UserRoleEnum.TEACHER]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
+    [UserRoleEnum.TEACHER]: ["dashboard", "schedule", "homework", "messages", "documents", "support"],
     [UserRoleEnum.STUDENT]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.PARENT]: ["dashboard", "grades", "messages", "documents", "support"],
     [UserRoleEnum.PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"],

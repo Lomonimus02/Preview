@@ -1,11 +1,20 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRoleEnum, Schedule as ScheduleType, insertScheduleSchema, Class, Subject, User } from "@shared/schema";
+import { 
+  UserRoleEnum, 
+  Schedule as ScheduleType, 
+  insertScheduleSchema, 
+  Class, 
+  Subject, 
+  User,
+  insertGradeSchema,
+  Grade
+} from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, PlusIcon, ClockIcon } from "lucide-react";
+import { CalendarIcon, PlusIcon, ClockIcon, GraduationCapIcon, UsersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -39,10 +48,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 const scheduleFormSchema = insertScheduleSchema.extend({
   classId: z.number({
@@ -62,21 +80,47 @@ const scheduleFormSchema = insertScheduleSchema.extend({
   room: z.string().optional(),
 });
 
+// Схема для создания оценок
+const gradeFormSchema = insertGradeSchema.extend({
+  studentId: z.number({
+    required_error: "Выберите ученика",
+  }),
+  grade: z.number({
+    required_error: "Укажите оценку",
+  }).min(1, "Минимальная оценка - 1").max(5, "Максимальная оценка - 5"),
+  comment: z.string().nullable().optional(),
+  gradeType: z.string({
+    required_error: "Укажите тип оценки",
+  }),
+});
+
 export default function SchedulePage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
+  const [isClassStudentsDialogOpen, setIsClassStudentsDialogOpen] = useState(false);
   const [currentTab, setCurrentTab] = useState("1"); // 1 to 7 for days of week
+  const [selectedSchedule, setSelectedSchedule] = useState<ScheduleType | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   
   // Check access permissions
   const canEditSchedule = user?.role === UserRoleEnum.SUPER_ADMIN || 
                           user?.role === UserRoleEnum.SCHOOL_ADMIN;
+  
+  const isTeacher = user?.role === UserRoleEnum.TEACHER;
   
   // Fetch schedules
   const { data: schedules = [], isLoading } = useQuery<ScheduleType[]>({
     queryKey: ["/api/schedules"],
     enabled: !!user
   });
+  
+  // Filter schedules for teacher
+  const teacherSchedules = isTeacher 
+    ? schedules.filter(s => s.teacherId === user?.id)
+    : schedules;
   
   // Fetch classes
   const { data: classes = [] } = useQuery<Class[]>({
@@ -93,9 +137,26 @@ export default function SchedulePage() {
   // Fetch teachers
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: !!user && canEditSchedule
+    enabled: !!user
   });
+  
+  // Fetch grades
+  const { data: grades = [] } = useQuery<Grade[]>({
+    queryKey: ["/api/grades"],
+    enabled: !!user && isTeacher
+  });
+  
   const teachers = users.filter(u => u.role === UserRoleEnum.TEACHER);
+  const students = users.filter(u => u.role === UserRoleEnum.STUDENT);
+  
+  // Get students for a specific class
+  const getClassStudents = (classId: number) => {
+    return students.filter(student => {
+      // В реальном приложении здесь должна быть логика связи студентов с классами
+      // Для примера используем простую проверку по школе
+      return student.schoolId === user?.schoolId;
+    });
+  };
   
   // Form for adding schedule
   const form = useForm<z.infer<typeof scheduleFormSchema>>({
@@ -148,9 +209,52 @@ export default function SchedulePage() {
     return days[day - 1];
   };
   
+  // Формa для добавления оценки
+  const gradeForm = useForm<z.infer<typeof gradeFormSchema>>({
+    resolver: zodResolver(gradeFormSchema),
+    defaultValues: {
+      studentId: undefined,
+      grade: undefined,
+      comment: "",
+      gradeType: "Текущая",
+      subjectId: selectedSchedule?.subjectId,
+      classId: selectedSchedule?.classId,
+      teacherId: user?.id,
+    },
+  });
+  
+  // Добавить оценку
+  const addGradeMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof gradeFormSchema>) => {
+      const res = await apiRequest("POST", "/api/grades", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      setIsGradeDialogOpen(false);
+      gradeForm.reset();
+      toast({
+        title: "Оценка добавлена",
+        description: "Оценка успешно добавлена",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось добавить оценку",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const onGradeSubmit = (values: z.infer<typeof gradeFormSchema>) => {
+    addGradeMutation.mutate(values);
+  };
+  
   // Filter schedules by day
   const getSchedulesByDay = (day: number) => {
-    return schedules
+    // Используем отфильтрованное расписание для учителя
+    return (isTeacher ? teacherSchedules : schedules)
       .filter(schedule => schedule.dayOfWeek === day)
       .sort((a, b) => {
         // Sort by start time
@@ -228,6 +332,9 @@ export default function SchedulePage() {
                       <TableHead>Класс</TableHead>
                       <TableHead>Учитель</TableHead>
                       <TableHead>Кабинет</TableHead>
+                      {isTeacher && (
+                        <TableHead>Действия</TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -240,6 +347,33 @@ export default function SchedulePage() {
                         <TableCell>{getClassName(schedule.classId)}</TableCell>
                         <TableCell>{getTeacherName(schedule.teacherId)}</TableCell>
                         <TableCell>{schedule.room || "-"}</TableCell>
+                        {isTeacher && user?.id === schedule.teacherId && (
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedSchedule(schedule);
+                                  setSelectedClassId(schedule.classId);
+                                  setIsClassStudentsDialogOpen(true);
+                                }}
+                              >
+                                <UsersIcon className="h-4 w-4 mr-1" /> Ученики
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedSchedule(schedule);
+                                  setIsGradeDialogOpen(true);
+                                }}
+                              >
+                                <GraduationCapIcon className="h-4 w-4 mr-1" /> Оценки
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -427,6 +561,165 @@ export default function SchedulePage() {
               <DialogFooter>
                 <Button type="submit" disabled={addScheduleMutation.isPending}>
                   {addScheduleMutation.isPending ? 'Сохранение...' : 'Сохранить'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      {/* Students List Dialog */}
+      <Dialog open={isClassStudentsDialogOpen} onOpenChange={setIsClassStudentsDialogOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Список учеников класса</DialogTitle>
+            <DialogDescription>
+              {selectedClassId && getClassName(selectedClassId)}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="max-h-[60vh] overflow-y-auto">
+            {selectedClassId && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Фамилия</TableHead>
+                    <TableHead>Имя</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Действия</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {getClassStudents(selectedClassId).map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell>{student.lastName}</TableCell>
+                      <TableCell>{student.firstName}</TableCell>
+                      <TableCell>{student.email}</TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setSelectedStudentId(student.id);
+                            setIsGradeDialogOpen(true);
+                            setIsClassStudentsDialogOpen(false);
+                            
+                            // Предзаполняем форму оценки
+                            gradeForm.reset({
+                              studentId: student.id,
+                              grade: undefined,
+                              comment: "",
+                              gradeType: "Текущая",
+                              classId: selectedClassId,
+                              subjectId: selectedSchedule?.subjectId,
+                              teacherId: user?.id,
+                            });
+                          }}
+                        >
+                          <GraduationCapIcon className="h-4 w-4 mr-1" /> Выставить оценку
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Grade Dialog */}
+      <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Выставление оценки</DialogTitle>
+            <DialogDescription>
+              {selectedStudentId && 
+                users.find(u => u.id === selectedStudentId)?.lastName + ' ' + 
+                users.find(u => u.id === selectedStudentId)?.firstName
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...gradeForm}>
+            <form onSubmit={gradeForm.handleSubmit(onGradeSubmit)} className="space-y-4">
+              <FormField
+                control={gradeForm.control}
+                name="grade"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Оценка</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      defaultValue={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите оценку" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5].map((grade) => (
+                          <SelectItem key={grade} value={grade.toString()}>
+                            {grade}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={gradeForm.control}
+                name="gradeType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Тип оценки</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value)}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите тип оценки" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Текущая">Текущая</SelectItem>
+                        <SelectItem value="Контрольная">Контрольная</SelectItem>
+                        <SelectItem value="Экзамен">Экзамен</SelectItem>
+                        <SelectItem value="Практическая">Практическая</SelectItem>
+                        <SelectItem value="Домашняя">Домашняя</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={gradeForm.control}
+                name="comment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Комментарий</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Комментарий к оценке"
+                        className="resize-none"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="submit" disabled={addGradeMutation.isPending}>
+                  {addGradeMutation.isPending ? 'Сохранение...' : 'Сохранить'}
                 </Button>
               </DialogFooter>
             </form>
