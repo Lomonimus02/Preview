@@ -16,6 +16,7 @@ import Analytics from "@/pages/analytics";
 import Settings from "@/pages/settings";
 import Support from "./pages/support-page";
 import Notifications from "./pages/notifications";
+import SystemLogs from "./pages/system-logs";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -35,6 +36,7 @@ function Router() {
       <ProtectedRoute path="/settings" component={Settings} />
       <ProtectedRoute path="/support" component={Support} />
       <ProtectedRoute path="/notifications" component={Notifications} />
+      <ProtectedRoute path="/system-logs" component={SystemLogs} />
       <Route component={NotFound} />
     </Switch>
   );

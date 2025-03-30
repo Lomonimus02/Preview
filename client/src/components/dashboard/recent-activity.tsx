@@ -1,5 +1,6 @@
 import { ActivityItem } from "./activity-item";
 import { UserPlusIcon, PencilIcon, RefreshCwIcon, LogInIcon } from "lucide-react";
+import { Link } from "wouter";
 
 export function RecentActivity() {
   const activities = [
@@ -44,7 +45,9 @@ export function RecentActivity() {
         ))}
       </div>
       <div className="mt-4 text-center">
-        <a href="#" className="text-sm text-primary hover:text-primary-dark">Все действия</a>
+        <Link href="/system-logs" className="text-sm text-primary hover:text-primary-dark hover:underline">
+          Все действия
+        </Link>
       </div>
     </div>
   );

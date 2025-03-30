@@ -501,8 +501,8 @@ export default function Users() {
                     <FormItem>
                       <FormLabel>Школа</FormLabel>
                       <Select
-                        onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
-                        defaultValue={field.value?.toString() || ""}
+                        onValueChange={(value) => field.onChange(value === "null" ? null : parseInt(value))}
+                        value={field.value === null ? "null" : field.value?.toString()}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -510,7 +510,7 @@ export default function Users() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Не выбрано</SelectItem>
+                          <SelectItem value="null">Не выбрано</SelectItem>
                           {schools.map(school => (
                             <SelectItem key={school.id} value={school.id.toString()}>
                               {school.name}
@@ -526,7 +526,7 @@ export default function Users() {
               
               <DialogFooter>
                 <Button type="submit" disabled={addUserMutation.isPending}>
-                  {addUserMutation.isPending ? 'Сохранение...' : 'Сохранить'}
+                  {addUserMutation.isPending ? "Добавление..." : "Добавить пользователя"}
                 </Button>
               </DialogFooter>
             </form>
@@ -688,8 +688,8 @@ export default function Users() {
                       <FormItem>
                         <FormLabel>Школа</FormLabel>
                         <Select
-                          onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
-                          defaultValue={field.value?.toString() || ""}
+                          onValueChange={(value) => field.onChange(value === "null" ? null : parseInt(value))}
+                          value={field.value === null ? "null" : field.value?.toString()}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -697,7 +697,7 @@ export default function Users() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">Не выбрано</SelectItem>
+                            <SelectItem value="null">Не выбрано</SelectItem>
                             {schools.map(school => (
                               <SelectItem key={school.id} value={school.id.toString()}>
                                 {school.name}
@@ -714,7 +714,7 @@ export default function Users() {
               
               <DialogFooter>
                 <Button type="submit" disabled={editUserMutation.isPending}>
-                  {editUserMutation.isPending ? 'Сохранение...' : 'Сохранить'}
+                  {editUserMutation.isPending ? "Сохранение..." : "Сохранить изменения"}
                 </Button>
               </DialogFooter>
             </form>

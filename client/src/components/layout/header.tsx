@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { BellIcon, ChevronDownIcon, Menu } from "lucide-react";
+import { Link } from "wouter";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -85,7 +86,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
               </div>
               <DropdownMenuSeparator />
               <div className="px-4 py-2 text-center">
-                <a href="#" className="text-sm text-primary hover:text-primary-dark">Все уведомления</a>
+                <Link href="/notifications" className="text-sm text-primary hover:text-primary-dark" onClick={() => setNotificationsOpen(false)}>Все уведомления</Link>
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
