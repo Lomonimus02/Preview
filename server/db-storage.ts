@@ -16,11 +16,11 @@ import {
   Notification, InsertNotification,
   ParentStudent, InsertParentStudent,
   SystemLog, InsertSystemLog,
-  UserRoleEnum,
+  UserRoleEnum, UserRoleModel, InsertUserRole,
   users, schools, classes, subjects, schedules,
   homework, homeworkSubmissions, grades, attendance,
   documents, messages, notifications, parentStudents,
-  systemLogs, teacherSubjects, studentClasses
+  systemLogs, teacherSubjects, studentClasses, userRoles
 } from '@shared/schema';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
@@ -411,6 +411,25 @@ export class DatabaseStorage implements IStorage {
 
     const teacherIds = subjectTeachersList.map(st => st.teacherId);
     return await db.select().from(users).where(inArray(users.id, teacherIds));
+  }
+
+  // User-Role operations
+  async getUserRole(id: number): Promise<UserRoleModel | undefined> {
+    const [userRole] = await db.select().from(userRoles).where(eq(userRoles.id, id)).limit(1);
+    return userRole;
+  }
+
+  async getUserRoles(userId: number): Promise<UserRoleModel[]> {
+    return await db.select().from(userRoles).where(eq(userRoles.userId, userId));
+  }
+
+  async addUserRole(userRole: InsertUserRole): Promise<UserRoleModel> {
+    const [newUserRole] = await db.insert(userRoles).values(userRole).returning();
+    return newUserRole;
+  }
+
+  async removeUserRole(id: number): Promise<void> {
+    await db.delete(userRoles).where(eq(userRoles.id, id));
   }
 }
 

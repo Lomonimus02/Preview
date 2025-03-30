@@ -13,7 +13,8 @@ import {
   Notification, InsertNotification,
   ParentStudent, InsertParentStudent,
   SystemLog, InsertSystemLog,
-  UserRoleEnum
+  UserRoleEnum,
+  UserRoleModel, InsertUserRole
 } from "@shared/schema";
 
 import session from "express-session";
@@ -122,6 +123,12 @@ export interface IStorage {
   assignTeacherToSubject(teacherId: number, subjectId: number): Promise<void>;
   getTeacherSubjects(teacherId: number): Promise<Subject[]>;
   getSubjectTeachers(subjectId: number): Promise<User[]>;
+  
+  // User-Role operations
+  getUserRole(id: number): Promise<UserRoleModel | undefined>;
+  getUserRoles(userId: number): Promise<UserRoleModel[]>;
+  addUserRole(userRole: InsertUserRole): Promise<UserRoleModel>;
+  removeUserRole(id: number): Promise<void>;
 }
 
 // In-memory storage implementation
@@ -140,6 +147,7 @@ export class MemStorage implements IStorage {
   private notifications: Map<number, Notification>;
   private parentStudents: Map<number, ParentStudent>;
   private systemLogs: Map<number, SystemLog>;
+  private userRoles: Map<number, UserRoleModel>;
   private studentClasses: Map<string, boolean>; // composite key "studentId-classId"
   private teacherSubjects: Map<string, boolean>; // composite key "teacherId-subjectId"
   
@@ -158,6 +166,7 @@ export class MemStorage implements IStorage {
   private notificationId = 1;
   private parentStudentId = 1;
   private systemLogId = 1;
+  private userRoleId = 1;
 
   sessionStore: session.Store;
   
@@ -176,6 +185,7 @@ export class MemStorage implements IStorage {
     this.notifications = new Map();
     this.parentStudents = new Map();
     this.systemLogs = new Map();
+    this.userRoles = new Map();
     this.studentClasses = new Map();
     this.teacherSubjects = new Map();
     
@@ -613,6 +623,26 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values()).filter(user => 
       user.role === UserRoleEnum.TEACHER && teacherIds.includes(user.id)
     );
+  }
+  
+  // User-Role operations
+  async getUserRole(id: number): Promise<UserRoleModel | undefined> {
+    return this.userRoles.get(id);
+  }
+
+  async getUserRoles(userId: number): Promise<UserRoleModel[]> {
+    return Array.from(this.userRoles.values()).filter(userRole => userRole.userId === userId);
+  }
+
+  async addUserRole(userRole: InsertUserRole): Promise<UserRoleModel> {
+    const id = this.userRoleId++;
+    const newUserRole: UserRoleModel = { ...userRole, id };
+    this.userRoles.set(id, newUserRole);
+    return newUserRole;
+  }
+
+  async removeUserRole(id: number): Promise<void> {
+    this.userRoles.delete(id);
   }
 }
 

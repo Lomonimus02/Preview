@@ -22,12 +22,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Middleware to check if user has specific role
-  const hasRole = (roles: UserRoleEnum[]) => (req, res, next) => {
+  const hasRole = (roles: UserRoleEnum[]) => async (req, res, next) => {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Unauthorized" });
     }
     
+    // Проверяем основную роль пользователя
     if (roles.includes(req.user.role)) {
+      return next();
+    }
+    
+    // Если основная роль не подходит, проверяем дополнительные роли
+    const userRoles = await dataStorage.getUserRoles(req.user.id);
+    const userRoleValues = userRoles.map(ur => ur.role);
+    
+    if (roles.some(role => userRoleValues.includes(role))) {
       return next();
     }
     
@@ -787,6 +796,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     res.status(201).json(relationship);
+  });
+
+  // User roles API
+  app.get("/api/user-roles/:userId", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    const userId = parseInt(req.params.userId);
+    const user = await dataStorage.getUser(userId);
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Проверка прав: школьный администратор может видеть роли только пользователей своей школы
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && user.schoolId !== req.user.schoolId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    const userRoles = await dataStorage.getUserRoles(userId);
+    res.json(userRoles);
+  });
+  
+  app.post("/api/user-roles", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    const { userId, role, schoolId } = req.body;
+    
+    const user = await dataStorage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Проверка прав: школьный администратор может добавлять роли только пользователям своей школы
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && user.schoolId !== req.user.schoolId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    // Проверяем, не существует ли уже такая роль у пользователя
+    const existingRoles = await dataStorage.getUserRoles(userId);
+    if (existingRoles.some(r => r.role === role && r.schoolId === schoolId)) {
+      return res.status(400).json({ message: "User already has this role" });
+    }
+    
+    const userRole = await dataStorage.addUserRole({ userId, role, schoolId });
+    
+    // Log the action
+    await dataStorage.createSystemLog({
+      userId: req.user.id,
+      action: "user_role_added",
+      details: `Added role ${role} to user ${userId}`,
+      ipAddress: req.ip
+    });
+    
+    res.status(201).json(userRole);
+  });
+  
+  app.delete("/api/user-roles/:id", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const userRole = await dataStorage.getUserRole(id);
+    
+    if (!userRole) {
+      return res.status(404).json({ message: "User role not found" });
+    }
+    
+    const user = await dataStorage.getUser(userRole.userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Проверка прав: школьный администратор может удалять роли только пользователям своей школы
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && user.schoolId !== req.user.schoolId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    await dataStorage.removeUserRole(id);
+    
+    // Log the action
+    await dataStorage.createSystemLog({
+      userId: req.user.id,
+      action: "user_role_removed",
+      details: `Removed role ${userRole.role} from user ${userRole.userId}`,
+      ipAddress: req.ip
+    });
+    
+    res.status(200).json({ message: "User role removed" });
+  });
+  
+  app.put("/api/users/:id/active-role", isAuthenticated, async (req, res) => {
+    const userId = parseInt(req.params.id);
+    const { activeRole } = req.body;
+    
+    // Пользователь может изменить только свою активную роль
+    if (req.user.id !== userId) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    // Проверяем, имеет ли пользователь эту роль
+    const userRoles = await dataStorage.getUserRoles(userId);
+    const hasMainRole = req.user.role === activeRole;
+    const hasAdditionalRole = userRoles.some(r => r.role === activeRole);
+    
+    if (!hasMainRole && !hasAdditionalRole) {
+      return res.status(400).json({ message: "User does not have this role" });
+    }
+    
+    const user = await dataStorage.updateUser(userId, { activeRole });
+    
+    // Log the action
+    await dataStorage.createSystemLog({
+      userId: req.user.id,
+      action: "active_role_changed",
+      details: `Changed active role to ${activeRole}`,
+      ipAddress: req.ip
+    });
+    
+    res.json(user);
+  });
+
+  // Notifications count API
+  app.get("/api/notifications/count", isAuthenticated, async (req, res) => {
+    const notifications = await dataStorage.getNotificationsByUser(req.user.id);
+    const unreadCount = notifications.filter(n => !n.isRead).length;
+    res.json({ unreadCount });
   });
 
   const httpServer = createServer(app);
