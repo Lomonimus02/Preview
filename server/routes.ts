@@ -20,6 +20,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     res.status(401).json({ message: "Unauthorized" });
   };
+  
+  // API для смены активной роли
+  app.post("/api/switch-role", isAuthenticated, async (req, res) => {
+    const { roleId } = req.body;
+    
+    if (!roleId) {
+      return res.status(400).json({ message: "RoleId is required" });
+    }
+    
+    try {
+      // Получаем роль из пользовательских ролей
+      const userRole = await dataStorage.getUserRole(parseInt(roleId));
+      
+      if (!userRole || userRole.userId !== req.user.id) {
+        return res.status(403).json({ message: "Forbidden. Role not found or doesn't belong to user" });
+      }
+      
+      // Обновляем активную роль пользователя
+      const updatedUser = await dataStorage.updateUser(req.user.id, { 
+        activeRole: userRole.role,
+        // Если роль привязана к школе, обновляем и schoolId
+        schoolId: userRole.schoolId
+      });
+      
+      // Обновляем данные пользователя в сессии
+      req.user.activeRole = userRole.role;
+      req.user.schoolId = userRole.schoolId;
+      
+      // Создаем запись о действии пользователя
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "role_switched",
+        details: `User switched to role: ${userRole.role}`,
+        ipAddress: req.ip
+      });
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error switching role:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
   // Middleware to check if user has specific role
   const hasRole = (roles: UserRoleEnum[]) => async (req, res, next) => {
@@ -27,12 +69,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ message: "Unauthorized" });
     }
     
+    // Проверяем активную роль пользователя, если она установлена
+    if (req.user.activeRole && roles.includes(req.user.activeRole)) {
+      return next();
+    }
+    
     // Проверяем основную роль пользователя
     if (roles.includes(req.user.role)) {
       return next();
     }
     
-    // Если основная роль не подходит, проверяем дополнительные роли
+    // Если ни активная, ни основная роль не подходит, проверяем дополнительные роли
     const userRoles = await dataStorage.getUserRoles(req.user.id);
     const userRoleValues = userRoles.map(ur => ur.role);
     
@@ -879,6 +926,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).json({ message: "User role removed" });
   });
   
+  // Получение списка всех доступных ролей пользователя
+  app.get("/api/my-roles", isAuthenticated, async (req, res) => {
+    const userRoles = await dataStorage.getUserRoles(req.user.id);
+    
+    // Добавляем основную роль пользователя, если её нет в списке
+    const roleExists = userRoles.some(ur => ur.role === req.user.role);
+    
+    const result = [...userRoles];
+    
+    if (!roleExists) {
+      // Добавим основную роль пользователя с виртуальным ID и пометим как default
+      result.unshift({
+        id: -1, // Виртуальный ID для основной роли
+        userId: req.user.id,
+        role: req.user.role,
+        schoolId: req.user.schoolId,
+        isDefault: true
+      });
+    }
+    
+    // Пометим активную роль, если она установлена
+    if (req.user.activeRole) {
+      for (const role of result) {
+        role.isActive = role.role === req.user.activeRole;
+      }
+    } else {
+      // Если активная роль не установлена, пометим основную роль как активную
+      if (result.length > 0) {
+        result[0].isActive = true;
+      }
+    }
+    
+    res.json(result);
+  });
+
   app.put("/api/users/:id/active-role", isAuthenticated, async (req, res) => {
     const userId = parseInt(req.params.id);
     const { activeRole } = req.body;

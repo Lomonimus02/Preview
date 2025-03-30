@@ -19,6 +19,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { UserRoleEnum } from "@shared/schema";
+import { RoleSwitcher } from "@/components/role-switcher";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -92,6 +93,11 @@ export function Sidebar({ isOpen }: SidebarProps) {
             <p className="text-xs text-gray-500">{roleNames[userRole]}</p>
           </div>
         </div>
+        
+        {/* Переключатель ролей */}
+        <div className="mt-3">
+          <RoleSwitcher />
+        </div>
       </div>
       
       {/* Navigation */}
@@ -103,7 +109,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
             
             return (
               <Link key={item.id} href={item.href}>
-                <a className={cn(
+                <div className={cn(
                   "group flex items-center px-2 py-2 text-sm font-medium rounded-md",
                   isActive 
                     ? "bg-primary text-white" 
@@ -117,7 +123,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
                     {item.icon}
                   </span>
                   {item.label}
-                </a>
+                </div>
               </Link>
             );
           })}
