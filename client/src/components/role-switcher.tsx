@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { UserRoleEnum } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Check, ChevronsUpDown, ShieldCheck, ShieldQuestion } from "lucide-react
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 // Расширенная модель роли пользователя
 interface UserRole {
@@ -33,47 +34,31 @@ const getRoleName = (role: UserRoleEnum) => {
   return roleMap[role] || role;
 };
 
-export function RoleSwitcher() {
+interface RoleSwitcherProps {
+  className?: string;
+}
+
+export function RoleSwitcher({ className }: RoleSwitcherProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  // Получаем все роли текущего пользователя
-  const { data: userRoles = [], isLoading } = useQuery<UserRole[]>({
-    queryKey: ["/api/my-roles"],
-  });
-  
-  // Получаем текущего пользователя
-  const { data: currentUser } = useQuery<{id: number, role: UserRoleEnum}>({
-    queryKey: ["/api/user"],
-  });
-  
-  // Мутация для изменения активной роли
+  const { user } = useAuth();
   const switchRoleMutation = useMutation({
     mutationFn: async (role: UserRoleEnum) => {
-      // Используем обновленный API endpoint с правильным параметром
       const res = await apiRequest("POST", "/api/switch-role", { role });
       return await res.json();
     },
     onSuccess: (updatedUser) => {
-      // Обновляем данные пользователя и роли после успешной смены
       queryClient.setQueryData(["/api/user"], updatedUser);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/my-roles"] });
-      
-      // Инвалидируем все данные в кэше, чтобы они обновились с учетом новой роли
       queryClient.invalidateQueries();
-      
       setOpen(false);
       toast({
         title: "Роль изменена",
         description: `Вы переключились на роль: ${getRoleName(updatedUser.activeRole)}`,
       });
-      
-      // Перезагружаем страницу, чтобы обновить данные для новой роли
-      // Используем небольшую задержку, чтобы изменения успели примениться
       setTimeout(() => {
-        window.location.href = "/"; // Перенаправляем на главную страницу вместо простой перезагрузки
+        window.location.href = "/";
       }, 500);
     },
     onError: (error: Error) => {
@@ -84,31 +69,24 @@ export function RoleSwitcher() {
       });
     },
   });
-  
-  // Получаем текущего пользователя и его активную роль
-  import { useAuth } from "@/hooks/use-auth";
-const { user } = useAuth();
-  
+
   // Находим текущую активную роль на основе данных пользователя
-  // Ищем либо по значению activeRole из пользователя, либо берем роль с флагом isActive, либо первую роль
-  const activeRole = user?.activeRole 
-    ? userRoles.find(role => role.role === user.activeRole) 
-    : (userRoles.find(role => role.isActive) || userRoles[0]);
-  
-  // Если данные загружаются, показываем индикатор загрузки
-  if (isLoading) {
+  const activeRole = user?.roles?.find(role => role.id === user?.activeRole) ||
+                     user?.roles?.find(role => role.isActive) ||
+                     user?.roles?.[0];
+
+  // Список всех ролей пользователя для выбора
+  const userRoles = user?.roles || [];
+
+  if (!userRoles || userRoles.length === 0) {
     return (
-      <Button variant="outline" className="flex items-center gap-2 justify-between max-w-[200px] text-sm">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4" />
-          <span className="truncate">Загрузка...</span>
-        </div>
-        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-      </Button>
-    );
+      <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700">
+        <ShieldCheck className="h-4 w-4" />
+        <span className="truncate">Нет ролей</span>
+      </div>
+    )
   }
-  
-  // Если у пользователя нет ролей или только одна роль, показываем только текущую роль
+
   if (userRoles.length <= 1) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700">
@@ -119,7 +97,7 @@ const { user } = useAuth();
       </div>
     );
   }
-  
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -156,10 +134,9 @@ const { user } = useAuth();
                 }}
                 className="flex items-center gap-2"
               >
-                {role.isDefault ? 
-                  <ShieldCheck className="h-4 w-4" /> : 
-                  <ShieldQuestion className="h-4 w-4" />
-                }
+                {role.isDefault ?
+                  <ShieldCheck className="h-4 w-4" /> :
+                  <ShieldQuestion className="h-4 w-4" />}
                 {getRoleName(role.role)}
                 <Check
                   className={cn(
