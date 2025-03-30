@@ -1,0 +1,33 @@
+import { useState, ReactNode } from "react";
+import { Header } from "./header";
+import { Sidebar } from "./sidebar";
+import { MobileNav } from "./mobile-nav";
+
+interface MainLayoutProps {
+  children: ReactNode;
+}
+
+export function MainLayout({ children }: MainLayoutProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
+  
+  return (
+    <div className="w-full flex flex-col h-screen bg-gray-50">
+      <Header toggleSidebar={toggleSidebar} />
+      
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <Sidebar isOpen={sidebarOpen} />
+        
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 pb-20 md:pb-4">
+          {children}
+        </main>
+      </div>
+      
+      {/* Mobile Navigation */}
+      <MobileNav />
+    </div>
+  );
+}
