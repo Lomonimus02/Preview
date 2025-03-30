@@ -51,7 +51,8 @@ export function RoleSwitcher() {
   // Мутация для изменения активной роли
   const switchRoleMutation = useMutation({
     mutationFn: async (role: UserRoleEnum) => {
-      const res = await apiRequest("PUT", `/api/users/${currentUser?.id}/active-role`, { activeRole: role });
+      // Используем обновленный API endpoint с правильным параметром
+      const res = await apiRequest("POST", "/api/switch-role", { role });
       return await res.json();
     },
     onSuccess: () => {

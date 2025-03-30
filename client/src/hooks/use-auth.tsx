@@ -8,13 +8,19 @@ import { insertUserSchema, User, InsertUser, UserRoleEnum } from "@shared/schema
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+// Расширяем тип User для поддержки activeRole
+type ExtendedUser = User & {
+  activeRole?: UserRoleEnum;
+  schoolId?: number | null;
+};
+
 type AuthContextType = {
-  user: User | null;
+  user: ExtendedUser | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: UseMutationResult<User, Error, LoginData>;
+  loginMutation: UseMutationResult<ExtendedUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<User, Error, InsertUser>;
+  registerMutation: UseMutationResult<ExtendedUser, Error, InsertUser>;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;

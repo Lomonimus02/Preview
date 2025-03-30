@@ -23,40 +23,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // API для смены активной роли
   app.post("/api/switch-role", isAuthenticated, async (req, res) => {
-    const { roleId } = req.body;
+    const { role } = req.body;
     
-    if (!roleId) {
-      return res.status(400).json({ message: "RoleId is required" });
+    if (!role) {
+      return res.status(400).json({ message: "Role is required" });
     }
     
     try {
-      // Получаем роль из пользовательских ролей
-      const userRole = await dataStorage.getUserRole(parseInt(roleId));
+      // Получаем роли пользователя
+      const userRoles = await dataStorage.getUserRoles(req.user.id);
       
-      if (!userRole || userRole.userId !== req.user.id) {
+      // Проверяем, есть ли у пользователя указанная роль
+      const userRole = userRoles.find(ur => ur.role === role);
+      
+      if (!userRole && req.user.role !== role) {
         return res.status(403).json({ message: "Forbidden. Role not found or doesn't belong to user" });
       }
       
+      // Используем роль пользователя или значение по умолчанию
+      const newRole = userRole || { 
+        role: req.user.role, 
+        schoolId: req.user.schoolId 
+      };
+      
       // Обновляем активную роль пользователя
       const updatedUser = await dataStorage.updateUser(req.user.id, { 
-        activeRole: userRole.role,
+        activeRole: newRole.role,
         // Если роль привязана к школе, обновляем и schoolId
-        schoolId: userRole.schoolId
+        schoolId: newRole.schoolId
       });
       
       // Обновляем данные пользователя в сессии
-      req.user.activeRole = userRole.role;
-      req.user.schoolId = userRole.schoolId;
+      req.user.activeRole = newRole.role;
+      req.user.schoolId = newRole.schoolId;
       
       // Создаем запись о действии пользователя
       await dataStorage.createSystemLog({
         userId: req.user.id,
         action: "role_switched",
-        details: `User switched to role: ${userRole.role}`,
+        details: `User switched to role: ${newRole.role}`,
         ipAddress: req.ip
       });
       
       res.json(updatedUser);
+    } catch (error) {
+      console.error("Error switching role:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Альтернативный API для смены активной роли (поддержка PUT /api/users/{id}/active-role)
+  app.put("/api/users/:id/active-role", isAuthenticated, async (req, res) => {
+    const userId = parseInt(req.params.id);
+    const { activeRole } = req.body;
+    
+    // Проверяем доступ
+    if (userId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden. You can only change your own role" });
+    }
+    
+    if (!activeRole) {
+      return res.status(400).json({ message: "Active role is required" });
+    }
+    
+    try {
+      // Перенаправляем запрос на обычный маршрут смены роли
+      req.body.role = activeRole;
+      return await app._router.handle(req, res);
     } catch (error) {
       console.error("Error switching role:", error);
       res.status(500).json({ message: "Internal server error" });
