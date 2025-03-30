@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Enum for user roles
-export enum UserRole {
+export enum UserRoleEnum {
   SUPER_ADMIN = "super_admin",
   SCHOOL_ADMIN = "school_admin",
   TEACHER = "teacher",
@@ -22,7 +22,10 @@ export const users = pgTable("users", {
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
   phone: text("phone"),
-  role: text("role").$type<UserRole>().notNull(),
+  // Основная роль пользователя (для обратной совместимости)
+  role: text("role").$type<UserRoleEnum>().notNull(),
+  // Текущая активная роль, выбранная пользователем
+  activeRole: text("active_role").$type<UserRoleEnum>(),
   schoolId: integer("school_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -168,6 +171,14 @@ export const parentStudents = pgTable("parent_students", {
   studentId: integer("student_id").notNull(),
 });
 
+// User-Role relation для хранения нескольких ролей пользователя
+export const userRoles = pgTable("user_roles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  role: text("role").$type<UserRoleEnum>().notNull(),
+  schoolId: integer("school_id"), // школа, связанная с этой ролью (например, для учителя, работающего в нескольких школах)
+});
+
 // System logs
 export const systemLogs = pgTable("system_logs", {
   id: serial("id").primaryKey(),
@@ -242,6 +253,10 @@ export const insertParentStudentSchema = createInsertSchema(parentStudents).omit
   id: true
 });
 
+export const insertUserRoleSchema = createInsertSchema(userRoles).omit({
+  id: true
+});
+
 export const insertSystemLogSchema = createInsertSchema(systemLogs).omit({
   id: true,
   createdAt: true
@@ -286,6 +301,9 @@ export type Notification = typeof notifications.$inferSelect;
 
 export type InsertParentStudent = z.infer<typeof insertParentStudentSchema>;
 export type ParentStudent = typeof parentStudents.$inferSelect;
+
+export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
+export type UserRoleModel = typeof userRoles.$inferSelect;
 
 export type InsertSystemLog = z.infer<typeof insertSystemLogSchema>;
 export type SystemLog = typeof systemLogs.$inferSelect;

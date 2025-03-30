@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRole, Grade, Attendance, Class } from "@shared/schema";
+import { UserRoleEnum, Grade, Attendance, Class } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { 
@@ -42,10 +42,10 @@ export default function AnalyticsPage() {
   
   // Define allowed roles for this page
   const allowedRoles = [
-    UserRole.SUPER_ADMIN, 
-    UserRole.SCHOOL_ADMIN, 
-    UserRole.PRINCIPAL, 
-    UserRole.VICE_PRINCIPAL
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.PRINCIPAL, 
+    UserRoleEnum.VICE_PRINCIPAL
   ];
 
   // Check if user has permission to access this page

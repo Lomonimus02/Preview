@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRole, User, insertUserSchema } from "@shared/schema";
+import { UserRoleEnum, User, insertUserSchema } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -51,13 +51,13 @@ const userFormSchema = insertUserSchema.extend({
   lastName: z.string().min(1, "Фамилия обязательна"),
   email: z.string().email("Введите корректный email"),
   role: z.enum([
-    UserRole.SUPER_ADMIN,
-    UserRole.SCHOOL_ADMIN,
-    UserRole.TEACHER,
-    UserRole.STUDENT,
-    UserRole.PARENT,
-    UserRole.PRINCIPAL,
-    UserRole.VICE_PRINCIPAL
+    UserRoleEnum.SUPER_ADMIN,
+    UserRoleEnum.SCHOOL_ADMIN,
+    UserRoleEnum.TEACHER,
+    UserRoleEnum.STUDENT,
+    UserRoleEnum.PARENT,
+    UserRoleEnum.PRINCIPAL,
+    UserRoleEnum.VICE_PRINCIPAL
   ]),
   confirmPassword: z.string().min(1, "Подтвердите пароль"),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -71,13 +71,13 @@ export default function Users() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<UserRole | "all">("all");
+  const [roleFilter, setRoleFilter] = useState<UserRoleEnum | "all">("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   // Only Super admin and School admin can access this page
-  if (user?.role !== UserRole.SUPER_ADMIN && user?.role !== UserRole.SCHOOL_ADMIN) {
+  if (user?.role !== UserRoleEnum.SUPER_ADMIN && user?.role !== UserRoleEnum.SCHOOL_ADMIN) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -93,13 +93,13 @@ export default function Users() {
   // Fetch users
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.SCHOOL_ADMIN
+    enabled: user?.role === UserRoleEnum.SUPER_ADMIN || user?.role === UserRoleEnum.SCHOOL_ADMIN
   });
   
   // Fetch schools for dropdown
   const { data: schools = [] } = useQuery({
     queryKey: ["/api/schools"],
-    enabled: user?.role === UserRole.SUPER_ADMIN
+    enabled: user?.role === UserRoleEnum.SUPER_ADMIN
   });
   
   // Filter users based on search query and role filter
@@ -126,7 +126,7 @@ export default function Users() {
       lastName: "",
       email: "",
       phone: "",
-      role: UserRole.STUDENT,
+      role: UserRoleEnum.STUDENT,
       schoolId: null,
     },
   });
@@ -141,8 +141,8 @@ export default function Users() {
       lastName: "",
       email: "",
       phone: "",
-      role: UserRole.STUDENT,
-      schoolId: user?.role === UserRole.SCHOOL_ADMIN ? user.schoolId : null,
+      role: UserRoleEnum.STUDENT,
+      schoolId: user?.role === UserRoleEnum.SCHOOL_ADMIN ? user.schoolId : null,
     });
   };
   
@@ -162,15 +162,15 @@ export default function Users() {
   };
   
   // Get role display name
-  const getRoleName = (role: UserRole) => {
+  const getRoleName = (role: UserRoleEnum) => {
     const roleNames = {
-      [UserRole.SUPER_ADMIN]: "Супер-администратор",
-      [UserRole.SCHOOL_ADMIN]: "Администратор школы",
-      [UserRole.TEACHER]: "Учитель",
-      [UserRole.STUDENT]: "Ученик",
-      [UserRole.PARENT]: "Родитель",
-      [UserRole.PRINCIPAL]: "Директор",
-      [UserRole.VICE_PRINCIPAL]: "Завуч"
+      [UserRoleEnum.SUPER_ADMIN]: "Супер-администратор",
+      [UserRoleEnum.SCHOOL_ADMIN]: "Администратор школы",
+      [UserRoleEnum.TEACHER]: "Учитель",
+      [UserRoleEnum.STUDENT]: "Ученик",
+      [UserRoleEnum.PARENT]: "Родитель",
+      [UserRoleEnum.PRINCIPAL]: "Директор",
+      [UserRoleEnum.VICE_PRINCIPAL]: "Завуч"
     };
     
     return roleNames[role] || role;
@@ -276,7 +276,7 @@ export default function Users() {
         <div className="w-full md:w-64">
           <Select
             value={roleFilter}
-            onValueChange={(value) => setRoleFilter(value as UserRole | "all")}
+            onValueChange={(value) => setRoleFilter(value as UserRoleEnum | "all")}
           >
             <SelectTrigger>
               <div className="flex items-center">
@@ -286,9 +286,9 @@ export default function Users() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Все роли</SelectItem>
-              {Object.values(UserRole).map((role) => (
+              {Object.values(UserRoleEnum).map((role) => (
                 <SelectItem key={role} value={role}>
-                  {getRoleName(role)}
+                  {getRoleName(role as UserRoleEnum)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -419,7 +419,7 @@ export default function Users() {
                   <FormItem>
                     <FormLabel>Телефон</FormLabel>
                     <FormControl>
-                      <Input placeholder="Телефон" {...field} />
+                      <Input placeholder="Телефон" {...field} value={field.value || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -473,19 +473,19 @@ export default function Users() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {user?.role === UserRole.SUPER_ADMIN && (
-                          <SelectItem value={UserRole.SUPER_ADMIN}>Супер-администратор</SelectItem>
+                        {user?.role === UserRoleEnum.SUPER_ADMIN && (
+                          <SelectItem value={UserRoleEnum.SUPER_ADMIN}>Супер-администратор</SelectItem>
                         )}
-                        {(user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.SCHOOL_ADMIN) && (
+                        {(user?.role === UserRoleEnum.SUPER_ADMIN || user?.role === UserRoleEnum.SCHOOL_ADMIN) && (
                           <>
-                            <SelectItem value={UserRole.SCHOOL_ADMIN}>Администратор школы</SelectItem>
-                            <SelectItem value={UserRole.PRINCIPAL}>Директор</SelectItem>
-                            <SelectItem value={UserRole.VICE_PRINCIPAL}>Завуч</SelectItem>
+                            <SelectItem value={UserRoleEnum.SCHOOL_ADMIN}>Администратор школы</SelectItem>
+                            <SelectItem value={UserRoleEnum.PRINCIPAL}>Директор</SelectItem>
+                            <SelectItem value={UserRoleEnum.VICE_PRINCIPAL}>Завуч</SelectItem>
                           </>
                         )}
-                        <SelectItem value={UserRole.TEACHER}>Учитель</SelectItem>
-                        <SelectItem value={UserRole.STUDENT}>Ученик</SelectItem>
-                        <SelectItem value={UserRole.PARENT}>Родитель</SelectItem>
+                        <SelectItem value={UserRoleEnum.TEACHER}>Учитель</SelectItem>
+                        <SelectItem value={UserRoleEnum.STUDENT}>Ученик</SelectItem>
+                        <SelectItem value={UserRoleEnum.PARENT}>Родитель</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -493,7 +493,7 @@ export default function Users() {
                 )}
               />
               
-              {user?.role === UserRole.SUPER_ADMIN && (
+              {user?.role === UserRoleEnum.SUPER_ADMIN && (
                 <FormField
                   control={form.control}
                   name="schoolId"
@@ -511,7 +511,7 @@ export default function Users() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="null">Не выбрано</SelectItem>
-                          {schools.map(school => (
+                          {Array.isArray(schools) && schools.map((school: any) => (
                             <SelectItem key={school.id} value={school.id.toString()}>
                               {school.name}
                             </SelectItem>
@@ -611,7 +611,7 @@ export default function Users() {
                   <FormItem>
                     <FormLabel>Телефон</FormLabel>
                     <FormControl>
-                      <Input placeholder="Телефон" {...field} />
+                      <Input placeholder="Телефон" {...field} value={field.value || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -648,7 +648,7 @@ export default function Users() {
                 />
               </div>
               
-              {user?.role === UserRole.SUPER_ADMIN && (
+              {user?.role === UserRoleEnum.SUPER_ADMIN && (
                 <>
                   <FormField
                     control={form.control}
@@ -667,13 +667,13 @@ export default function Users() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value={UserRole.SUPER_ADMIN}>Супер-администратор</SelectItem>
-                            <SelectItem value={UserRole.SCHOOL_ADMIN}>Администратор школы</SelectItem>
-                            <SelectItem value={UserRole.PRINCIPAL}>Директор</SelectItem>
-                            <SelectItem value={UserRole.VICE_PRINCIPAL}>Завуч</SelectItem>
-                            <SelectItem value={UserRole.TEACHER}>Учитель</SelectItem>
-                            <SelectItem value={UserRole.STUDENT}>Ученик</SelectItem>
-                            <SelectItem value={UserRole.PARENT}>Родитель</SelectItem>
+                            <SelectItem value={UserRoleEnum.SUPER_ADMIN}>Супер-администратор</SelectItem>
+                            <SelectItem value={UserRoleEnum.SCHOOL_ADMIN}>Администратор школы</SelectItem>
+                            <SelectItem value={UserRoleEnum.PRINCIPAL}>Директор</SelectItem>
+                            <SelectItem value={UserRoleEnum.VICE_PRINCIPAL}>Завуч</SelectItem>
+                            <SelectItem value={UserRoleEnum.TEACHER}>Учитель</SelectItem>
+                            <SelectItem value={UserRoleEnum.STUDENT}>Ученик</SelectItem>
+                            <SelectItem value={UserRoleEnum.PARENT}>Родитель</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -698,7 +698,7 @@ export default function Users() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="null">Не выбрано</SelectItem>
-                            {schools.map(school => (
+                            {Array.isArray(schools) && schools.map((school: any) => (
                               <SelectItem key={school.id} value={school.id.toString()}>
                                 {school.name}
                               </SelectItem>

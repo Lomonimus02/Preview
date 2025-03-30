@@ -13,7 +13,7 @@ import {
   Notification, InsertNotification,
   ParentStudent, InsertParentStudent,
   SystemLog, InsertSystemLog,
-  UserRole
+  UserRoleEnum
 } from "@shared/schema";
 
 import session from "express-session";
@@ -32,7 +32,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined>;
   getUsers(): Promise<User[]>;
-  getUsersByRole(role: UserRole): Promise<User[]>;
+  getUsersByRole(role: UserRoleEnum): Promise<User[]>;
   getUsersBySchool(schoolId: number): Promise<User[]>;
   
   // School operations
@@ -190,7 +190,8 @@ export class MemStorage implements IStorage {
       firstName: "Администратор",
       lastName: "Системы",
       email: "admin@example.com",
-      role: UserRole.SUPER_ADMIN,
+      role: UserRoleEnum.SUPER_ADMIN,
+      activeRole: UserRoleEnum.SUPER_ADMIN,
       schoolId: null,
       phone: null
     });
@@ -209,7 +210,15 @@ export class MemStorage implements IStorage {
   
   async createUser(user: InsertUser): Promise<User> {
     const id = this.userId++;
-    const newUser: User = { ...user, id, createdAt: new Date() };
+    // Преобразуем тип user к типу User
+    const userWithCorrectType = {
+      ...user,
+      phone: user.phone ?? null,
+      role: user.role as UserRoleEnum, 
+      activeRole: user.activeRole as UserRoleEnum ?? null,
+      schoolId: user.schoolId ?? null
+    };
+    const newUser: User = { ...userWithCorrectType, id, createdAt: new Date() };
     this.users.set(id, newUser);
     return newUser;
   }
@@ -218,7 +227,18 @@ export class MemStorage implements IStorage {
     const existingUser = this.users.get(id);
     if (!existingUser) return undefined;
     
-    const updatedUser: User = { ...existingUser, ...user };
+    // Сначала создаем промежуточный объект без полей, которые мы будем специально обрабатывать
+    const { role, activeRole, ...rest } = user;
+    
+    // Создаем новый объект обновления только с безопасными полями
+    const updatedUser: User = { 
+      ...existingUser,
+      ...rest,
+      // Явно обновляем только указанные поля, сохраняя существующие значения если они не указаны
+      role: role ? role as UserRoleEnum : existingUser.role,
+      activeRole: activeRole ? activeRole as UserRoleEnum : existingUser.activeRole
+    };
+    
     this.users.set(id, updatedUser);
     return updatedUser;
   }
@@ -227,7 +247,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.users.values());
   }
   
-  async getUsersByRole(role: UserRole): Promise<User[]> {
+  async getUsersByRole(role: UserRoleEnum): Promise<User[]> {
     return Array.from(this.users.values()).filter(user => user.role === role);
   }
   
@@ -246,7 +266,12 @@ export class MemStorage implements IStorage {
   
   async createSchool(school: InsertSchool): Promise<School> {
     const id = this.schoolId++;
-    const newSchool: School = { ...school, id, createdAt: new Date() };
+    // Убедимся, что у нас всегда есть статус для школы
+    const schoolWithStatus = {
+      ...school,
+      status: school.status || 'active'
+    };
+    const newSchool: School = { ...schoolWithStatus, id, createdAt: new Date() };
     this.schools.set(id, newSchool);
     return newSchool;
   }
@@ -562,7 +587,7 @@ export class MemStorage implements IStorage {
       .map(key => parseInt(key.split('-')[0]));
       
     return Array.from(this.users.values()).filter(user => 
-      user.role === UserRole.STUDENT && studentIds.includes(user.id)
+      user.role === UserRoleEnum.STUDENT && studentIds.includes(user.id)
     );
   }
   
@@ -586,7 +611,7 @@ export class MemStorage implements IStorage {
       .map(key => parseInt(key.split('-')[0]));
       
     return Array.from(this.users.values()).filter(user => 
-      user.role === UserRole.TEACHER && teacherIds.includes(user.id)
+      user.role === UserRoleEnum.TEACHER && teacherIds.includes(user.id)
     );
   }
 }

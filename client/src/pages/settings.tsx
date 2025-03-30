@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRole, User } from "@shared/schema";
+import { UserRoleEnum, User } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -203,15 +203,15 @@ export default function SettingsPage() {
   };
   
   // Get role display name
-  const getRoleName = (role: UserRole) => {
+  const getRoleName = (role: UserRoleEnum) => {
     const roleNames = {
-      [UserRole.SUPER_ADMIN]: "Супер-администратор",
-      [UserRole.SCHOOL_ADMIN]: "Администратор школы",
-      [UserRole.TEACHER]: "Учитель",
-      [UserRole.STUDENT]: "Ученик",
-      [UserRole.PARENT]: "Родитель",
-      [UserRole.PRINCIPAL]: "Директор",
-      [UserRole.VICE_PRINCIPAL]: "Завуч"
+      [UserRoleEnum.SUPER_ADMIN]: "Супер-администратор",
+      [UserRoleEnum.SCHOOL_ADMIN]: "Администратор школы",
+      [UserRoleEnum.TEACHER]: "Учитель",
+      [UserRoleEnum.STUDENT]: "Ученик",
+      [UserRoleEnum.PARENT]: "Родитель",
+      [UserRoleEnum.PRINCIPAL]: "Директор",
+      [UserRoleEnum.VICE_PRINCIPAL]: "Завуч"
     };
     
     return roleNames[role] || role;

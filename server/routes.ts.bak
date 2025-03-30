@@ -36,7 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(schools);
   });
 
-  app.post("/api/schools", hasRole([UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
+  app.post("/api/schools", hasRole([UserRole.SUPER_ADMIN]), async (req, res) => {
     const school = await storage.createSchool(req.body);
     
     // Log the action
@@ -61,7 +61,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(school);
   });
 
-  app.put("/api/schools/:id", hasRole([UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
+  app.put("/api/schools/:id", hasRole([UserRole.SUPER_ADMIN]), async (req, res) => {
     const id = parseInt(req.params.id);
     const updatedSchool = await storage.updateSchool(id, req.body);
     
@@ -81,11 +81,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Users API
-  app.get("/api/users", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
-    if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
+  app.get("/api/users", hasRole([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), async (req, res) => {
+    if (req.user.role === UserRole.SUPER_ADMIN) {
       const users = await storage.getUsers();
       return res.json(users);
-    } else if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && req.user.schoolId) {
+    } else if (req.user.role === UserRole.SCHOOL_ADMIN && req.user.schoolId) {
       const users = await storage.getUsersBySchool(req.user.schoolId);
       return res.json(users);
     }
@@ -102,8 +102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Check permissions
-    if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
-        req.user.role === UserRoleEnum.SCHOOL_ADMIN && user.schoolId !== req.user.schoolId &&
+    if (req.user.role !== UserRole.SUPER_ADMIN && 
+        req.user.role === UserRole.SCHOOL_ADMIN && user.schoolId !== req.user.schoolId &&
         req.user.id !== id) {
       return res.status(403).json({ message: "Forbidden" });
     }
@@ -120,14 +120,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Check permissions
-    if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
-        !(req.user.role === UserRoleEnum.SCHOOL_ADMIN && user.schoolId === req.user.schoolId) &&
+    if (req.user.role !== UserRole.SUPER_ADMIN && 
+        !(req.user.role === UserRole.SCHOOL_ADMIN && user.schoolId === req.user.schoolId) &&
         req.user.id !== id) {
       return res.status(403).json({ message: "Forbidden" });
     }
     
     // Don't allow role changes unless super admin
-    if (req.body.role && req.body.role !== user.role && req.user.role !== UserRoleEnum.SUPER_ADMIN) {
+    if (req.body.role && req.body.role !== user.role && req.user.role !== UserRole.SUPER_ADMIN) {
       return res.status(403).json({ message: "Cannot change user role" });
     }
     
@@ -148,7 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/classes", isAuthenticated, async (req, res) => {
     let classes = [];
     
-    if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
+    if (req.user.role === UserRole.SUPER_ADMIN) {
       // Get all classes from all schools
       const schools = await storage.getSchools();
       for (const school of schools) {
@@ -158,10 +158,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (req.user.schoolId) {
       // Get classes for the user's school
       classes = await storage.getClasses(req.user.schoolId);
-    } else if (req.user.role === UserRoleEnum.STUDENT) {
+    } else if (req.user.role === UserRole.STUDENT) {
       // Get classes the student is enrolled in
       classes = await storage.getStudentClasses(req.user.id);
-    } else if (req.user.role === UserRoleEnum.TEACHER) {
+    } else if (req.user.role === UserRole.TEACHER) {
       // Get classes the teacher teaches (this is a simplification)
       const schedules = await storage.getSchedulesByTeacher(req.user.id);
       const classIds = [...new Set(schedules.map(s => s.classId))];
@@ -177,9 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(classes);
   });
 
-  app.post("/api/classes", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+  app.post("/api/classes", hasRole([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), async (req, res) => {
     // Validate school access
-    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && req.body.schoolId !== req.user.schoolId) {
+    if (req.user.role === UserRole.SCHOOL_ADMIN && req.body.schoolId !== req.user.schoolId) {
       return res.status(403).json({ message: "You can only create classes for your school" });
     }
     
@@ -200,7 +200,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/subjects", isAuthenticated, async (req, res) => {
     let subjects = [];
     
-    if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
+    if (req.user.role === UserRole.SUPER_ADMIN) {
       // Get all subjects from all schools
       const schools = await storage.getSchools();
       for (const school of schools) {
@@ -210,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (req.user.schoolId) {
       // Get subjects for the user's school
       subjects = await storage.getSubjects(req.user.schoolId);
-    } else if (req.user.role === UserRoleEnum.TEACHER) {
+    } else if (req.user.role === UserRole.TEACHER) {
       // Get subjects the teacher teaches
       subjects = await storage.getTeacherSubjects(req.user.id);
     }
@@ -218,9 +218,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(subjects);
   });
 
-  app.post("/api/subjects", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+  app.post("/api/subjects", hasRole([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), async (req, res) => {
     // Validate school access
-    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && req.body.schoolId !== req.user.schoolId) {
+    if (req.user.role === UserRole.SCHOOL_ADMIN && req.body.schoolId !== req.user.schoolId) {
       return res.status(403).json({ message: "You can only create subjects for your school" });
     }
     
@@ -247,9 +247,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (req.query.teacherId) {
       const teacherId = parseInt(req.query.teacherId as string);
       schedules = await storage.getSchedulesByTeacher(teacherId);
-    } else if (req.user.role === UserRoleEnum.TEACHER) {
+    } else if (req.user.role === UserRole.TEACHER) {
       schedules = await storage.getSchedulesByTeacher(req.user.id);
-    } else if (req.user.role === UserRoleEnum.STUDENT) {
+    } else if (req.user.role === UserRole.STUDENT) {
       // Get all classes for the student
       const classes = await storage.getStudentClasses(req.user.id);
       
@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(schedules);
   });
 
-  app.post("/api/schedules", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+  app.post("/api/schedules", hasRole([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), async (req, res) => {
     const schedule = await storage.createSchedule(req.body);
     
     // Log the action
@@ -284,16 +284,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
       homework = await storage.getHomeworkByClass(classId);
-    } else if (req.user.role === UserRoleEnum.TEACHER) {
+    } else if (req.user.role === UserRole.TEACHER) {
       homework = await storage.getHomeworkByTeacher(req.user.id);
-    } else if (req.user.role === UserRoleEnum.STUDENT) {
+    } else if (req.user.role === UserRole.STUDENT) {
       homework = await storage.getHomeworkByStudent(req.user.id);
     }
     
     res.json(homework);
   });
 
-  app.post("/api/homework", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+  app.post("/api/homework", hasRole([UserRole.TEACHER]), async (req, res) => {
     const homework = await storage.createHomework({
       ...req.body,
       teacherId: req.user.id
@@ -328,25 +328,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const homeworkId = parseInt(req.query.homeworkId as string);
       
       // For teachers, get all submissions for this homework
-      if (req.user.role === UserRoleEnum.TEACHER) {
+      if (req.user.role === UserRole.TEACHER) {
         const homework = await storage.getHomework(homeworkId);
         if (homework && homework.teacherId === req.user.id) {
           submissions = await storage.getHomeworkSubmissionsByHomework(homeworkId);
         }
       }
       // For students, get only their submissions
-      else if (req.user.role === UserRoleEnum.STUDENT) {
+      else if (req.user.role === UserRole.STUDENT) {
         submissions = await storage.getHomeworkSubmissionsByStudent(req.user.id);
         submissions = submissions.filter(s => s.homeworkId === homeworkId);
       }
-    } else if (req.user.role === UserRoleEnum.STUDENT) {
+    } else if (req.user.role === UserRole.STUDENT) {
       submissions = await storage.getHomeworkSubmissionsByStudent(req.user.id);
     }
     
     res.json(submissions);
   });
 
-  app.post("/api/homework-submissions", hasRole([UserRoleEnum.STUDENT]), async (req, res) => {
+  app.post("/api/homework-submissions", hasRole([UserRole.STUDENT]), async (req, res) => {
     const submission = await storage.createHomeworkSubmission({
       ...req.body,
       studentId: req.user.id
@@ -374,7 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(201).json(submission);
   });
 
-  app.post("/api/homework-submissions/:id/grade", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+  app.post("/api/homework-submissions/:id/grade", hasRole([UserRole.TEACHER]), async (req, res) => {
     const id = parseInt(req.params.id);
     const { grade, feedback } = req.body;
     
@@ -417,11 +417,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const studentId = parseInt(req.query.studentId as string);
       
       // Check permissions
-      if (req.user.role === UserRoleEnum.STUDENT && req.user.id !== studentId) {
+      if (req.user.role === UserRole.STUDENT && req.user.id !== studentId) {
         return res.status(403).json({ message: "You can only view your own grades" });
       }
       
-      if (req.user.role === UserRoleEnum.PARENT) {
+      if (req.user.role === UserRole.PARENT) {
         // Check if the student is a child of this parent
         const relationships = await storage.getParentStudents(req.user.id);
         const childIds = relationships.map(r => r.studentId);
@@ -436,19 +436,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const classId = parseInt(req.query.classId as string);
       
       // Teachers, school admins, principals, and vice principals can view class grades
-      if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+      if ([UserRole.TEACHER, UserRole.SCHOOL_ADMIN, UserRole.PRINCIPAL, UserRole.VICE_PRINCIPAL].includes(req.user.role)) {
         grades = await storage.getGradesByClass(classId);
       } else {
         return res.status(403).json({ message: "Forbidden" });
       }
-    } else if (req.user.role === UserRoleEnum.STUDENT) {
+    } else if (req.user.role === UserRole.STUDENT) {
       grades = await storage.getGradesByStudent(req.user.id);
     }
     
     res.json(grades);
   });
 
-  app.post("/api/grades", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+  app.post("/api/grades", hasRole([UserRole.TEACHER]), async (req, res) => {
     const grade = await storage.createGrade({
       ...req.body,
       teacherId: req.user.id
@@ -480,11 +480,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const studentId = parseInt(req.query.studentId as string);
       
       // Check permissions
-      if (req.user.role === UserRoleEnum.STUDENT && req.user.id !== studentId) {
+      if (req.user.role === UserRole.STUDENT && req.user.id !== studentId) {
         return res.status(403).json({ message: "You can only view your own attendance" });
       }
       
-      if (req.user.role === UserRoleEnum.PARENT) {
+      if (req.user.role === UserRole.PARENT) {
         // Check if the student is a child of this parent
         const relationships = await storage.getParentStudents(req.user.id);
         const childIds = relationships.map(r => r.studentId);
@@ -499,19 +499,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const classId = parseInt(req.query.classId as string);
       
       // Teachers, school admins, principals, and vice principals can view class attendance
-      if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+      if ([UserRole.TEACHER, UserRole.SCHOOL_ADMIN, UserRole.PRINCIPAL, UserRole.VICE_PRINCIPAL].includes(req.user.role)) {
         attendance = await storage.getAttendanceByClass(classId);
       } else {
         return res.status(403).json({ message: "Forbidden" });
       }
-    } else if (req.user.role === UserRoleEnum.STUDENT) {
+    } else if (req.user.role === UserRole.STUDENT) {
       attendance = await storage.getAttendanceByStudent(req.user.id);
     }
     
     res.json(attendance);
   });
 
-  app.post("/api/attendance", hasRole([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+  app.post("/api/attendance", hasRole([UserRole.TEACHER, UserRole.SCHOOL_ADMIN]), async (req, res) => {
     const attendance = await storage.createAttendance(req.body);
     
     if (attendance.status !== "present") {
@@ -656,7 +656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // System logs API (only for super admin)
-  app.get("/api/system-logs", hasRole([UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
+  app.get("/api/system-logs", hasRole([UserRole.SUPER_ADMIN]), async (req, res) => {
     const logs = await storage.getSystemLogs();
     
     // Sort by creation time (newest first)
@@ -668,7 +668,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Student-class relationships
-  app.post("/api/student-classes", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+  app.post("/api/student-classes", hasRole([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), async (req, res) => {
     const { studentId, classId } = req.body;
     
     // Validate input
@@ -680,7 +680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const student = await storage.getUser(studentId);
     const classObj = await storage.getClass(classId);
     
-    if (!student || student.role !== UserRoleEnum.STUDENT) {
+    if (!student || student.role !== UserRole.STUDENT) {
       return res.status(404).json({ message: "Student not found" });
     }
     
@@ -689,7 +689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // School admin can only add students to classes in their school
-    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && classObj.schoolId !== req.user.schoolId) {
+    if (req.user.role === UserRole.SCHOOL_ADMIN && classObj.schoolId !== req.user.schoolId) {
       return res.status(403).json({ message: "You can only add students to classes in your school" });
     }
     
@@ -707,7 +707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Teacher-subject relationships
-  app.post("/api/teacher-subjects", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+  app.post("/api/teacher-subjects", hasRole([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), async (req, res) => {
     const { teacherId, subjectId } = req.body;
     
     // Validate input
@@ -719,7 +719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const teacher = await storage.getUser(teacherId);
     const subject = await storage.getSubject(subjectId);
     
-    if (!teacher || teacher.role !== UserRoleEnum.TEACHER) {
+    if (!teacher || teacher.role !== UserRole.TEACHER) {
       return res.status(404).json({ message: "Teacher not found" });
     }
     
@@ -728,7 +728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // School admin can only assign teachers to subjects in their school
-    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && subject.schoolId !== req.user.schoolId) {
+    if (req.user.role === UserRole.SCHOOL_ADMIN && subject.schoolId !== req.user.schoolId) {
       return res.status(403).json({ message: "You can only assign teachers to subjects in your school" });
     }
     
@@ -746,7 +746,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Parent-student relationships
-  app.post("/api/parent-students", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+  app.post("/api/parent-students", hasRole([UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN]), async (req, res) => {
     const { parentId, studentId } = req.body;
     
     // Validate input
@@ -758,16 +758,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const parent = await storage.getUser(parentId);
     const student = await storage.getUser(studentId);
     
-    if (!parent || parent.role !== UserRoleEnum.PARENT) {
+    if (!parent || parent.role !== UserRole.PARENT) {
       return res.status(404).json({ message: "Parent not found" });
     }
     
-    if (!student || student.role !== UserRoleEnum.STUDENT) {
+    if (!student || student.role !== UserRole.STUDENT) {
       return res.status(404).json({ message: "Student not found" });
     }
     
     // School admin can only connect parents to students in their school
-    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && 
+    if (req.user.role === UserRole.SCHOOL_ADMIN && 
         (student.schoolId !== req.user.schoolId || parent.schoolId !== req.user.schoolId)) {
       return res.status(403).json({ message: "You can only connect parents to students in your school" });
     }

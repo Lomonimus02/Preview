@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
-import { UserRole } from "@shared/schema";
+import { UserRoleEnum } from "@shared/schema";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -29,13 +29,13 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   // Maps user roles to which menu items they can see
   const roleAccess = {
-    [UserRole.SUPER_ADMIN]: ["dashboard", "schools", "users", "analytics", "notifications", "settings", "support"],
-    [UserRole.SCHOOL_ADMIN]: ["dashboard", "users", "schedule", "homework", "grades", "analytics", "notifications", "settings", "support"],
-    [UserRole.TEACHER]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
-    [UserRole.STUDENT]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
-    [UserRole.PARENT]: ["dashboard", "grades", "messages", "documents", "support"],
-    [UserRole.PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"],
-    [UserRole.VICE_PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"]
+    [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "analytics", "notifications", "settings", "support"],
+    [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "schedule", "homework", "grades", "analytics", "notifications", "settings", "support"],
+    [UserRoleEnum.TEACHER]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
+    [UserRoleEnum.STUDENT]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
+    [UserRoleEnum.PARENT]: ["dashboard", "grades", "messages", "documents", "support"],
+    [UserRoleEnum.PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"],
+    [UserRoleEnum.VICE_PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"]
   };
 
   // Navigation items
@@ -55,7 +55,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
   ];
 
   // Filter nav items based on user role
-  const userRole = user?.role || UserRole.STUDENT;
+  const userRole = user?.role || UserRoleEnum.STUDENT;
   const allowedItems = navItems.filter(item => 
     roleAccess[userRole]?.includes(item.id)
   );
@@ -66,13 +66,13 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   // Role display names in Russian
   const roleNames = {
-    [UserRole.SUPER_ADMIN]: "Супер-админ",
-    [UserRole.SCHOOL_ADMIN]: "Администратор школы",
-    [UserRole.TEACHER]: "Учитель",
-    [UserRole.STUDENT]: "Ученик",
-    [UserRole.PARENT]: "Родитель",
-    [UserRole.PRINCIPAL]: "Директор",
-    [UserRole.VICE_PRINCIPAL]: "Завуч"
+    [UserRoleEnum.SUPER_ADMIN]: "Супер-админ",
+    [UserRoleEnum.SCHOOL_ADMIN]: "Администратор школы",
+    [UserRoleEnum.TEACHER]: "Учитель",
+    [UserRoleEnum.STUDENT]: "Ученик",
+    [UserRoleEnum.PARENT]: "Родитель",
+    [UserRoleEnum.PRINCIPAL]: "Директор",
+    [UserRoleEnum.VICE_PRINCIPAL]: "Завуч"
   };
 
   return (

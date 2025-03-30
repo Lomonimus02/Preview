@@ -5,7 +5,7 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User, UserRole } from "@shared/schema";
+import { User, UserRoleEnum } from "@shared/schema";
 
 // Use type augmentation for Express session
 declare module 'express-session' {
@@ -78,18 +78,18 @@ export function setupAuth(app: Express) {
         const newUserRole = req.body.role;
         
         // Validate permissions based on user roles
-        if (currentUser.role !== UserRole.SUPER_ADMIN && 
-            (newUserRole === UserRole.SUPER_ADMIN || 
-             newUserRole === UserRole.SCHOOL_ADMIN && currentUser.role !== UserRole.SCHOOL_ADMIN)) {
+        if (currentUser.role !== UserRoleEnum.SUPER_ADMIN && 
+            (newUserRole === UserRoleEnum.SUPER_ADMIN || 
+             newUserRole === UserRoleEnum.SCHOOL_ADMIN && currentUser.role !== UserRoleEnum.SCHOOL_ADMIN)) {
           return res.status(403).send("У вас нет прав для создания пользователя с данной ролью");
         }
         
         // School admin can only create users for their school
-        if (currentUser.role === UserRole.SCHOOL_ADMIN && 
+        if (currentUser.role === UserRoleEnum.SCHOOL_ADMIN && 
             req.body.schoolId !== currentUser.schoolId) {
           return res.status(403).send("Вы можете создавать пользователей только для своей школы");
         }
-      } else if (req.body.role !== UserRole.SUPER_ADMIN) {
+      } else if (req.body.role !== UserRoleEnum.SUPER_ADMIN) {
         // Only allow super admin registration when not authenticated
         return res.status(403).send("Необходима авторизация для регистрации");
       }

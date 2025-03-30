@@ -7,7 +7,7 @@ import {
   BuildingIcon,
   MoreHorizontalIcon
 } from "lucide-react";
-import { UserRole } from "@shared/schema";
+import { UserRoleEnum } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 
@@ -17,13 +17,13 @@ export function MobileNav() {
   
   // Maps user roles to which menu items they can see in the mobile nav
   const roleAccess = {
-    [UserRole.SUPER_ADMIN]: ["dashboard", "schools", "users", "analytics", "more"],
-    [UserRole.SCHOOL_ADMIN]: ["dashboard", "users", "schedule", "grades", "more"],
-    [UserRole.TEACHER]: ["dashboard", "schedule", "homework", "grades", "more"],
-    [UserRole.STUDENT]: ["dashboard", "schedule", "homework", "grades", "more"],
-    [UserRole.PARENT]: ["dashboard", "grades", "messages", "more"],
-    [UserRole.PRINCIPAL]: ["dashboard", "users", "grades", "analytics", "more"],
-    [UserRole.VICE_PRINCIPAL]: ["dashboard", "users", "grades", "analytics", "more"]
+    [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "analytics", "more"],
+    [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "schedule", "grades", "more"],
+    [UserRoleEnum.TEACHER]: ["dashboard", "schedule", "homework", "grades", "more"],
+    [UserRoleEnum.STUDENT]: ["dashboard", "schedule", "homework", "grades", "more"],
+    [UserRoleEnum.PARENT]: ["dashboard", "grades", "messages", "more"],
+    [UserRoleEnum.PRINCIPAL]: ["dashboard", "users", "grades", "analytics", "more"],
+    [UserRoleEnum.VICE_PRINCIPAL]: ["dashboard", "users", "grades", "analytics", "more"]
   };
 
   // Mobile navigation items (limited to 5 for the bottom bar)
@@ -37,7 +37,7 @@ export function MobileNav() {
   ];
 
   // Filter nav items based on user role (keep max 5 items for mobile)
-  const userRole = user?.role || UserRole.STUDENT;
+  const userRole = user?.role || UserRoleEnum.STUDENT;
   const allowedItems = navItems.filter(item => 
     roleAccess[userRole]?.includes(item.id)
   ).slice(0, 5);

@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, Mail, MessageSquare, Phone } from "lucide-react";
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
+import { SupportChat } from "@/components/support-chat";
 
 const faqs = [
   {
@@ -50,6 +51,7 @@ export default function SupportPage() {
 
   return (
     <MainLayout>
+      <SupportChat />
       <div className="container mx-auto py-10 px-4 md:px-6">
         <h1 className="text-4xl font-bold mb-8">Поддержка</h1>
         
@@ -90,6 +92,15 @@ export default function SupportPage() {
             <CardContent>
               <p>Онлайн-чат с поддержкой</p>
               <p className="text-sm text-muted-foreground mt-2">Доступен в рабочее время</p>
+              <Button 
+                onClick={() => {
+                  const chatButton = document.querySelector('[data-support-chat-button]') as HTMLButtonElement;
+                  if (chatButton) chatButton.click();
+                }} 
+                className="mt-3"
+              >
+                Начать чат
+              </Button>
             </CardContent>
           </Card>
         </div>
