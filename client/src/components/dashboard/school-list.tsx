@@ -1,18 +1,93 @@
 import { Button } from "@/components/ui/button";
 import { PlusIcon, PencilIcon } from "lucide-react";
-import { School } from "@shared/schema";
-import { useQuery } from "@tanstack/react-query";
+import { InsertSchool, School } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export function SchoolList() {
   const { data: schools = [], isLoading } = useQuery<School[]>({ 
     queryKey: ["/api/schools"] 
   });
+  
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [schoolData, setSchoolData] = useState<Partial<InsertSchool>>({
+    name: '',
+    address: '',
+    city: '',
+    status: 'setup'
+  });
+  const { toast } = useToast();
+  
+  const addSchoolMutation = useMutation({
+    mutationFn: async (newSchool: InsertSchool) => {
+      const res = await apiRequest("POST", "/api/schools", newSchool);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schools"] });
+      toast({
+        title: "Школа успешно добавлена",
+        description: "Новая школа была успешно добавлена в систему",
+        variant: "default",
+      });
+      setIsDialogOpen(false);
+      // Reset form
+      setSchoolData({
+        name: '',
+        address: '',
+        city: '',
+        status: 'setup'
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: `Не удалось добавить школу: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setSchoolData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!schoolData.name || !schoolData.address || !schoolData.city) {
+      toast({
+        title: "Ошибка",
+        description: "Пожалуйста, заполните все обязательные поля",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    addSchoolMutation.mutate(schoolData as InsertSchool);
+  };
 
   return (
     <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-4">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-heading font-semibold text-gray-800">Школы</h3>
-        <Button size="sm" className="flex items-center gap-1">
+        <Button 
+          size="sm" 
+          className="flex items-center gap-1"
+          onClick={() => setIsDialogOpen(true)}
+        >
           <PlusIcon className="h-4 w-4" />
           Добавить
         </Button>
@@ -74,9 +149,9 @@ export function SchoolList() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <a href="#" className="text-primary hover:text-primary-dark">
+                    <button onClick={() => {}} className="text-primary hover:text-primary-dark">
                       <PencilIcon className="h-4 w-4 inline" />
-                    </a>
+                    </button>
                   </td>
                 </tr>
               ))
@@ -84,6 +159,66 @@ export function SchoolList() {
           </tbody>
         </table>
       </div>
+      
+      {/* Dialog for adding a new school */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Добавить новую школу</DialogTitle>
+            <DialogDescription>
+              Введите информацию о новой школе. Все поля обязательны.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Название
+                </Label>
+                <Input
+                  id="name"
+                  name="name"
+                  className="col-span-3"
+                  value={schoolData.name}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="address" className="text-right">
+                  Адрес
+                </Label>
+                <Input
+                  id="address"
+                  name="address"
+                  className="col-span-3"
+                  value={schoolData.address}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="city" className="text-right">
+                  Город
+                </Label>
+                <Input
+                  id="city"
+                  name="city"
+                  className="col-span-3"
+                  value={schoolData.city}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={addSchoolMutation.isPending}>
+                {addSchoolMutation.isPending ? "Добавление..." : "Добавить школу"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
