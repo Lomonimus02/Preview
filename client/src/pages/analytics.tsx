@@ -601,22 +601,46 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button variant="outline" className="h-auto py-6 flex flex-col items-center justify-center">
+                <Button 
+                  variant="outline" 
+                  className="h-auto py-6 flex flex-col items-center justify-center"
+                  onClick={() => {
+                    window.open(`/api/reports/performance?classId=${selectedClassId}&period=${selectedPeriod}`, '_blank');
+                  }}
+                >
                   <BarChartIcon className="h-8 w-8 mb-2 text-primary" />
                   <span>Успеваемость</span>
                 </Button>
                 
-                <Button variant="outline" className="h-auto py-6 flex flex-col items-center justify-center">
+                <Button 
+                  variant="outline" 
+                  className="h-auto py-6 flex flex-col items-center justify-center"
+                  onClick={() => {
+                    window.open(`/api/reports/attendance?classId=${selectedClassId}&period=${selectedPeriod}`, '_blank');
+                  }}
+                >
                   <Calendar className="h-8 w-8 mb-2 text-primary" />
                   <span>Посещаемость</span>
                 </Button>
                 
-                <Button variant="outline" className="h-auto py-6 flex flex-col items-center justify-center">
+                <Button 
+                  variant="outline" 
+                  className="h-auto py-6 flex flex-col items-center justify-center"
+                  onClick={() => {
+                    window.open(`/api/reports/students?classId=${selectedClassId}`, '_blank');
+                  }}
+                >
                   <Users className="h-8 w-8 mb-2 text-primary" />
                   <span>Ученики</span>
                 </Button>
                 
-                <Button variant="outline" className="h-auto py-6 flex flex-col items-center justify-center">
+                <Button 
+                  variant="outline" 
+                  className="h-auto py-6 flex flex-col items-center justify-center"
+                  onClick={() => {
+                    window.open(`/api/reports/summary?classId=${selectedClassId}&period=${selectedPeriod}`, '_blank');
+                  }}
+                >
                   <PieChartIcon className="h-8 w-8 mb-2 text-primary" />
                   <span>Сводный отчет</span>
                 </Button>

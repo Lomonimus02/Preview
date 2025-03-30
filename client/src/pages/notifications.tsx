@@ -202,7 +202,19 @@ export default function NotificationsPage() {
                 }
               </Button>
             )}
-            <Button variant="outline">
+            <Button 
+              variant="outline"
+              onClick={() => {
+                window.location.href = '/settings';
+                // После загрузки страницы настроек активируем вкладку "Уведомления"
+                setTimeout(() => {
+                  const notificationsTab = document.querySelector('[data-value="notifications"]') as HTMLElement;
+                  if (notificationsTab) {
+                    notificationsTab.click();
+                  }
+                }, 500);
+              }}
+            >
               Настройки уведомлений
             </Button>
           </div>

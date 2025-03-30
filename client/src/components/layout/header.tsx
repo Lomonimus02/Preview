@@ -104,14 +104,18 @@ export function Header({ toggleSidebar }: HeaderProps) {
               <ChevronDownIcon className="h-4 w-4 text-gray-600 ml-1" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem className="cursor-pointer">
-                <span className="material-icons text-sm mr-2">person</span>
-                Профиль
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
-                <span className="material-icons text-sm mr-2">settings</span>
-                Настройки
-              </DropdownMenuItem>
+              <Link href="/settings">
+                <DropdownMenuItem className="cursor-pointer">
+                  <span className="material-icons text-sm mr-2">person</span>
+                  Профиль
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/settings">
+                <DropdownMenuItem className="cursor-pointer">
+                  <span className="material-icons text-sm mr-2">settings</span>
+                  Настройки
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="cursor-pointer" onClick={handleLogout}>
                 <span className="material-icons text-sm mr-2">logout</span>

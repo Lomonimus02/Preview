@@ -441,7 +441,14 @@ export default function SettingsPage() {
                     <p className="text-gray-500 text-sm mb-4">
                       Улучшите безопасность вашего аккаунта с помощью двухфакторной аутентификации
                     </p>
-                    <Button variant="outline">Настроить 2FA</Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        window.open('/api/auth/2fa/setup', '_blank');
+                      }}
+                    >
+                      Настроить 2FA
+                    </Button>
                   </div>
                   
                   <div>
@@ -449,7 +456,14 @@ export default function SettingsPage() {
                     <p className="text-gray-500 text-sm mb-4">
                       Просмотрите историю входов в вашу учетную запись
                     </p>
-                    <Button variant="outline">Показать историю</Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        window.open('/api/auth/login-history', '_blank');
+                      }}
+                    >
+                      Показать историю
+                    </Button>
                   </div>
                 </div>
               </CardContent>

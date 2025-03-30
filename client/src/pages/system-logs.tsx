@@ -63,7 +63,39 @@ export default function SystemLogs() {
       <div className="container mx-auto py-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Журнал системных действий</h1>
-          <Button variant="outline">
+          <Button 
+            variant="outline"
+            onClick={() => {
+              // Создаем CSV содержимое
+              let csvContent = "Дата и время,Пользователь ID,Действие,IP адрес,Детали\n";
+              
+              filteredLogs.forEach(log => {
+                const date = formatDate(log.createdAt);
+                const userId = log.userId;
+                const action = log.action?.replace(/,/g, ';');
+                const ip = log.ipAddress || '-';
+                const details = log.details?.replace(/,/g, ';') || '-';
+                
+                csvContent += `${date},${userId},${action},${ip},${details}\n`;
+              });
+              
+              // Создаем блоб и ссылку для скачивания
+              const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              
+              // Устанавливаем атрибуты ссылки
+              const fileName = `system-logs-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+              link.setAttribute('href', url);
+              link.setAttribute('download', fileName);
+              link.style.visibility = 'hidden';
+              
+              // Добавляем ссылку в DOM, кликаем по ней и удаляем
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+            }}
+          >
             <FileDown className="mr-2 h-4 w-4" />
             Экспорт
           </Button>
