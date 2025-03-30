@@ -13,7 +13,8 @@ import {
   GraduationCapIcon,
   NotebookPenIcon,
   MessagesSquareIcon,
-  FolderIcon
+  FolderIcon,
+  UserCogIcon
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -29,8 +30,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   // Maps user roles to which menu items they can see
   const roleAccess = {
-    [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "analytics", "messages", "notifications", "settings", "support"],
-    [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "schedule", "homework", "grades", "analytics", "messages", "notifications", "settings", "support"],
+    [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "user-roles", "analytics", "messages", "notifications", "settings", "support"],
+    [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "user-roles", "schedule", "homework", "grades", "analytics", "messages", "notifications", "settings", "support"],
     [UserRoleEnum.TEACHER]: ["dashboard", "schedule", "homework", "messages", "documents", "support"],
     [UserRoleEnum.STUDENT]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.PARENT]: ["dashboard", "grades", "messages", "documents", "support"],
@@ -43,6 +44,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     { id: "dashboard", label: "Главная", icon: <HomeIcon className="h-4 w-4 mr-3" />, href: "/" },
     { id: "schools", label: "Школы", icon: <BuildingIcon className="h-4 w-4 mr-3" />, href: "/schools" },
     { id: "users", label: "Пользователи", icon: <Users2Icon className="h-4 w-4 mr-3" />, href: "/users" },
+    { id: "user-roles", label: "Роли пользователей", icon: <UserCogIcon className="h-4 w-4 mr-3" />, href: "/user-roles" },
     { id: "schedule", label: "Расписание", icon: <CalendarIcon className="h-4 w-4 mr-3" />, href: "/schedule" },
     { id: "grades", label: "Оценки", icon: <GraduationCapIcon className="h-4 w-4 mr-3" />, href: "/grades" },
     { id: "homework", label: "Домашние задания", icon: <BookIcon className="h-4 w-4 mr-3" />, href: "/homework" },

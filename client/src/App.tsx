@@ -7,6 +7,7 @@ import AuthPage from "@/pages/auth-page";
 import Dashboard from "@/pages/dashboard";
 import Schools from "@/pages/schools";
 import Users from "@/pages/users";
+import UserRoles from "@/pages/user-roles";
 import SchedulePage from "@/pages/schedule";
 import Grades from "@/pages/grades";
 import Homework from "@/pages/homework";
@@ -27,6 +28,7 @@ function Router() {
       <ProtectedRoute path="/" component={Dashboard} />
       <ProtectedRoute path="/schools" component={Schools} />
       <ProtectedRoute path="/users" component={Users} />
+      <ProtectedRoute path="/user-roles" component={UserRoles} />
       <ProtectedRoute path="/schedule" component={SchedulePage} />
       <ProtectedRoute path="/grades" component={Grades} />
       <ProtectedRoute path="/homework" component={Homework} />
