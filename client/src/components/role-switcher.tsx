@@ -55,18 +55,26 @@ export function RoleSwitcher() {
       const res = await apiRequest("POST", "/api/switch-role", { role });
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (updatedUser) => {
       // Обновляем данные пользователя и роли после успешной смены
+      queryClient.setQueryData(["/api/user"], updatedUser);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-roles"] });
+      
+      // Инвалидируем все данные в кэше, чтобы они обновились с учетом новой роли
+      queryClient.invalidateQueries();
+      
       setOpen(false);
       toast({
         title: "Роль изменена",
-        description: "Ваша активная роль успешно изменена",
+        description: `Вы переключились на роль: ${getRoleName(updatedUser.activeRole)}`,
       });
       
       // Перезагружаем страницу, чтобы обновить данные для новой роли
-      window.location.reload();
+      // Используем небольшую задержку, чтобы изменения успели примениться
+      setTimeout(() => {
+        window.location.href = "/"; // Перенаправляем на главную страницу вместо простой перезагрузки
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
@@ -77,8 +85,14 @@ export function RoleSwitcher() {
     },
   });
   
-  // Находим текущую активную роль
-  const activeRole = userRoles.find(role => role.isActive) || userRoles[0];
+  // Получаем текущего пользователя и его активную роль
+  const { user } = useAuth();
+  
+  // Находим текущую активную роль на основе данных пользователя
+  // Ищем либо по значению activeRole из пользователя, либо берем роль с флагом isActive, либо первую роль
+  const activeRole = user?.activeRole 
+    ? userRoles.find(role => role.role === user.activeRole) 
+    : (userRoles.find(role => role.isActive) || userRoles[0]);
   
   // Если данные загружаются, показываем индикатор загрузки
   if (isLoading) {

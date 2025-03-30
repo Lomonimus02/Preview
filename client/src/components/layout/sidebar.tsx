@@ -57,8 +57,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
     { id: "support", label: "Поддержка", icon: <HelpCircleIcon className="h-4 w-4 mr-3" />, href: "/support" }
   ];
 
-  // Filter nav items based on user role
-  const userRole = user?.role || UserRoleEnum.STUDENT;
+  // Filter nav items based on user's active role (or default role if active not set)
+  const userRole = user?.activeRole || user?.role || UserRoleEnum.STUDENT;
   const allowedItems = navItems.filter(item => 
     roleAccess[userRole]?.includes(item.id)
   );

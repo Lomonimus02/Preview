@@ -10,7 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 
 // Расширяем тип User для поддержки activeRole
 type ExtendedUser = User & {
-  activeRole?: UserRoleEnum;
+  // Используем undefined вместо null для activeRole, чтобы избежать проблем с типами
+  activeRole?: UserRoleEnum; 
   schoolId?: number | null;
 };
 
