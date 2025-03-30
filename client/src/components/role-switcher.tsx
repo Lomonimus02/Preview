@@ -86,7 +86,8 @@ export function RoleSwitcher() {
   });
   
   // Получаем текущего пользователя и его активную роль
-  const { user } = useAuth();
+  import { useAuth } from "@/hooks/use-auth";
+const { user } = useAuth();
   
   // Находим текущую активную роль на основе данных пользователя
   // Ищем либо по значению activeRole из пользователя, либо берем роль с флагом isActive, либо первую роль
