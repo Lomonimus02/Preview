@@ -5,6 +5,10 @@ import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
+import { dbStorage } from "./db-storage";
+
+// Выбираем хранилище для использования (БД или in-memory)
+const dataStorage = process.env.USE_DATABASE === "true" ? dbStorage : storage;
 import { User, UserRoleEnum } from "@shared/schema";
 
 // Use type augmentation for Express session
@@ -42,7 +46,7 @@ export function setupAuth(app: Express) {
     secret: process.env.SESSION_SECRET || "school-management-secret",
     resave: false,
     saveUninitialized: false,
-    store: storage.sessionStore,
+    store: dataStorage.sessionStore,
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     }
@@ -55,7 +59,7 @@ export function setupAuth(app: Express) {
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
-      const user = await storage.getUserByUsername(username);
+      const user = await dataStorage.getUserByUsername(username);
       if (!user || !(await comparePasswords(password, user.password))) {
         return done(null, false);
       } else {
@@ -66,7 +70,7 @@ export function setupAuth(app: Express) {
 
   passport.serializeUser((user: any, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
-    const user = await storage.getUser(id);
+    const user = await dataStorage.getUser(id);
     done(null, user);
   });
 
@@ -95,14 +99,14 @@ export function setupAuth(app: Express) {
       }
       
       // Check if username already exists
-      const existingUser = await storage.getUserByUsername(req.body.username);
+      const existingUser = await dataStorage.getUserByUsername(req.body.username);
       if (existingUser) {
         return res.status(400).send("Пользователь с таким логином уже существует");
       }
 
       // Create the user
       const hashedPassword = await hashPassword(req.body.password);
-      const user = await storage.createUser({
+      const user = await dataStorage.createUser({
         ...req.body,
         password: hashedPassword,
       });
@@ -110,7 +114,7 @@ export function setupAuth(app: Express) {
       // Log the new user creation
       if (req.isAuthenticated()) {
         const currentUser = req.user as User;
-        await storage.createSystemLog({
+        await dataStorage.createSystemLog({
           userId: currentUser.id,
           action: "user_created",
           details: `Created user ${user.username} with role ${user.role}`,
@@ -135,7 +139,7 @@ export function setupAuth(app: Express) {
   app.post("/api/login", passport.authenticate("local"), async (req, res) => {
     // Log the login
     const user = req.user as User;
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: user.id,
       action: "user_login",
       details: `User ${user.username} logged in`,
@@ -150,7 +154,7 @@ export function setupAuth(app: Express) {
       const user = req.user as User;
       
       // Log the logout
-      await storage.createSystemLog({
+      await dataStorage.createSystemLog({
         userId: user.id,
         action: "user_logout",
         details: `User ${user.username} logged out`,

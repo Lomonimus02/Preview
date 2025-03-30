@@ -1,6 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { dbStorage } from "./db-storage";
+
+// Выбираем хранилище для использования (БД или in-memory)
+const dataStorage = process.env.USE_DATABASE === "true" ? dbStorage : storage;
 import { setupAuth } from "./auth";
 import { z } from "zod";
 import { UserRoleEnum } from "@shared/schema";
@@ -32,15 +36,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Schools API
   app.get("/api/schools", isAuthenticated, async (req, res) => {
-    const schools = await storage.getSchools();
+    const schools = await dataStorage.getSchools();
     res.json(schools);
   });
 
   app.post("/api/schools", hasRole([UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
-    const school = await storage.createSchool(req.body);
+    const school = await dataStorage.createSchool(req.body);
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "school_created",
       details: `Created school: ${school.name}`,
@@ -52,7 +56,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/schools/:id", isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
-    const school = await storage.getSchool(id);
+    const school = await dataStorage.getSchool(id);
     
     if (!school) {
       return res.status(404).json({ message: "School not found" });
@@ -63,14 +67,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/schools/:id", hasRole([UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
     const id = parseInt(req.params.id);
-    const updatedSchool = await storage.updateSchool(id, req.body);
+    const updatedSchool = await dataStorage.updateSchool(id, req.body);
     
     if (!updatedSchool) {
       return res.status(404).json({ message: "School not found" });
     }
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "school_updated",
       details: `Updated school: ${updatedSchool.name}`,
@@ -83,10 +87,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Users API
   app.get("/api/users", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
     if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
-      const users = await storage.getUsers();
+      const users = await dataStorage.getUsers();
       return res.json(users);
     } else if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && req.user.schoolId) {
-      const users = await storage.getUsersBySchool(req.user.schoolId);
+      const users = await dataStorage.getUsersBySchool(req.user.schoolId);
       return res.json(users);
     }
     
@@ -95,7 +99,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/users/:id", isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
-    const user = await storage.getUser(id);
+    const user = await dataStorage.getUser(id);
     
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -113,7 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/users/:id", isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
-    const user = await storage.getUser(id);
+    const user = await dataStorage.getUser(id);
     
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -131,10 +135,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Cannot change user role" });
     }
     
-    const updatedUser = await storage.updateUser(id, req.body);
+    const updatedUser = await dataStorage.updateUser(id, req.body);
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "user_updated",
       details: `Updated user: ${updatedUser?.username}`,
@@ -150,24 +154,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
       // Get all classes from all schools
-      const schools = await storage.getSchools();
+      const schools = await dataStorage.getSchools();
       for (const school of schools) {
-        const schoolClasses = await storage.getClasses(school.id);
+        const schoolClasses = await dataStorage.getClasses(school.id);
         classes.push(...schoolClasses);
       }
     } else if (req.user.schoolId) {
       // Get classes for the user's school
-      classes = await storage.getClasses(req.user.schoolId);
+      classes = await dataStorage.getClasses(req.user.schoolId);
     } else if (req.user.role === UserRoleEnum.STUDENT) {
       // Get classes the student is enrolled in
-      classes = await storage.getStudentClasses(req.user.id);
+      classes = await dataStorage.getStudentClasses(req.user.id);
     } else if (req.user.role === UserRoleEnum.TEACHER) {
       // Get classes the teacher teaches (this is a simplification)
-      const schedules = await storage.getSchedulesByTeacher(req.user.id);
+      const schedules = await dataStorage.getSchedulesByTeacher(req.user.id);
       const classIds = [...new Set(schedules.map(s => s.classId))];
       
       for (const classId of classIds) {
-        const classObj = await storage.getClass(classId);
+        const classObj = await dataStorage.getClass(classId);
         if (classObj) {
           classes.push(classObj);
         }
@@ -183,10 +187,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "You can only create classes for your school" });
     }
     
-    const newClass = await storage.createClass(req.body);
+    const newClass = await dataStorage.createClass(req.body);
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "class_created",
       details: `Created class: ${newClass.name}`,
@@ -202,17 +206,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
       // Get all subjects from all schools
-      const schools = await storage.getSchools();
+      const schools = await dataStorage.getSchools();
       for (const school of schools) {
-        const schoolSubjects = await storage.getSubjects(school.id);
+        const schoolSubjects = await dataStorage.getSubjects(school.id);
         subjects.push(...schoolSubjects);
       }
     } else if (req.user.schoolId) {
       // Get subjects for the user's school
-      subjects = await storage.getSubjects(req.user.schoolId);
+      subjects = await dataStorage.getSubjects(req.user.schoolId);
     } else if (req.user.role === UserRoleEnum.TEACHER) {
       // Get subjects the teacher teaches
-      subjects = await storage.getTeacherSubjects(req.user.id);
+      subjects = await dataStorage.getTeacherSubjects(req.user.id);
     }
     
     res.json(subjects);
@@ -224,10 +228,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "You can only create subjects for your school" });
     }
     
-    const subject = await storage.createSubject(req.body);
+    const subject = await dataStorage.createSubject(req.body);
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "subject_created",
       details: `Created subject: ${subject.name}`,
@@ -243,19 +247,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
-      schedules = await storage.getSchedulesByClass(classId);
+      schedules = await dataStorage.getSchedulesByClass(classId);
     } else if (req.query.teacherId) {
       const teacherId = parseInt(req.query.teacherId as string);
-      schedules = await storage.getSchedulesByTeacher(teacherId);
+      schedules = await dataStorage.getSchedulesByTeacher(teacherId);
     } else if (req.user.role === UserRoleEnum.TEACHER) {
-      schedules = await storage.getSchedulesByTeacher(req.user.id);
+      schedules = await dataStorage.getSchedulesByTeacher(req.user.id);
     } else if (req.user.role === UserRoleEnum.STUDENT) {
       // Get all classes for the student
-      const classes = await storage.getStudentClasses(req.user.id);
+      const classes = await dataStorage.getStudentClasses(req.user.id);
       
       // Get schedules for each class
       for (const cls of classes) {
-        const classSchedules = await storage.getSchedulesByClass(cls.id);
+        const classSchedules = await dataStorage.getSchedulesByClass(cls.id);
         schedules.push(...classSchedules);
       }
     }
@@ -264,10 +268,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/schedules", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
-    const schedule = await storage.createSchedule(req.body);
+    const schedule = await dataStorage.createSchedule(req.body);
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "schedule_created",
       details: `Created schedule entry`,
@@ -283,26 +287,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
-      homework = await storage.getHomeworkByClass(classId);
+      homework = await dataStorage.getHomeworkByClass(classId);
     } else if (req.user.role === UserRoleEnum.TEACHER) {
-      homework = await storage.getHomeworkByTeacher(req.user.id);
+      homework = await dataStorage.getHomeworkByTeacher(req.user.id);
     } else if (req.user.role === UserRoleEnum.STUDENT) {
-      homework = await storage.getHomeworkByStudent(req.user.id);
+      homework = await dataStorage.getHomeworkByStudent(req.user.id);
     }
     
     res.json(homework);
   });
 
   app.post("/api/homework", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
-    const homework = await storage.createHomework({
+    const homework = await dataStorage.createHomework({
       ...req.body,
       teacherId: req.user.id
     });
     
     // Create notifications for all students in the class
-    const students = await storage.getClassStudents(homework.classId);
+    const students = await dataStorage.getClassStudents(homework.classId);
     for (const student of students) {
-      await storage.createNotification({
+      await dataStorage.createNotification({
         userId: student.id,
         title: "Новое домашнее задание",
         content: `По предмету добавлено новое задание: ${homework.title}`
@@ -310,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "homework_created",
       details: `Created homework: ${homework.title}`,
@@ -329,34 +333,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // For teachers, get all submissions for this homework
       if (req.user.role === UserRoleEnum.TEACHER) {
-        const homework = await storage.getHomework(homeworkId);
+        const homework = await dataStorage.getHomework(homeworkId);
         if (homework && homework.teacherId === req.user.id) {
-          submissions = await storage.getHomeworkSubmissionsByHomework(homeworkId);
+          submissions = await dataStorage.getHomeworkSubmissionsByHomework(homeworkId);
         }
       }
       // For students, get only their submissions
       else if (req.user.role === UserRoleEnum.STUDENT) {
-        submissions = await storage.getHomeworkSubmissionsByStudent(req.user.id);
+        submissions = await dataStorage.getHomeworkSubmissionsByStudent(req.user.id);
         submissions = submissions.filter(s => s.homeworkId === homeworkId);
       }
     } else if (req.user.role === UserRoleEnum.STUDENT) {
-      submissions = await storage.getHomeworkSubmissionsByStudent(req.user.id);
+      submissions = await dataStorage.getHomeworkSubmissionsByStudent(req.user.id);
     }
     
     res.json(submissions);
   });
 
   app.post("/api/homework-submissions", hasRole([UserRoleEnum.STUDENT]), async (req, res) => {
-    const submission = await storage.createHomeworkSubmission({
+    const submission = await dataStorage.createHomeworkSubmission({
       ...req.body,
       studentId: req.user.id
     });
     
     // Get the homework details
-    const homework = await storage.getHomework(submission.homeworkId);
+    const homework = await dataStorage.getHomework(submission.homeworkId);
     if (homework) {
       // Notify the teacher
-      await storage.createNotification({
+      await dataStorage.createNotification({
         userId: homework.teacherId,
         title: "Новая сдача домашнего задания",
         content: `Ученик сдал задание: ${homework.title}`
@@ -364,7 +368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "homework_submitted",
       details: `Submitted homework`,
@@ -379,27 +383,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { grade, feedback } = req.body;
     
     // Validate the submission belongs to a homework assigned by this teacher
-    const submission = await storage.getHomeworkSubmission(id);
+    const submission = await dataStorage.getHomeworkSubmission(id);
     if (!submission) {
       return res.status(404).json({ message: "Submission not found" });
     }
     
-    const homework = await storage.getHomework(submission.homeworkId);
+    const homework = await dataStorage.getHomework(submission.homeworkId);
     if (!homework || homework.teacherId !== req.user.id) {
       return res.status(403).json({ message: "You can only grade submissions for your assignments" });
     }
     
-    const gradedSubmission = await storage.gradeHomeworkSubmission(id, grade, feedback);
+    const gradedSubmission = await dataStorage.gradeHomeworkSubmission(id, grade, feedback);
     
     // Notify the student
-    await storage.createNotification({
+    await dataStorage.createNotification({
       userId: submission.studentId,
       title: "Домашнее задание оценено",
       content: `Ваше задание "${homework.title}" оценено на ${grade}`
     });
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "homework_graded",
       details: `Graded homework submission with ${grade}`,
@@ -423,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (req.user.role === UserRoleEnum.PARENT) {
         // Check if the student is a child of this parent
-        const relationships = await storage.getParentStudents(req.user.id);
+        const relationships = await dataStorage.getParentStudents(req.user.id);
         const childIds = relationships.map(r => r.studentId);
         
         if (!childIds.includes(studentId)) {
@@ -431,38 +435,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      grades = await storage.getGradesByStudent(studentId);
+      grades = await dataStorage.getGradesByStudent(studentId);
     } else if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
       
       // Teachers, school admins, principals, and vice principals can view class grades
       if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
-        grades = await storage.getGradesByClass(classId);
+        grades = await dataStorage.getGradesByClass(classId);
       } else {
         return res.status(403).json({ message: "Forbidden" });
       }
     } else if (req.user.role === UserRoleEnum.STUDENT) {
-      grades = await storage.getGradesByStudent(req.user.id);
+      grades = await dataStorage.getGradesByStudent(req.user.id);
     }
     
     res.json(grades);
   });
 
   app.post("/api/grades", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
-    const grade = await storage.createGrade({
+    const grade = await dataStorage.createGrade({
       ...req.body,
       teacherId: req.user.id
     });
     
     // Notify the student
-    await storage.createNotification({
+    await dataStorage.createNotification({
       userId: grade.studentId,
       title: "Новая оценка",
       content: `У вас новая оценка: ${grade.grade} (${grade.gradeType})`
     });
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "grade_created",
       details: `Created grade ${grade.grade} for student ${grade.studentId}`,
@@ -486,7 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (req.user.role === UserRoleEnum.PARENT) {
         // Check if the student is a child of this parent
-        const relationships = await storage.getParentStudents(req.user.id);
+        const relationships = await dataStorage.getParentStudents(req.user.id);
         const childIds = relationships.map(r => r.studentId);
         
         if (!childIds.includes(studentId)) {
@@ -494,36 +498,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      attendance = await storage.getAttendanceByStudent(studentId);
+      attendance = await dataStorage.getAttendanceByStudent(studentId);
     } else if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
       
       // Teachers, school admins, principals, and vice principals can view class attendance
       if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
-        attendance = await storage.getAttendanceByClass(classId);
+        attendance = await dataStorage.getAttendanceByClass(classId);
       } else {
         return res.status(403).json({ message: "Forbidden" });
       }
     } else if (req.user.role === UserRoleEnum.STUDENT) {
-      attendance = await storage.getAttendanceByStudent(req.user.id);
+      attendance = await dataStorage.getAttendanceByStudent(req.user.id);
     }
     
     res.json(attendance);
   });
 
   app.post("/api/attendance", hasRole([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
-    const attendance = await storage.createAttendance(req.body);
+    const attendance = await dataStorage.createAttendance(req.body);
     
     if (attendance.status !== "present") {
       // If student is absent or late, notify parents
-      const student = await storage.getUser(attendance.studentId);
+      const student = await dataStorage.getUser(attendance.studentId);
       if (student) {
-        const relationships = await storage.getStudentParents(student.id);
+        const relationships = await dataStorage.getStudentParents(student.id);
         
         for (const relationship of relationships) {
-          const parent = await storage.getUser(relationship.parentId);
+          const parent = await dataStorage.getUser(relationship.parentId);
           if (parent) {
-            await storage.createNotification({
+            await dataStorage.createNotification({
               userId: parent.id,
               title: "Отсутствие на уроке",
               content: `Ваш ребенок отмечен как "${attendance.status}" на уроке`
@@ -534,7 +538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "attendance_created",
       details: `Recorded attendance for student ${attendance.studentId}: ${attendance.status}`,
@@ -550,26 +554,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     if (req.query.schoolId) {
       const schoolId = parseInt(req.query.schoolId as string);
-      documents = await storage.getDocumentsBySchool(schoolId);
+      documents = await dataStorage.getDocumentsBySchool(schoolId);
     } else if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
-      documents = await storage.getDocumentsByClass(classId);
+      documents = await dataStorage.getDocumentsByClass(classId);
     } else if (req.query.subjectId) {
       const subjectId = parseInt(req.query.subjectId as string);
-      documents = await storage.getDocumentsBySubject(subjectId);
+      documents = await dataStorage.getDocumentsBySubject(subjectId);
     }
     
     res.json(documents);
   });
 
   app.post("/api/documents", isAuthenticated, async (req, res) => {
-    const document = await storage.createDocument({
+    const document = await dataStorage.createDocument({
       ...req.body,
       uploaderId: req.user.id
     });
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "document_uploaded",
       details: `Uploaded document: ${document.title}`,
@@ -582,8 +586,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Messages API
   app.get("/api/messages", isAuthenticated, async (req, res) => {
     // Get both sent and received messages
-    const sent = await storage.getMessagesBySender(req.user.id);
-    const received = await storage.getMessagesByReceiver(req.user.id);
+    const sent = await dataStorage.getMessagesBySender(req.user.id);
+    const received = await dataStorage.getMessagesByReceiver(req.user.id);
     
     // Combine and sort by sent time (newest first)
     const messages = [...sent, ...received].sort((a, b) => 
@@ -594,13 +598,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/messages", isAuthenticated, async (req, res) => {
-    const message = await storage.createMessage({
+    const message = await dataStorage.createMessage({
       ...req.body,
       senderId: req.user.id
     });
     
     // Create notification for the receiver
-    await storage.createNotification({
+    await dataStorage.createNotification({
       userId: message.receiverId,
       title: "Новое сообщение",
       content: "У вас новое сообщение"
@@ -611,7 +615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/messages/:id/read", isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
-    const message = await storage.getMessage(id);
+    const message = await dataStorage.getMessage(id);
     
     if (!message) {
       return res.status(404).json({ message: "Message not found" });
@@ -622,13 +626,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "You can only mark your own messages as read" });
     }
     
-    const updatedMessage = await storage.markMessageAsRead(id);
+    const updatedMessage = await dataStorage.markMessageAsRead(id);
     res.json(updatedMessage);
   });
 
   // Notifications API
   app.get("/api/notifications", isAuthenticated, async (req, res) => {
-    const notifications = await storage.getNotificationsByUser(req.user.id);
+    const notifications = await dataStorage.getNotificationsByUser(req.user.id);
     
     // Sort by creation time (newest first)
     notifications.sort((a, b) => 
@@ -640,7 +644,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/notifications/:id/read", isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
-    const notification = await storage.getNotification(id);
+    const notification = await dataStorage.getNotification(id);
     
     if (!notification) {
       return res.status(404).json({ message: "Notification not found" });
@@ -651,13 +655,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "You can only mark your own notifications as read" });
     }
     
-    const updatedNotification = await storage.markNotificationAsRead(id);
+    const updatedNotification = await dataStorage.markNotificationAsRead(id);
     res.json(updatedNotification);
   });
 
   // System logs API (only for super admin)
   app.get("/api/system-logs", hasRole([UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
-    const logs = await storage.getSystemLogs();
+    const logs = await dataStorage.getSystemLogs();
     
     // Sort by creation time (newest first)
     logs.sort((a, b) => 
@@ -677,8 +681,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Check if student and class exist
-    const student = await storage.getUser(studentId);
-    const classObj = await storage.getClass(classId);
+    const student = await dataStorage.getUser(studentId);
+    const classObj = await dataStorage.getClass(classId);
     
     if (!student || student.role !== UserRoleEnum.STUDENT) {
       return res.status(404).json({ message: "Student not found" });
@@ -693,10 +697,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "You can only add students to classes in your school" });
     }
     
-    await storage.addStudentToClass(studentId, classId);
+    await dataStorage.addStudentToClass(studentId, classId);
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "student_added_to_class",
       details: `Added student ${studentId} to class ${classId}`,
@@ -716,8 +720,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Check if teacher and subject exist
-    const teacher = await storage.getUser(teacherId);
-    const subject = await storage.getSubject(subjectId);
+    const teacher = await dataStorage.getUser(teacherId);
+    const subject = await dataStorage.getSubject(subjectId);
     
     if (!teacher || teacher.role !== UserRoleEnum.TEACHER) {
       return res.status(404).json({ message: "Teacher not found" });
@@ -732,10 +736,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "You can only assign teachers to subjects in your school" });
     }
     
-    await storage.assignTeacherToSubject(teacherId, subjectId);
+    await dataStorage.assignTeacherToSubject(teacherId, subjectId);
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "teacher_assigned_to_subject",
       details: `Assigned teacher ${teacherId} to subject ${subjectId}`,
@@ -755,8 +759,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Check if parent and student exist
-    const parent = await storage.getUser(parentId);
-    const student = await storage.getUser(studentId);
+    const parent = await dataStorage.getUser(parentId);
+    const student = await dataStorage.getUser(studentId);
     
     if (!parent || parent.role !== UserRoleEnum.PARENT) {
       return res.status(404).json({ message: "Parent not found" });
@@ -772,10 +776,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "You can only connect parents to students in your school" });
     }
     
-    const relationship = await storage.addParentStudent({ parentId, studentId });
+    const relationship = await dataStorage.addParentStudent({ parentId, studentId });
     
     // Log the action
-    await storage.createSystemLog({
+    await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "parent_connected_to_student",
       details: `Connected parent ${parentId} to student ${studentId}`,

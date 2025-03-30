@@ -1,6 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { testConnection } from "./db";
+import { runMigrations } from "../drizzle/migrations";
+import dotenv from "dotenv";
+
+// Загружаем переменные окружения
+dotenv.config();
 
 const app = express();
 app.use(express.json());
@@ -37,6 +43,18 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  try {
+    // Проверяем подключение к базе данных и запускаем миграции
+    console.log('Testing database connection and running migrations...');
+    await testConnection();
+    await runMigrations();
+    console.log('Database setup complete.');
+  } catch (error) {
+    console.error('Database setup error:', error);
+    // При ошибке продолжаем работу приложения с in-memory хранилищем
+    console.log('Falling back to in-memory storage');
+  }
+  
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
