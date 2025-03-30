@@ -21,6 +21,14 @@ export const testConnection = async (): Promise<boolean> => {
   try {
     const result = await testClient`SELECT 1 as test`;
     console.log('Database connection successful');
+    
+    // Проверяем существование необходимых таблиц
+    await queryClient`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'users'
+      )`;
+    
     return result[0].test === 1;
   } catch (error) {
     console.error('Failed to connect to the database:', error);

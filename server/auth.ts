@@ -93,9 +93,15 @@ export function setupAuth(app: Express) {
             req.body.schoolId !== currentUser.schoolId) {
           return res.status(403).send("Вы можете создавать пользователей только для своей школы");
         }
-      } else if (req.body.role !== UserRoleEnum.SUPER_ADMIN) {
-        // Only allow super admin registration when not authenticated
-        return res.status(403).send("Необходима авторизация для регистрации");
+      } else {
+        // Check if there are any users in the system
+        const usersCount = await dataStorage.getUsersCount();
+        if (usersCount > 0 && req.body.role === UserRoleEnum.SUPER_ADMIN) {
+          return res.status(403).send("Супер-администратор уже существует");
+        }
+        if (usersCount > 0 && req.body.role !== UserRoleEnum.SUPER_ADMIN) {
+          return res.status(403).send("Необходима авторизация для регистрации");
+        }
       }
       
       // Check if username already exists
