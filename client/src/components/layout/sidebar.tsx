@@ -29,8 +29,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   // Maps user roles to which menu items they can see
   const roleAccess = {
-    [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "analytics", "notifications", "settings", "support"],
-    [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "schedule", "homework", "grades", "analytics", "notifications", "settings", "support"],
+    [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "analytics", "messages", "notifications", "settings", "support"],
+    [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "schedule", "homework", "grades", "analytics", "messages", "notifications", "settings", "support"],
     [UserRoleEnum.TEACHER]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.STUDENT]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.PARENT]: ["dashboard", "grades", "messages", "documents", "support"],
