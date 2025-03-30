@@ -7,7 +7,7 @@ import { TeacherSchedule } from "@/components/dashboard/teacher-schedule";
 import { StudentSchedule } from "@/components/dashboard/student-schedule";
 import { HomeworkList } from "@/components/dashboard/homework-list";
 import { AdminClassList } from "@/components/dashboard/admin-class-list";
-import { UserRole } from "@shared/schema";
+import { UserRoleEnum } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { 
   School, 
@@ -25,13 +25,13 @@ export default function Dashboard() {
   // Get user counts by role for admin dashboard
   const { data: users = [] } = useQuery({
     queryKey: ["/api/users"],
-    enabled: !!user && (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN)
+    enabled: !!user && (user.role === UserRoleEnum.SUPER_ADMIN || user.role === UserRoleEnum.SCHOOL_ADMIN)
   });
   
   // Get number of schools for super admin
   const { data: schools = [] } = useQuery({
     queryKey: ["/api/schools"],
-    enabled: !!user && user.role === UserRole.SUPER_ADMIN
+    enabled: !!user && user.role === UserRoleEnum.SUPER_ADMIN
   });
   
   // Get notifications count
@@ -43,7 +43,7 @@ export default function Dashboard() {
   // Get homework count
   const { data: homework = [] } = useQuery({
     queryKey: ["/api/homework"],
-    enabled: !!user && (user.role === UserRole.TEACHER || user.role === UserRole.STUDENT)
+    enabled: !!user && (user.role === UserRoleEnum.TEACHER || user.role === UserRoleEnum.STUDENT)
   });
   
   // Stats based on user role
@@ -51,29 +51,29 @@ export default function Dashboard() {
     if (!user) return [];
     
     switch (user.role) {
-      case UserRole.SUPER_ADMIN:
+      case UserRoleEnum.SUPER_ADMIN:
         return [
           { title: "Школы", value: schools.length, icon: School },
           { title: "Пользователи", value: users.length, icon: Users },
           { title: "Уведомления", value: notifications.length, icon: Bell },
           { title: "Система", value: "Стабильна", icon: BarChart3 },
         ];
-      case UserRole.SCHOOL_ADMIN:
-        const students = users.filter(u => u.role === UserRole.STUDENT).length;
-        const teachers = users.filter(u => u.role === UserRole.TEACHER).length;
+      case UserRoleEnum.SCHOOL_ADMIN:
+        const students = users.filter(u => u.role === UserRoleEnum.STUDENT).length;
+        const teachers = users.filter(u => u.role === UserRoleEnum.TEACHER).length;
         return [
           { title: "Ученики", value: students, icon: GraduationCap },
           { title: "Учителя", value: teachers, icon: Users },
           { title: "Уведомления", value: notifications.length, icon: Bell },
           { title: "Задания", value: homework.length, icon: BookOpen },
         ];
-      case UserRole.TEACHER:
+      case UserRoleEnum.TEACHER:
         return [
           { title: "Заданий", value: homework.length, icon: BookOpen },
           { title: "Уведомления", value: notifications.length, icon: Bell },
         ];
-      case UserRole.STUDENT:
-      case UserRole.PARENT:
+      case UserRoleEnum.STUDENT:
+      case UserRoleEnum.PARENT:
         return [
           { title: "Задания", value: homework.length, icon: BookOpen },
           { title: "Уведомления", value: notifications.length, icon: Bell },
@@ -90,7 +90,7 @@ export default function Dashboard() {
     if (!user) return null;
     
     switch (user.role) {
-      case UserRole.SUPER_ADMIN:
+      case UserRoleEnum.SUPER_ADMIN:
         return (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <SchoolList />
@@ -100,7 +100,7 @@ export default function Dashboard() {
             </div>
           </div>
         );
-      case UserRole.SCHOOL_ADMIN:
+      case UserRoleEnum.SCHOOL_ADMIN:
         return (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <AdminClassList />
@@ -109,23 +109,23 @@ export default function Dashboard() {
             </div>
           </div>
         );
-      case UserRole.TEACHER:
+      case UserRoleEnum.TEACHER:
         return (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <TeacherSchedule />
             <HomeworkList />
           </div>
         );
-      case UserRole.STUDENT:
+      case UserRoleEnum.STUDENT:
         return (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <StudentSchedule />
             <HomeworkList />
           </div>
         );
-      case UserRole.PARENT:
-      case UserRole.PRINCIPAL:
-      case UserRole.VICE_PRINCIPAL:
+      case UserRoleEnum.PARENT:
+      case UserRoleEnum.PRINCIPAL:
+      case UserRoleEnum.VICE_PRINCIPAL:
         return (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-4">

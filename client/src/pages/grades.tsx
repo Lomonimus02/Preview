@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRole, Grade, insertGradeSchema, Class, Subject, User } from "@shared/schema";
+import { UserRoleEnum, Grade, insertGradeSchema, Class, Subject, User } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -74,11 +74,11 @@ export default function Grades() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   
   // Determine if the user can add grades (only teachers can)
-  const canAddGrades = user?.role === UserRole.TEACHER;
+  const canAddGrades = user?.role === UserRoleEnum.TEACHER;
   
   // For students and parents, we only show their own grades or their children's grades
   let apiParams = "";
-  if (user?.role === UserRole.STUDENT) {
+  if (user?.role === UserRoleEnum.STUDENT) {
     apiParams = `?studentId=${user.id}`;
   }
   
@@ -105,7 +105,7 @@ export default function Grades() {
     queryKey: ["/api/users"],
     enabled: !!user && canAddGrades
   });
-  const students = users.filter(u => u.role === UserRole.STUDENT);
+  const students = users.filter(u => u.role === UserRoleEnum.STUDENT);
   
   // Form for adding grades
   const form = useForm<GradeFormValues>({

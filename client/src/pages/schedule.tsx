@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRole, Schedule as ScheduleType, insertScheduleSchema, Class, Subject, User } from "@shared/schema";
+import { UserRoleEnum, Schedule as ScheduleType, insertScheduleSchema, Class, Subject, User } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -69,8 +69,8 @@ export default function SchedulePage() {
   const [currentTab, setCurrentTab] = useState("1"); // 1 to 7 for days of week
   
   // Check access permissions
-  const canEditSchedule = user?.role === UserRole.SUPER_ADMIN || 
-                          user?.role === UserRole.SCHOOL_ADMIN;
+  const canEditSchedule = user?.role === UserRoleEnum.SUPER_ADMIN || 
+                          user?.role === UserRoleEnum.SCHOOL_ADMIN;
   
   // Fetch schedules
   const { data: schedules = [], isLoading } = useQuery<ScheduleType[]>({
@@ -95,7 +95,7 @@ export default function SchedulePage() {
     queryKey: ["/api/users"],
     enabled: !!user && canEditSchedule
   });
-  const teachers = users.filter(u => u.role === UserRole.TEACHER);
+  const teachers = users.filter(u => u.role === UserRoleEnum.TEACHER);
   
   // Form for adding schedule
   const form = useForm<z.infer<typeof scheduleFormSchema>>({

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRole, School, insertSchoolSchema } from "@shared/schema";
+import { UserRoleEnum, School, insertSchoolSchema } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -53,7 +53,7 @@ export default function Schools() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   // Only Super admin can access this page
-  if (user?.role !== UserRole.SUPER_ADMIN) {
+  if (user?.role !== UserRoleEnum.SUPER_ADMIN) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -69,7 +69,7 @@ export default function Schools() {
   // Fetch schools
   const { data: schools = [], isLoading } = useQuery<School[]>({
     queryKey: ["/api/schools"],
-    enabled: user?.role === UserRole.SUPER_ADMIN
+    enabled: user?.role === UserRoleEnum.SUPER_ADMIN
   });
   
   // Filter schools based on search query

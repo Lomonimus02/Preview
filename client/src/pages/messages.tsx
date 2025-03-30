@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRole, Message, insertMessageSchema, User } from "@shared/schema";
+import { UserRoleEnum, Message, insertMessageSchema, User } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -302,9 +302,9 @@ export default function MessagesPage() {
                             {contact.firstName} {contact.lastName}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {contact.role === UserRole.TEACHER ? 'Учитель' : 
-                             contact.role === UserRole.STUDENT ? 'Ученик' : 
-                             contact.role === UserRole.PARENT ? 'Родитель' : 
+                            {contact.role === UserRoleEnum.TEACHER ? 'Учитель' : 
+                             contact.role === UserRoleEnum.STUDENT ? 'Ученик' : 
+                             contact.role === UserRoleEnum.PARENT ? 'Родитель' : 
                              contact.role}
                           </p>
                         </div>

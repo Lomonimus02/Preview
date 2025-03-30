@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRole, Homework, insertHomeworkSchema, Class, Subject, HomeworkSubmission } from "@shared/schema";
+import { UserRoleEnum, Homework, insertHomeworkSchema, Class, Subject, HomeworkSubmission } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -78,9 +78,9 @@ export default function HomeworkPage() {
   const [currentTab, setCurrentTab] = useState("active");
 
   // Determine if the user can create homework (only teachers)
-  const canCreateHomework = user?.role === UserRole.TEACHER;
+  const canCreateHomework = user?.role === UserRoleEnum.TEACHER;
   // Determine if the user can submit homework (only students)
-  const canSubmitHomework = user?.role === UserRole.STUDENT;
+  const canSubmitHomework = user?.role === UserRoleEnum.STUDENT;
 
   // Fetch homework
   const { data: homework = [], isLoading: homeworkLoading } = useQuery<Homework[]>({
