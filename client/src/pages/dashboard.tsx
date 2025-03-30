@@ -7,6 +7,7 @@ import { TeacherSchedule } from "@/components/dashboard/teacher-schedule";
 import { StudentSchedule } from "@/components/dashboard/student-schedule";
 import { HomeworkList } from "@/components/dashboard/homework-list";
 import { AdminClassList } from "@/components/dashboard/admin-class-list";
+import { AdminSubjectList } from "@/components/dashboard/admin-subject-list";
 import { UserRoleEnum } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { 
@@ -105,6 +106,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <AdminClassList />
             <div className="lg:col-span-1 space-y-6">
+              <AdminSubjectList />
               <RecentActivity />
             </div>
           </div>
