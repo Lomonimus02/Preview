@@ -7,11 +7,12 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import { User, UserRole } from "@shared/schema";
 
-declare global {
-  namespace Express {
-    interface User extends User {
-      role: UserRole;
-    }
+// Use type augmentation for Express session
+declare module 'express-session' {
+  interface SessionData {
+    passport: {
+      user: number; // User ID
+    };
   }
 }
 
@@ -24,10 +25,16 @@ async function hashPassword(password: string) {
 }
 
 async function comparePasswords(supplied: string, stored: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  // Check if the stored password is already hashed (has a salt)
+  if (stored.includes(".")) {
+    const [hashed, salt] = stored.split(".");
+    const hashedBuf = Buffer.from(hashed, "hex");
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    return timingSafeEqual(hashedBuf, suppliedBuf);
+  } else {
+    // For plaintext passwords (like initial admin user), do a direct comparison
+    return supplied === stored;
+  }
 }
 
 export function setupAuth(app: Express) {
@@ -57,7 +64,7 @@ export function setupAuth(app: Express) {
     }),
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
+  passport.serializeUser((user: any, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
     const user = await storage.getUser(id);
     done(null, user);
@@ -127,10 +134,11 @@ export function setupAuth(app: Express) {
 
   app.post("/api/login", passport.authenticate("local"), async (req, res) => {
     // Log the login
+    const user = req.user as User;
     await storage.createSystemLog({
-      userId: req.user!.id,
+      userId: user.id,
       action: "user_login",
-      details: `User ${req.user!.username} logged in`,
+      details: `User ${user.username} logged in`,
       ipAddress: req.ip
     });
     

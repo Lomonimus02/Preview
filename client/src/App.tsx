@@ -14,7 +14,7 @@ import Messages from "@/pages/messages";
 import Documents from "@/pages/documents";
 import Analytics from "@/pages/analytics";
 import Settings from "@/pages/settings";
-import Support from "@/pages/support";
+import Support from "./pages/support-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
