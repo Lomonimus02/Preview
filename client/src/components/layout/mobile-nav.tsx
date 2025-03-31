@@ -1,4 +1,4 @@
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { 
   HomeIcon, 
   BookIcon, 
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 export function MobileNav() {
   const [location] = useLocation();
   const { user } = useAuth();
-  
+
   // Maps user roles to which menu items they can see in the mobile nav
   const roleAccess = {
     [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "analytics", "more"],
@@ -47,10 +47,13 @@ export function MobileNav() {
       {allowedItems.map((item) => {
         const isActive = location === item.href || 
                         (item.href !== "/" && location.startsWith(item.href));
-        
+
         return (
-          <Link key={item.id} href={item.href}>
-            <a className="flex flex-col items-center">
+          <div key={item.id} onClick={() => window.location.href = item.href}>
+            <a className={cn(
+              "flex flex-col items-center",
+              isActive && "text-primary"
+            )}>
               <span className={cn(
                 isActive ? "text-primary" : "text-gray-500"
               )}>
@@ -63,7 +66,7 @@ export function MobileNav() {
                 {item.label}
               </span>
             </a>
-          </Link>
+          </div>
         );
       })}
     </nav>
