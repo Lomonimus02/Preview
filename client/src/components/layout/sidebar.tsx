@@ -1,20 +1,20 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import {
-  LayoutDashboardIcon,
-  UsersIcon,
-  BookOpenIcon,
-  CalendarIcon,
-  ClipboardListIcon,
-  GraduationCapIcon,
-  MessageSquareIcon,
-  FileTextIcon,
-  BarChartIcon,
-  SettingsIcon,
-  BellIcon,
-  HelpCircleIcon,
-  UserPlusIcon,
+import { 
+  HomeIcon, 
+  BookIcon, 
+  Users2Icon, 
+  BarChartIcon, 
+  BellIcon, 
+  SettingsIcon, 
+  HelpCircleIcon, 
   BuildingIcon,
+  CalendarIcon,
+  GraduationCapIcon,
+  NotebookPenIcon,
+  MessagesSquareIcon,
+  FolderIcon,
+  UserCogIcon
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -40,16 +40,17 @@ export function Sidebar({ isOpen }: SidebarProps) {
     [UserRoleEnum.VICE_PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"]
   };
 
+  // Navigation items
   const navItems = [
-    { id: "dashboard", label: "Главная", icon: <LayoutDashboardIcon className="h-4 w-4 mr-3" />, href: "/" },
+    { id: "dashboard", label: "Главная", icon: <HomeIcon className="h-4 w-4 mr-3" />, href: "/" },
     { id: "schools", label: "Школы", icon: <BuildingIcon className="h-4 w-4 mr-3" />, href: "/schools" },
-    { id: "users", label: "Пользователи", icon: <UsersIcon className="h-4 w-4 mr-3" />, href: "/users" },
-    { id: "user-roles", label: "Роли", icon: <UserPlusIcon className="h-4 w-4 mr-3" />, href: "/user-roles" },
+    { id: "users", label: "Пользователи", icon: <Users2Icon className="h-4 w-4 mr-3" />, href: "/users" },
+    { id: "user-roles", label: "Роли пользователей", icon: <UserCogIcon className="h-4 w-4 mr-3" />, href: "/user-roles" },
     { id: "schedule", label: "Расписание", icon: <CalendarIcon className="h-4 w-4 mr-3" />, href: "/schedule" },
-    { id: "homework", label: "Домашние задания", icon: <BookOpenIcon className="h-4 w-4 mr-3" />, href: "/homework" },
-    { id: "grades", label: "Оценки", icon: <ClipboardListIcon className="h-4 w-4 mr-3" />, href: "/grades" },
-    { id: "messages", label: "Сообщения", icon: <MessageSquareIcon className="h-4 w-4 mr-3" />, href: "/messages" },
-    { id: "documents", label: "Документы", icon: <FileTextIcon className="h-4 w-4 mr-3" />, href: "/documents" },
+    { id: "grades", label: "Оценки", icon: <GraduationCapIcon className="h-4 w-4 mr-3" />, href: "/grades" },
+    { id: "homework", label: "Домашние задания", icon: <BookIcon className="h-4 w-4 mr-3" />, href: "/homework" },
+    { id: "messages", label: "Сообщения", icon: <MessagesSquareIcon className="h-4 w-4 mr-3" />, href: "/messages" },
+    { id: "documents", label: "Документы", icon: <FolderIcon className="h-4 w-4 mr-3" />, href: "/documents" },
     { id: "analytics", label: "Аналитика", icon: <BarChartIcon className="h-4 w-4 mr-3" />, href: "/analytics" },
     { id: "notifications", label: "Уведомления", icon: <BellIcon className="h-4 w-4 mr-3" />, href: "/notifications" },
     { id: "settings", label: "Настройки", icon: <SettingsIcon className="h-4 w-4 mr-3" />, href: "/settings" },
@@ -58,11 +59,11 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   // Filter nav items based on user's active role (or default role if active not set)
   const userRole = user?.activeRole || user?.role || UserRoleEnum.STUDENT;
-  const allowedItems = navItems.filter(item =>
+  const allowedItems = navItems.filter(item => 
     roleAccess[userRole]?.includes(item.id)
   );
 
-  const sidebarClass = isOpen
+  const sidebarClass = isOpen 
     ? "fixed inset-0 z-40 md:relative w-64 md:translate-x-0 transform transition duration-200 ease-in-out"
     : "fixed inset-0 z-40 md:relative w-64 -translate-x-full md:translate-x-0 transform transition duration-200 ease-in-out";
 
@@ -78,46 +79,56 @@ export function Sidebar({ isOpen }: SidebarProps) {
   };
 
   return (
-    <aside className={sidebarClass}>
-      <div className="h-full bg-white border-r">
-        <div className="flex flex-col h-full">
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex items-center">
-              <Avatar className="h-10 w-10 border-2 border-primary-50">
-                <AvatarFallback className="bg-primary text-white">
-                  {user?.firstName?.[0]}{user?.lastName?.[0]}
-                </AvatarFallback>
-              </Avatar>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-800">{user?.firstName} {user?.lastName}</p>
-                <p className="text-xs text-gray-500">{roleNames[userRole]}</p>
-              </div>
-            </div>
-
-            {/* Переключатель ролей */}
-            <div className="mt-3">
-              <RoleSwitcher />
-            </div>
+    <aside className={`${sidebarClass} bg-white shadow-md h-full overflow-y-auto sidebar`}>
+      {/* User Info */}
+      <div className="p-4 border-b border-gray-200">
+        <div className="flex items-center">
+          <Avatar className="h-10 w-10 border-2 border-primary-50">
+            <AvatarFallback className="bg-primary text-white">
+              {user?.firstName?.[0]}{user?.lastName?.[0]}
+            </AvatarFallback>
+          </Avatar>
+          <div className="ml-3">
+            <p className="text-sm font-medium text-gray-800">{user?.firstName} {user?.lastName}</p>
+            <p className="text-xs text-gray-500">{roleNames[userRole]}</p>
           </div>
-          <nav className="space-y-1 px-2 py-4">
-            {allowedItems.map((item) => (
-              <Link key={item.id} href={item.href}>
-                <a
-                  className={cn(
-                    "flex items-center px-2 py-2 text-sm font-medium rounded-md hover:bg-gray-50 hover:text-gray-900",
-                    location === item.href
-                      ? "bg-gray-100 text-gray-900"
-                      : "text-gray-700"
-                  )}
-                >
-                  {item.icon}
-                  {item.label}
-                </a>
-              </Link>
-            ))}
-          </nav>
+        </div>
+        
+        {/* Переключатель ролей */}
+        <div className="mt-3">
+          <RoleSwitcher />
         </div>
       </div>
+      
+      {/* Navigation */}
+      <nav className="py-4 px-2">
+        <div className="space-y-1">
+          {allowedItems.map((item) => {
+            const isActive = location === item.href || 
+                            (item.href !== "/" && location.startsWith(item.href));
+            
+            return (
+              <Link key={item.id} href={item.href}>
+                <div className={cn(
+                  "group flex items-center px-2 py-2 text-sm font-medium rounded-md",
+                  isActive 
+                    ? "bg-primary text-white" 
+                    : "text-gray-700 hover:bg-primary-50 hover:text-gray-900"
+                )}>
+                  <span className={cn(
+                    isActive 
+                      ? "text-white" 
+                      : "text-gray-500 group-hover:text-gray-700"
+                  )}>
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
     </aside>
   );
 }

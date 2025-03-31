@@ -1,11 +1,10 @@
-
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { UserRoleEnum } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronsUpDown, ShieldCheck } from "lucide-react";
+import { Check, ChevronsUpDown, ShieldCheck, ShieldQuestion } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
@@ -43,8 +42,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user, roles } = useAuth();
-
+  const { user } = useAuth();
   const switchRoleMutation = useMutation({
     mutationFn: async (role: UserRoleEnum) => {
       const res = await apiRequest("POST", "/api/switch-role", { role });
@@ -73,20 +71,23 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
   });
 
   // Находим текущую активную роль на основе данных пользователя
-  const activeRole = roles?.find(role => role.role === user?.activeRole) ||
-                    roles?.find(role => role.isActive) ||
-                    roles?.[0];
+  const activeRole = user?.roles?.find(role => role.id === user?.activeRole) ||
+                     user?.roles?.find(role => role.isActive) ||
+                     user?.roles?.[0];
 
-  if (!roles || roles.length === 0) {
+  // Список всех ролей пользователя для выбора
+  const userRoles = user?.roles || [];
+
+  if (!userRoles || userRoles.length === 0) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700">
         <ShieldCheck className="h-4 w-4" />
         <span className="truncate">Нет ролей</span>
       </div>
-    );
+    )
   }
 
-  if (roles.length <= 1) {
+  if (userRoles.length <= 1) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700">
         <ShieldCheck className="h-4 w-4" />
@@ -120,7 +121,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
           <CommandInput placeholder="Найти роль..." />
           <CommandEmpty>Роли не найдены</CommandEmpty>
           <CommandGroup>
-            {roles.map((role) => (
+            {userRoles.map((role) => (
               <CommandItem
                 key={role.id}
                 value={role.role}
@@ -131,14 +132,18 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
                     setOpen(false);
                   }
                 }}
+                className="flex items-center gap-2"
               >
+                {role.isDefault ?
+                  <ShieldCheck className="h-4 w-4" /> :
+                  <ShieldQuestion className="h-4 w-4" />}
+                {getRoleName(role.role)}
                 <Check
                   className={cn(
-                    "mr-2 h-4 w-4",
-                    role.role === activeRole?.role ? "opacity-100" : "opacity-0"
+                    "ml-auto h-4 w-4",
+                    role.isActive ? "opacity-100" : "opacity-0"
                   )}
                 />
-                {getRoleName(role.role)}
               </CommandItem>
             ))}
           </CommandGroup>
