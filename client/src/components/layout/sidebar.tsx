@@ -93,20 +93,20 @@ export function Sidebar({ isOpen }: SidebarProps) {
             <p className="text-xs text-gray-500">{roleNames[userRole]}</p>
           </div>
         </div>
-        
+
         {/* Переключатель ролей */}
         <div className="mt-3">
           <RoleSwitcher />
         </div>
       </div>
-      
+
       {/* Navigation */}
       <nav className="py-4 px-2">
         <div className="space-y-1">
           {allowedItems.map((item) => {
             const isActive = location === item.href || 
                             (item.href !== "/" && location.startsWith(item.href));
-            
+
             return (
               <Link key={item.id} href={item.href}>
                 <div className={cn(
