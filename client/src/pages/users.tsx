@@ -6,9 +6,14 @@ import { UserRoleEnum, User, insertUserSchema, Class, ParentStudent } from "@sha
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, Plus, Search, Filter, BookOpen, UsersIcon, UserIcon, UserPlusIcon } from "lucide-react";
+import { Pencil, Plus, Search, Filter, BookOpen, UsersIcon, UserIcon, UserPlusIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { 
+  FormDescription
+} from "@/components/ui/form";
 import {
   Table,
   TableBody,
@@ -74,6 +79,10 @@ const userFormSchema = insertUserSchema.extend({
     UserRoleEnum.VICE_PRINCIPAL
   ]),
   confirmPassword: z.string().min(1, "Подтвердите пароль"),
+  // Дополнительные поля для привязок
+  classIds: z.array(z.number()).optional(),
+  parentIds: z.array(z.number()).optional(),
+  childIds: z.array(z.number()).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Пароли не совпадают",
   path: ["confirmPassword"],
@@ -159,11 +168,26 @@ export default function UsersPage() {
       phone: "",
       role: UserRoleEnum.STUDENT,
       schoolId: user?.schoolId || null,
+      classIds: [],
+      parentIds: [],
+      childIds: [],
     });
   };
   
   // Set form values when editing
   const setFormForEdit = (user: User) => {
+    // Загружаем классы для ученика при редактировании
+    if (user.role === UserRoleEnum.STUDENT) {
+      fetchStudentClassesForEdit(user.id);
+    }
+    
+    // Загружаем связи родитель-ребенок при редактировании
+    if (user.role === UserRoleEnum.PARENT) {
+      fetchParentStudentsForEdit(user.id);
+    } else if (user.role === UserRoleEnum.STUDENT) {
+      fetchStudentParentsForEdit(user.id);
+    }
+    
     form.reset({
       username: user.username,
       password: "", // Don't include password when editing
@@ -174,6 +198,9 @@ export default function UsersPage() {
       phone: user.phone || "",
       role: user.role,
       schoolId: user.schoolId,
+      classIds: [], // Будет заполнено после загрузки данных
+      parentIds: [], // Будет заполнено после загрузки данных
+      childIds: [], // Будет заполнено после загрузки данных
     });
   };
   
@@ -275,6 +302,55 @@ export default function UsersPage() {
   // States for parent-student management
   const [selectedParent, setSelectedParent] = useState<number | null>(null);
   const [searchParentTerm, setSearchParentTerm] = useState("");
+  
+  // Функции для загрузки данных при редактировании
+  const fetchStudentClassesForEdit = async (studentId: number) => {
+    try {
+      const res = await fetch(`/api/student-classes?studentId=${studentId}`);
+      if (!res.ok) throw new Error("Failed to fetch student classes");
+      const classes = await res.json();
+      form.setValue("classIds", classes.map((c: Class) => c.id));
+    } catch (error) {
+      console.error("Error fetching student classes:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось загрузить классы ученика",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const fetchParentStudentsForEdit = async (parentId: number) => {
+    try {
+      const res = await fetch(`/api/parent-students?parentId=${parentId}`);
+      if (!res.ok) throw new Error("Failed to fetch parent-student connections");
+      const connections = await res.json();
+      form.setValue("childIds", connections.map((c: ParentStudent) => c.studentId));
+    } catch (error) {
+      console.error("Error fetching parent-student connections:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось загрузить связи родитель-ученик",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const fetchStudentParentsForEdit = async (studentId: number) => {
+    try {
+      const res = await fetch(`/api/student-parents?studentId=${studentId}`);
+      if (!res.ok) throw new Error("Failed to fetch student-parent connections");
+      const connections = await res.json();
+      form.setValue("parentIds", connections.map((c: ParentStudent) => c.parentId));
+    } catch (error) {
+      console.error("Error fetching student-parent connections:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось загрузить связи ученик-родитель",
+        variant: "destructive",
+      });
+    }
+  };
   
   // Fetch classes for student assignment
   const { data: classes = [] } = useQuery<Class[]>({
@@ -1119,6 +1195,150 @@ export default function UsersPage() {
                 />
               )}
               
+              {/* Управление классами для студента */}
+              {form.watch("role") === UserRoleEnum.STUDENT && (
+                <FormField
+                  control={form.control}
+                  name="classIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Классы</FormLabel>
+                      <FormDescription>
+                        Выберите классы, в которые будет добавлен ученик
+                      </FormDescription>
+                      <div className="mt-2 max-h-32 overflow-y-auto">
+                        {classes.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Нет доступных классов</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {classes.map((cls) => (
+                              <div key={cls.id} className="flex items-center">
+                                <Checkbox
+                                  id={`add-class-${cls.id}`}
+                                  checked={field.value?.includes(cls.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      field.onChange([...(field.value || []), cls.id]);
+                                    } else {
+                                      field.onChange(
+                                        field.value?.filter((id) => id !== cls.id) || []
+                                      );
+                                    }
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`add-class-${cls.id}`}
+                                  className="ml-2 text-sm font-medium cursor-pointer"
+                                >
+                                  {cls.name}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              
+              {/* Управление связями родитель-ученик для родителя */}
+              {form.watch("role") === UserRoleEnum.PARENT && (
+                <FormField
+                  control={form.control}
+                  name="childIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Дети</FormLabel>
+                      <FormDescription>
+                        Выберите учеников, с которыми будет связан родитель
+                      </FormDescription>
+                      <div className="mt-2 max-h-32 overflow-y-auto">
+                        {students.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Нет доступных учеников</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {students.map((student) => (
+                              <div key={student.id} className="flex items-center">
+                                <Checkbox
+                                  id={`add-student-${student.id}`}
+                                  checked={field.value?.includes(student.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      field.onChange([...(field.value || []), student.id]);
+                                    } else {
+                                      field.onChange(
+                                        field.value?.filter((id) => id !== student.id) || []
+                                      );
+                                    }
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`add-student-${student.id}`}
+                                  className="ml-2 text-sm font-medium cursor-pointer"
+                                >
+                                  {student.lastName} {student.firstName}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              
+              {/* Управление связями ученик-родитель для ученика */}
+              {form.watch("role") === UserRoleEnum.STUDENT && (
+                <FormField
+                  control={form.control}
+                  name="parentIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Родители</FormLabel>
+                      <FormDescription>
+                        Выберите родителей для ученика
+                      </FormDescription>
+                      <div className="mt-2 max-h-32 overflow-y-auto">
+                        {parents.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Нет доступных родителей</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {parents.map((parent) => (
+                              <div key={parent.id} className="flex items-center">
+                                <Checkbox
+                                  id={`add-parent-${parent.id}`}
+                                  checked={field.value?.includes(parent.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      field.onChange([...(field.value || []), parent.id]);
+                                    } else {
+                                      field.onChange(
+                                        field.value?.filter((id) => id !== parent.id) || []
+                                      );
+                                    }
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`add-parent-${parent.id}`}
+                                  className="ml-2 text-sm font-medium cursor-pointer"
+                                >
+                                  {parent.lastName} {parent.firstName}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              
               <DialogFooter>
                 <Button type="submit" disabled={addUserMutation.isPending}>
                   {addUserMutation.isPending ? "Добавление..." : "Добавить пользователя"}
@@ -1305,6 +1525,150 @@ export default function UsersPage() {
                     )}
                   />
                 </>
+              )}
+              
+              {/* Управление классами для студента */}
+              {form.watch("role") === UserRoleEnum.STUDENT && (
+                <FormField
+                  control={form.control}
+                  name="classIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Классы</FormLabel>
+                      <FormDescription>
+                        Выберите классы, в которые добавлен ученик
+                      </FormDescription>
+                      <div className="mt-2 max-h-32 overflow-y-auto">
+                        {classes.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Нет доступных классов</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {classes.map((cls) => (
+                              <div key={cls.id} className="flex items-center">
+                                <Checkbox
+                                  id={`edit-class-${cls.id}`}
+                                  checked={field.value?.includes(cls.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      field.onChange([...(field.value || []), cls.id]);
+                                    } else {
+                                      field.onChange(
+                                        field.value?.filter((id) => id !== cls.id) || []
+                                      );
+                                    }
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`edit-class-${cls.id}`}
+                                  className="ml-2 text-sm font-medium cursor-pointer"
+                                >
+                                  {cls.name}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              
+              {/* Управление связями родитель-ученик для родителя */}
+              {form.watch("role") === UserRoleEnum.PARENT && (
+                <FormField
+                  control={form.control}
+                  name="childIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Дети</FormLabel>
+                      <FormDescription>
+                        Выберите учеников, с которыми связан родитель
+                      </FormDescription>
+                      <div className="mt-2 max-h-32 overflow-y-auto">
+                        {students.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Нет доступных учеников</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {students.map((student) => (
+                              <div key={student.id} className="flex items-center">
+                                <Checkbox
+                                  id={`edit-student-${student.id}`}
+                                  checked={field.value?.includes(student.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      field.onChange([...(field.value || []), student.id]);
+                                    } else {
+                                      field.onChange(
+                                        field.value?.filter((id) => id !== student.id) || []
+                                      );
+                                    }
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`edit-student-${student.id}`}
+                                  className="ml-2 text-sm font-medium cursor-pointer"
+                                >
+                                  {student.lastName} {student.firstName}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              
+              {/* Управление связями ученик-родитель для ученика */}
+              {form.watch("role") === UserRoleEnum.STUDENT && (
+                <FormField
+                  control={form.control}
+                  name="parentIds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Родители</FormLabel>
+                      <FormDescription>
+                        Выберите родителей для ученика
+                      </FormDescription>
+                      <div className="mt-2 max-h-32 overflow-y-auto">
+                        {parents.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">Нет доступных родителей</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {parents.map((parent) => (
+                              <div key={parent.id} className="flex items-center">
+                                <Checkbox
+                                  id={`edit-parent-${parent.id}`}
+                                  checked={field.value?.includes(parent.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      field.onChange([...(field.value || []), parent.id]);
+                                    } else {
+                                      field.onChange(
+                                        field.value?.filter((id) => id !== parent.id) || []
+                                      );
+                                    }
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`edit-parent-${parent.id}`}
+                                  className="ml-2 text-sm font-medium cursor-pointer"
+                                >
+                                  {parent.lastName} {parent.firstName}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
               
               <DialogFooter>
