@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
+import { useRoleCheck } from "@/hooks/use-role-check";
 import { UserRoleEnum, User, insertUserSchema } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -69,6 +70,7 @@ type UserFormData = z.infer<typeof userFormSchema>;
 
 export default function Users() {
   const { user } = useAuth();
+  const { isAdmin } = useRoleCheck();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRoleEnum | "all">("all");
@@ -77,7 +79,7 @@ export default function Users() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   // Only Super admin and School admin can access this page
-  if (user?.role !== UserRoleEnum.SUPER_ADMIN && user?.role !== UserRoleEnum.SCHOOL_ADMIN) {
+  if (!isAdmin()) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -93,13 +95,14 @@ export default function Users() {
   // Fetch users
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: user?.role === UserRoleEnum.SUPER_ADMIN || user?.role === UserRoleEnum.SCHOOL_ADMIN
+    enabled: isAdmin()
   });
   
   // Fetch schools for dropdown
+  const { isSuperAdmin } = useRoleCheck();
   const { data: schools = [] } = useQuery({
     queryKey: ["/api/schools"],
-    enabled: user?.role === UserRoleEnum.SUPER_ADMIN
+    enabled: isSuperAdmin()
   });
   
   // Filter users based on search query and role filter
@@ -142,7 +145,7 @@ export default function Users() {
       email: "",
       phone: "",
       role: UserRoleEnum.STUDENT,
-      schoolId: user?.role === UserRoleEnum.SCHOOL_ADMIN ? user.schoolId : null,
+      schoolId: isSchoolAdmin() && user?.schoolId ? user.schoolId : null,
     });
   };
   
@@ -234,9 +237,9 @@ export default function Users() {
   const onSubmitEdit = (values: UserFormData) => {
     if (selectedUser) {
       // Only include password if it was changed
-      const userData = { ...values };
+      const userData = { ...values } as Partial<UserFormData>;
       if (!userData.password) {
-        delete userData.password;
+        userData.password = undefined; // Используем undefined вместо delete
       }
       
       editUserMutation.mutate({
@@ -473,10 +476,10 @@ export default function Users() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {user?.role === UserRoleEnum.SUPER_ADMIN && (
+                        {isSuperAdmin() && (
                           <SelectItem value={UserRoleEnum.SUPER_ADMIN}>Супер-администратор</SelectItem>
                         )}
-                        {(user?.role === UserRoleEnum.SUPER_ADMIN || user?.role === UserRoleEnum.SCHOOL_ADMIN) && (
+                        {isAdmin() && (
                           <>
                             <SelectItem value={UserRoleEnum.SCHOOL_ADMIN}>Администратор школы</SelectItem>
                             <SelectItem value={UserRoleEnum.PRINCIPAL}>Директор</SelectItem>
@@ -493,7 +496,7 @@ export default function Users() {
                 )}
               />
               
-              {user?.role === UserRoleEnum.SUPER_ADMIN && (
+              {isSuperAdmin() && (
                 <FormField
                   control={form.control}
                   name="schoolId"
@@ -648,7 +651,7 @@ export default function Users() {
                 />
               </div>
               
-              {user?.role === UserRoleEnum.SUPER_ADMIN && (
+              {isSuperAdmin() && (
                 <>
                   <FormField
                     control={form.control}

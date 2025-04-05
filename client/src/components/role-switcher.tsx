@@ -110,7 +110,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
     );
   }
 
-  // Если есть только одна роль, просто показываем её
+  // Если есть только одна роль, просто показываем её без возможности переключения
   if (userRoles.length <= 1) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700">

@@ -107,20 +107,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return next();
     }
     
-    // Проверяем основную роль пользователя
-    if (roles.includes(req.user.role)) {
+    // Если активная роль не установлена, проверяем основную роль пользователя
+    if (!req.user.activeRole && roles.includes(req.user.role)) {
       return next();
     }
     
-    // Если ни активная, ни основная роль не подходит, проверяем дополнительные роли
-    const userRoles = await dataStorage.getUserRoles(req.user.id);
-    const userRoleValues = userRoles.map(ur => ur.role);
-    
-    if (roles.some(role => userRoleValues.includes(role))) {
-      return next();
-    }
-    
-    res.status(403).json({ message: "Forbidden" });
+    // Доступ запрещен, если активная роль не соответствует требуемой
+    res.status(403).json({ message: "Forbidden. You don't have the required role permissions." });
   };
 
   // Schools API
@@ -175,10 +168,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Users API
   app.get("/api/users", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
-    if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
+    const activeRole = req.user.activeRole || req.user.role;
+    
+    if (activeRole === UserRoleEnum.SUPER_ADMIN) {
       const users = await dataStorage.getUsers();
       return res.json(users);
-    } else if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && req.user.schoolId) {
+    } else if (activeRole === UserRoleEnum.SCHOOL_ADMIN && req.user.schoolId) {
       const users = await dataStorage.getUsersBySchool(req.user.schoolId);
       return res.json(users);
     }
