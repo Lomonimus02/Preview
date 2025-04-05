@@ -94,7 +94,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
           </div>
         </div>
 
-        {/* Переключатель ролей */}
+        {/* Переключатель ролей - отображается только для пользователей с несколькими ролями */}
         <div className="mt-3">
           <RoleSwitcher />
         </div>
