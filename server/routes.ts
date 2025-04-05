@@ -338,6 +338,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (req.query.teacherId) {
       const teacherId = parseInt(req.query.teacherId as string);
       schedules = await dataStorage.getSchedulesByTeacher(teacherId);
+    } else if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
+      // Супер администратор может видеть расписание всех школ
+      // Получим все классы из всех школ
+      const schools = await dataStorage.getSchools();
+      for (const school of schools) {
+        const classes = await dataStorage.getClasses(school.id);
+        for (const cls of classes) {
+          const classSchedules = await dataStorage.getSchedulesByClass(cls.id);
+          schedules.push(...classSchedules);
+        }
+      }
+    } else if (req.user.role === UserRoleEnum.SCHOOL_ADMIN || req.user.role === UserRoleEnum.PRINCIPAL || req.user.role === UserRoleEnum.VICE_PRINCIPAL) {
+      // Школьный администратор, директор и завуч могут видеть расписание своей школы
+      if (req.user.schoolId) {
+        const classes = await dataStorage.getClasses(req.user.schoolId);
+        for (const cls of classes) {
+          const classSchedules = await dataStorage.getSchedulesByClass(cls.id);
+          schedules.push(...classSchedules);
+        }
+      }
     } else if (req.user.role === UserRoleEnum.TEACHER) {
       schedules = await dataStorage.getSchedulesByTeacher(req.user.id);
     } else if (req.user.role === UserRoleEnum.STUDENT) {
@@ -348,6 +368,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const cls of classes) {
         const classSchedules = await dataStorage.getSchedulesByClass(cls.id);
         schedules.push(...classSchedules);
+      }
+    } else if (req.user.role === UserRoleEnum.PARENT) {
+      // Родители могут видеть расписание своих детей
+      const parentStudents = await dataStorage.getParentStudents(req.user.id);
+      for (const relation of parentStudents) {
+        const studentClasses = await dataStorage.getStudentClasses(relation.studentId);
+        for (const cls of studentClasses) {
+          const classSchedules = await dataStorage.getSchedulesByClass(cls.id);
+          schedules.push(...classSchedules);
+        }
       }
     }
     

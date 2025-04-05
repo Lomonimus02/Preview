@@ -273,8 +273,14 @@ export default function SchedulePage() {
   
   // Filter schedules by day
   const getSchedulesByDay = (day: number) => {
-    // Используем отфильтрованное расписание для учителя
-    return (isTeacher() ? teacherSchedules : schedules)
+    // Используем соответствующее расписание в зависимости от роли пользователя
+    let schedulesToFilter = schedules;
+    
+    if (isTeacher()) {
+      schedulesToFilter = teacherSchedules;
+    }
+    
+    return schedulesToFilter
       .filter(schedule => schedule.dayOfWeek === day)
       .sort((a, b) => {
         // Sort by start time
