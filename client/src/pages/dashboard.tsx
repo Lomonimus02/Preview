@@ -10,6 +10,7 @@ import { AdminClassList } from "@/components/dashboard/admin-class-list";
 import { AdminSubjectList } from "@/components/dashboard/admin-subject-list";
 import { UserRoleEnum } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { useRoleCheck } from "@/hooks/use-role-check";
 import { 
   School, 
   Users, 
@@ -22,36 +23,40 @@ import { useQuery } from "@tanstack/react-query";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { isSuperAdmin, isSchoolAdmin, isTeacher, isStudent, isParent, currentRole } = useRoleCheck();
   
   // Get user counts by role for admin dashboard
-  const { data: users = [] } = useQuery({
+  const { data: users = [] } = useQuery<any[]>({
     queryKey: ["/api/users"],
-    enabled: !!user && (user.role === UserRoleEnum.SUPER_ADMIN || user.role === UserRoleEnum.SCHOOL_ADMIN)
+    enabled: !!user && (isSuperAdmin() || isSchoolAdmin())
   });
   
   // Get number of schools for super admin
-  const { data: schools = [] } = useQuery({
+  const { data: schools = [] } = useQuery<any[]>({
     queryKey: ["/api/schools"],
-    enabled: !!user && user.role === UserRoleEnum.SUPER_ADMIN
+    enabled: !!user
   });
   
   // Get notifications count
-  const { data: notifications = [] } = useQuery({
+  const { data: notifications = [] } = useQuery<any[]>({
     queryKey: ["/api/notifications"],
     enabled: !!user
   });
   
   // Get homework count
-  const { data: homework = [] } = useQuery({
+  const { data: homework = [] } = useQuery<any[]>({
     queryKey: ["/api/homework"],
-    enabled: !!user && (user.role === UserRoleEnum.TEACHER || user.role === UserRoleEnum.STUDENT)
+    enabled: !!user && (isTeacher() || isStudent() || isParent())
   });
   
   // Stats based on user role
   const getRoleStats = () => {
     if (!user) return [];
     
-    switch (user.role) {
+    const role = currentRole();
+    if (!role) return [];
+    
+    switch (role) {
       case UserRoleEnum.SUPER_ADMIN:
         return [
           { title: "Школы", value: schools.length, icon: School },
@@ -90,56 +95,58 @@ export default function Dashboard() {
   const getDashboardContent = () => {
     if (!user) return null;
     
-    switch (user.role) {
-      case UserRoleEnum.SUPER_ADMIN:
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <SchoolList />
-            <div className="lg:col-span-1 space-y-6">
-              <SystemStatus />
-              <RecentActivity />
-            </div>
+    if (isSuperAdmin()) {
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <SchoolList />
+          <div className="lg:col-span-1 space-y-6">
+            <SystemStatus />
+            <RecentActivity />
           </div>
-        );
-      case UserRoleEnum.SCHOOL_ADMIN:
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <AdminClassList />
-            <div className="lg:col-span-1 space-y-6">
-              <AdminSubjectList />
-              <RecentActivity />
-            </div>
-          </div>
-        );
-      case UserRoleEnum.TEACHER:
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <TeacherSchedule />
-            <HomeworkList />
-          </div>
-        );
-      case UserRoleEnum.STUDENT:
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <StudentSchedule />
-            <HomeworkList />
-          </div>
-        );
-      case UserRoleEnum.PARENT:
-      case UserRoleEnum.PRINCIPAL:
-      case UserRoleEnum.VICE_PRINCIPAL:
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-4">
-              <h3 className="text-lg font-heading font-semibold text-gray-800 mb-4">Общая статистика</h3>
-              <p className="text-gray-600">Здесь будет отображаться общая статистика и отчеты.</p>
-            </div>
-            <HomeworkList />
-          </div>
-        );
-      default:
-        return null;
+        </div>
+      );
     }
+    
+    if (isSchoolAdmin()) {
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <AdminClassList />
+          <div className="lg:col-span-1 space-y-6">
+            <AdminSubjectList />
+            <RecentActivity />
+          </div>
+        </div>
+      );
+    }
+    
+    if (isTeacher()) {
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <TeacherSchedule />
+          <HomeworkList />
+        </div>
+      );
+    }
+    
+    if (isStudent()) {
+      return (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <StudentSchedule />
+          <HomeworkList />
+        </div>
+      );
+    }
+    
+    // Для родителей и других ролей
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-4">
+          <h3 className="text-lg font-heading font-semibold text-gray-800 mb-4">Общая статистика</h3>
+          <p className="text-gray-600">Здесь будет отображаться общая статистика и отчеты.</p>
+        </div>
+        <HomeworkList />
+      </div>
+    );
   };
   
   return (

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
+import { useRoleCheck } from "@/hooks/use-role-check";
 import { 
   UserRoleEnum, 
   Schedule as ScheduleType, 
@@ -97,6 +98,7 @@ const gradeFormSchema = insertGradeSchema.extend({
 export default function SchedulePage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { isSuperAdmin, isSchoolAdmin, isTeacher } = useRoleCheck();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [isClassStudentsDialogOpen, setIsClassStudentsDialogOpen] = useState(false);
@@ -106,10 +108,7 @@ export default function SchedulePage() {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   
   // Check access permissions
-  const canEditSchedule = user?.role === UserRoleEnum.SUPER_ADMIN || 
-                          user?.role === UserRoleEnum.SCHOOL_ADMIN;
-  
-  const isTeacher = user?.role === UserRoleEnum.TEACHER;
+  const canEditSchedule = isSuperAdmin() || isSchoolAdmin();
   
   // Fetch schedules
   const { data: schedules = [], isLoading } = useQuery<ScheduleType[]>({
@@ -118,7 +117,7 @@ export default function SchedulePage() {
   });
   
   // Filter schedules for teacher
-  const teacherSchedules = isTeacher 
+  const teacherSchedules = isTeacher() 
     ? schedules.filter(s => s.teacherId === user?.id)
     : schedules;
   
@@ -143,7 +142,7 @@ export default function SchedulePage() {
   // Fetch grades
   const { data: grades = [] } = useQuery<Grade[]>({
     queryKey: ["/api/grades"],
-    enabled: !!user && isTeacher
+    enabled: !!user && isTeacher()
   });
   
   const teachers = users.filter(u => u.role === UserRoleEnum.TEACHER);
@@ -254,7 +253,7 @@ export default function SchedulePage() {
   // Filter schedules by day
   const getSchedulesByDay = (day: number) => {
     // Используем отфильтрованное расписание для учителя
-    return (isTeacher ? teacherSchedules : schedules)
+    return (isTeacher() ? teacherSchedules : schedules)
       .filter(schedule => schedule.dayOfWeek === day)
       .sort((a, b) => {
         // Sort by start time
@@ -332,7 +331,7 @@ export default function SchedulePage() {
                       <TableHead>Класс</TableHead>
                       <TableHead>Учитель</TableHead>
                       <TableHead>Кабинет</TableHead>
-                      {isTeacher && (
+                      {isTeacher() && (
                         <TableHead>Действия</TableHead>
                       )}
                     </TableRow>
@@ -347,7 +346,7 @@ export default function SchedulePage() {
                         <TableCell>{getClassName(schedule.classId)}</TableCell>
                         <TableCell>{getTeacherName(schedule.teacherId)}</TableCell>
                         <TableCell>{schedule.room || "-"}</TableCell>
-                        {isTeacher && user?.id === schedule.teacherId && (
+                        {isTeacher() && user?.id === schedule.teacherId && (
                           <TableCell>
                             <div className="flex gap-2">
                               <Button 
