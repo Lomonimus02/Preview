@@ -79,6 +79,7 @@ export const schedules = pgTable("schedules", {
   subjectId: integer("subject_id").notNull(),
   teacherId: integer("teacher_id").notNull(),
   dayOfWeek: integer("day_of_week").notNull(), // 1-7 for Monday-Sunday
+  scheduleDate: date("schedule_date"), // Конкретная дата урока
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
   room: text("room"),

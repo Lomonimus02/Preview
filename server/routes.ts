@@ -329,6 +329,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/schedules", isAuthenticated, async (req, res) => {
     let schedules = [];
     
+    // Добавляем фильтрацию по дате
+    const scheduleDate = req.query.scheduleDate ? String(req.query.scheduleDate) : null;
+    
     if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
       schedules = await dataStorage.getSchedulesByClass(classId);
@@ -348,17 +351,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     
+    // Фильтрация по дате, если указана
+    if (scheduleDate) {
+      schedules = schedules.filter(schedule => {
+        // Если у нас есть поле scheduleDate в расписании, то проверяем его
+        if (schedule.scheduleDate) {
+          return schedule.scheduleDate === scheduleDate;
+        }
+        return false;
+      });
+    }
+    
     res.json(schedules);
   });
 
   app.post("/api/schedules", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    // Если дата передана как строка или объект Date, преобразуем ее в правильный формат для PostgreSQL
+    if (req.body.scheduleDate) {
+      try {
+        // Преобразуем дату в формат ISO, затем берем только часть с датой (без времени)
+        const dateObj = new Date(req.body.scheduleDate);
+        req.body.scheduleDate = dateObj.toISOString().split('T')[0];
+      } catch (error) {
+        console.error('Error processing schedule date:', error);
+      }
+    }
+    
     const schedule = await dataStorage.createSchedule(req.body);
     
     // Log the action
     await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "schedule_created",
-      details: `Created schedule entry`,
+      details: `Created schedule entry for ${req.body.scheduleDate || 'unspecified date'}`,
       ipAddress: req.ip
     });
     

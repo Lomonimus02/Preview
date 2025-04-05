@@ -10,12 +10,13 @@ import {
   Subject, 
   User,
   insertGradeSchema,
-  Grade
+  Grade,
+  ParentStudent
 } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, PlusIcon, ClockIcon, GraduationCapIcon, UsersIcon } from "lucide-react";
+import { CalendarIcon, PlusIcon, ClockIcon, GraduationCapIcon, UsersIcon, FilterIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -62,6 +63,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 
 const scheduleFormSchema = insertScheduleSchema.extend({
   classId: z.number({
@@ -75,6 +84,9 @@ const scheduleFormSchema = insertScheduleSchema.extend({
   }),
   dayOfWeek: z.number({
     required_error: "Выберите день недели",
+  }),
+  scheduleDate: z.date({
+    required_error: "Выберите дату урока",
   }),
   startTime: z.string().min(1, "Укажите время начала"),
   endTime: z.string().min(1, "Укажите время окончания"),
@@ -106,13 +118,21 @@ export default function SchedulePage() {
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleType | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
   // Check access permissions
   const canEditSchedule = isSuperAdmin() || isSchoolAdmin();
   
   // Fetch schedules
   const { data: schedules = [], isLoading } = useQuery<ScheduleType[]>({
-    queryKey: ["/api/schedules"],
+    queryKey: ["/api/schedules", selectedDate ? format(selectedDate, "yyyy-MM-dd") : null],
+    queryFn: async ({ queryKey }) => {
+      const dateParam = queryKey[1];
+      const url = dateParam ? `/api/schedules?scheduleDate=${dateParam}` : "/api/schedules";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch schedules");
+      return res.json();
+    },
     enabled: !!user
   });
   
@@ -165,6 +185,7 @@ export default function SchedulePage() {
       subjectId: undefined,
       teacherId: undefined,
       dayOfWeek: undefined,
+      scheduleDate: undefined,
       startTime: "",
       endTime: "",
       room: "",
@@ -285,11 +306,41 @@ export default function SchedulePage() {
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-heading font-bold text-gray-800">Расписание</h2>
-        {canEditSchedule && (
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <PlusIcon className="mr-2 h-4 w-4" /> Добавить урок
-          </Button>
-        )}
+        <div className="flex gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="flex gap-2 items-center">
+                <FilterIcon className="h-4 w-4" />
+                {selectedDate ? format(selectedDate, "dd.MM.yyyy") : "Выберите дату"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <div className="p-4 flex flex-col gap-2">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  className="rounded-md border"
+                />
+                <div className="flex justify-end">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedDate(null)}
+                  >
+                    Сбросить
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          
+          {canEditSchedule && (
+            <Button onClick={() => setIsAddDialogOpen(true)}>
+              <PlusIcon className="mr-2 h-4 w-4" /> Добавить урок
+            </Button>
+          )}
+        </div>
       </div>
       
       {/* Weekly Schedule Tabs */}
@@ -395,6 +446,42 @@ export default function SchedulePage() {
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="scheduleDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Дата урока</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP", { locale: ru })
+                            ) : (
+                              <span>Выберите дату</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
               <FormField
                 control={form.control}
                 name="dayOfWeek"

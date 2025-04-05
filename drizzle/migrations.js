@@ -1,10 +1,5 @@
-import { drizzle } from "drizzle-orm/postgres-js";
-import { migrate } from "drizzle-orm/postgres-js/migrator";
-import postgres from "postgres";
-import * as schema from "@shared/schema";
-import * as dotenv from "dotenv";
-
-dotenv.config();
+require('dotenv').config();
+const postgres = require('postgres');
 
 async function runMigrations() {
   const DATABASE_URL = process.env.DATABASE_URL || '';
@@ -21,7 +16,7 @@ async function runMigrations() {
     
     // Add the schedule_date column to the schedules table if it doesn't exist
     await migrationClient`
-      DO 4303
+      DO 4364
       BEGIN
         IF NOT EXISTS (
           SELECT 1 FROM information_schema.columns 
@@ -29,7 +24,7 @@ async function runMigrations() {
         ) THEN
           ALTER TABLE schedules ADD COLUMN schedule_date DATE;
         END IF;
-      END 4303;
+      END 4364;
     `;
     
     console.log("Migration completed successfully");
@@ -38,6 +33,7 @@ async function runMigrations() {
     process.exit(1);
   } finally {
     await migrationClient.end();
+    process.exit(0);
   }
 }
 
