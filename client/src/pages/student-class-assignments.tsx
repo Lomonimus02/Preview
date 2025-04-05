@@ -132,6 +132,20 @@ export default function StudentClassAssignmentsPage() {
 
   // Обработчик отправки формы
   const onSubmit = (values: z.infer<typeof studentClassFormSchema>) => {
+    // Устанавливаем выбранного студента в форму, если не выбран
+    if (!values.studentId && selectedStudent) {
+      values.studentId = selectedStudent.toString();
+    }
+    
+    if (!values.studentId || !values.classId) {
+      toast({
+        title: "Ошибка",
+        description: "Необходимо выбрать ученика и класс",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     addStudentToClassMutation.mutate({
       studentId: parseInt(values.studentId),
       classId: parseInt(values.classId)
@@ -141,6 +155,9 @@ export default function StudentClassAssignmentsPage() {
   // Назначить выбранного студента и получить его классы
   const handleStudentSelect = (studentId: number) => {
     setSelectedStudent(studentId);
+    
+    // Устанавливаем выбранного студента в форму
+    form.setValue("studentId", studentId.toString());
   };
 
   // Получаем имя студента
@@ -236,6 +253,7 @@ export default function StudentClassAssignmentsPage() {
                               <FormLabel>Ученик</FormLabel>
                               <Select
                                 onValueChange={field.onChange}
+                                value={selectedStudent?.toString() || field.value}
                                 defaultValue={selectedStudent?.toString()}
                               >
                                 <FormControl>

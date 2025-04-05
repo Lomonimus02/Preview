@@ -2,11 +2,11 @@ import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
-import { UserRoleEnum, User, insertUserSchema } from "@shared/schema";
+import { UserRoleEnum, User, insertUserSchema, Class, ParentStudent } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, Plus, Search, Filter } from "lucide-react";
+import { Pencil, Plus, Search, Filter, BookOpen, UsersIcon, UserIcon, UserPlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -40,6 +40,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -68,7 +81,7 @@ const userFormSchema = insertUserSchema.extend({
 
 type UserFormData = z.infer<typeof userFormSchema>;
 
-export default function Users() {
+export default function UsersPage() {
   const { user } = useAuth();
   const { isAdmin } = useRoleCheck();
   const { toast } = useToast();
@@ -255,95 +268,674 @@ export default function Users() {
     setIsEditDialogOpen(true);
   };
   
+  // States for student-class management
+  const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
+  const [searchStudentTerm, setSearchStudentTerm] = useState("");
+  
+  // States for parent-student management
+  const [selectedParent, setSelectedParent] = useState<number | null>(null);
+  const [searchParentTerm, setSearchParentTerm] = useState("");
+  
+  // Fetch classes for student assignment
+  const { data: classes = [] } = useQuery<Class[]>({
+    queryKey: ["/api/classes"],
+    enabled: isAdmin()
+  });
+  
+  // Fetch student classes for selected student
+  const { data: studentClasses = [], isLoading: studentClassesLoading, refetch: refetchStudentClasses } = useQuery<Class[]>({
+    queryKey: ["/api/student-classes", selectedStudent],
+    queryFn: async ({ queryKey }) => {
+      const studentId = queryKey[1];
+      if (!studentId) return [];
+      const res = await fetch(`/api/student-classes?studentId=${studentId}`);
+      if (!res.ok) throw new Error("Failed to fetch student classes");
+      return res.json();
+    },
+    enabled: !!selectedStudent
+  });
+  
+  // Fetch parent-student connections for selected parent
+  const { data: parentStudents = [], isLoading: parentStudentsLoading, refetch: refetchParentStudents } = useQuery<ParentStudent[]>({
+    queryKey: ["/api/parent-students", selectedParent],
+    queryFn: async ({ queryKey }) => {
+      const parentId = queryKey[1];
+      if (!parentId) return [];
+      const res = await fetch(`/api/parent-students?parentId=${parentId}`);
+      if (!res.ok) throw new Error("Failed to fetch parent-student connections");
+      return res.json();
+    },
+    enabled: !!selectedParent
+  });
+  
+  // Filter students and parents
+  const students = users.filter(u => u.role === UserRoleEnum.STUDENT);
+  const parents = users.filter(u => u.role === UserRoleEnum.PARENT);
+  
+  const filteredStudents = searchStudentTerm 
+    ? students.filter(student => 
+        `${student.firstName} ${student.lastName} ${student.username}`.toLowerCase().includes(searchStudentTerm.toLowerCase()))
+    : students;
+    
+  const filteredParents = searchParentTerm
+    ? parents.filter(parent => 
+        `${parent.firstName} ${parent.lastName} ${parent.username}`.toLowerCase().includes(searchParentTerm.toLowerCase()))
+    : parents;
+  
+  // Form for adding student to class
+  const studentClassForm = useForm({
+    defaultValues: {
+      studentId: "",
+      classId: ""
+    },
+    resolver: zodResolver(
+      z.object({
+        studentId: z.string({
+          required_error: "Выберите ученика"
+        }),
+        classId: z.string({
+          required_error: "Выберите класс"
+        })
+      })
+    )
+  });
+  
+  // Form for connecting parent and student
+  const parentStudentForm = useForm({
+    defaultValues: {
+      parentId: "",
+      studentId: ""
+    },
+    resolver: zodResolver(
+      z.object({
+        parentId: z.string({
+          required_error: "Выберите родителя"
+        }),
+        studentId: z.string({
+          required_error: "Выберите ученика"
+        })
+      })
+    )
+  });
+  
+  // Add student to class mutation
+  const addStudentToClassMutation = useMutation({
+    mutationFn: async (data: { studentId: number, classId: number }) => {
+      const res = await apiRequest("POST", "/api/student-classes", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Успешно",
+        description: "Ученик добавлен в класс",
+        variant: "default",
+      });
+      studentClassForm.reset({ 
+        studentId: selectedStudent?.toString() || "", 
+        classId: "" 
+      });
+      if (selectedStudent) {
+        refetchStudentClasses();
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось добавить ученика в класс",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Add parent-student connection mutation
+  const addParentStudentMutation = useMutation({
+    mutationFn: async (data: { parentId: number, studentId: number }) => {
+      const res = await apiRequest("POST", "/api/parent-students", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Успешно",
+        description: "Родитель связан с учеником",
+        variant: "default",
+      });
+      parentStudentForm.reset({ 
+        parentId: selectedParent?.toString() || "", 
+        studentId: "" 
+      });
+      if (selectedParent) {
+        refetchParentStudents();
+      }
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось связать родителя с учеником",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Handlers for student-class management
+  const handleStudentSelect = (studentId: number) => {
+    setSelectedStudent(studentId);
+    studentClassForm.setValue("studentId", studentId.toString());
+  };
+  
+  const onSubmitStudentClass = (values: any) => {
+    addStudentToClassMutation.mutate({
+      studentId: parseInt(values.studentId),
+      classId: parseInt(values.classId)
+    });
+  };
+  
+  // Handlers for parent-student management
+  const handleParentSelect = (parentId: number) => {
+    setSelectedParent(parentId);
+    parentStudentForm.setValue("parentId", parentId.toString());
+  };
+  
+  const onSubmitParentStudent = (values: any) => {
+    addParentStudentMutation.mutate({
+      parentId: parseInt(values.parentId),
+      studentId: parseInt(values.studentId)
+    });
+  };
+  
+  // Helper functions
+  const getStudentName = (id: number) => {
+    const student = users.find(s => s.id === id);
+    return student ? `${student.lastName} ${student.firstName}` : `Ученик ${id}`;
+  };
+  
+  const getClassName = (id: number) => {
+    const cls = classes.find(c => c.id === id);
+    return cls ? cls.name : `Класс ${id}`;
+  };
+  
+  const isStudentInClass = (studentId: number, classId: number) => {
+    if (!selectedStudent || selectedStudent !== studentId) return false;
+    return studentClasses.some(cls => cls.id === classId);
+  };
+  
+  const isStudentConnectedToParent = (parentId: number, studentId: number) => {
+    if (!selectedParent || selectedParent !== parentId) return false;
+    return parentStudents.some(ps => ps.studentId === studentId);
+  };
+  
+  const getConnectedStudents = () => {
+    if (!selectedParent) return [];
+    
+    return parentStudents.map(ps => {
+      const student = users.find(u => u.id === ps.studentId);
+      return {
+        id: ps.id,
+        studentId: ps.studentId,
+        name: student ? `${student.lastName} ${student.firstName}` : `Ученик ${ps.studentId}`,
+        email: student?.email
+      };
+    });
+  };
+
   return (
     <MainLayout>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-heading font-bold text-gray-800">Пользователи</h2>
-        <Button onClick={() => { resetForm(); setIsAddDialogOpen(true); }}>
-          <Plus className="mr-2 h-4 w-4" /> Добавить пользователя
-        </Button>
-      </div>
-      
-      {/* Search and filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-grow">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Поиск пользователей..."
-            className="pl-10"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="users" className="flex items-center">
+            <UsersIcon className="mr-2 h-4 w-4" />
+            Пользователи
+          </TabsTrigger>
+          <TabsTrigger value="student-classes" className="flex items-center">
+            <BookOpen className="mr-2 h-4 w-4" />
+            Ученики и классы
+          </TabsTrigger>
+          <TabsTrigger value="parent-students" className="flex items-center">
+            <UserPlusIcon className="mr-2 h-4 w-4" />
+            Родители и дети
+          </TabsTrigger>
+        </TabsList>
         
-        <div className="w-full md:w-64">
-          <Select
-            value={roleFilter}
-            onValueChange={(value) => setRoleFilter(value as UserRoleEnum | "all")}
-          >
-            <SelectTrigger>
-              <div className="flex items-center">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Фильтр по роли" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Все роли</SelectItem>
-              {Object.values(UserRoleEnum).map((role) => (
-                <SelectItem key={role} value={role}>
-                  {getRoleName(role as UserRoleEnum)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      
-      {/* Users Table */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Имя</TableHead>
-              <TableHead>Логин</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Роль</TableHead>
-              <TableHead>Школа</TableHead>
-              <TableHead className="text-right">Действия</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-6">
-                  Загрузка...
-                </TableCell>
-              </TableRow>
-            ) : filteredUsers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-6">
-                  {searchQuery || roleFilter !== "all" ? "Пользователи не найдены" : "Нет пользователей"}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredUsers.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">{u.firstName} {u.lastName}</TableCell>
-                  <TableCell>{u.username}</TableCell>
-                  <TableCell>{u.email}</TableCell>
-                  <TableCell>{getRoleName(u.role)}</TableCell>
-                  <TableCell>{u.schoolId || '-'}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleEdit(u)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
+        {/* Users Tab */}
+        <TabsContent value="users">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-heading font-bold text-gray-800">Пользователи</h2>
+            <Button onClick={() => { resetForm(); setIsAddDialogOpen(true); }}>
+              <Plus className="mr-2 h-4 w-4" /> Добавить пользователя
+            </Button>
+          </div>
+          
+          {/* Search and filters */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="relative flex-grow">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="Поиск пользователей..."
+                className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            
+            <div className="w-full md:w-64">
+              <Select
+                value={roleFilter}
+                onValueChange={(value) => setRoleFilter(value as UserRoleEnum | "all")}
+              >
+                <SelectTrigger>
+                  <div className="flex items-center">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Фильтр по роли" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Все роли</SelectItem>
+                  {Object.values(UserRoleEnum).map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {getRoleName(role as UserRoleEnum)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Users Table */}
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Имя</TableHead>
+                  <TableHead>Логин</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Роль</TableHead>
+                  <TableHead>Школа</TableHead>
+                  <TableHead className="text-right">Действия</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6">
+                      Загрузка...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-6">
+                      {searchQuery || roleFilter !== "all" ? "Пользователи не найдены" : "Нет пользователей"}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredUsers.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-medium">{u.firstName} {u.lastName}</TableCell>
+                      <TableCell>{u.username}</TableCell>
+                      <TableCell>{u.email}</TableCell>
+                      <TableCell>{getRoleName(u.role)}</TableCell>
+                      <TableCell>{u.schoolId || '-'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(u)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+        
+        {/* Student-Classes Tab */}
+        <TabsContent value="student-classes">
+          <div className="mb-6">
+            <h2 className="text-2xl font-heading font-bold text-gray-800">Управление учениками в классах</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Список студентов */}
+            <Card className="md:col-span-1">
+              <CardHeader>
+                <CardTitle>Ученики</CardTitle>
+                <CardDescription>Выберите ученика для просмотра его классов</CardDescription>
+                <div className="relative mt-2">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Поиск ученика..."
+                    className="pl-8"
+                    value={searchStudentTerm}
+                    onChange={(e) => setSearchStudentTerm(e.target.value)}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px] overflow-y-auto">
+                  {isLoading ? (
+                    <div className="text-center p-4">Загрузка учеников...</div>
+                  ) : filteredStudents.length === 0 ? (
+                    <div className="text-center p-4 text-gray-500">Ученики не найдены</div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {filteredStudents.map((student) => (
+                        <li key={student.id}>
+                          <Button
+                            variant={selectedStudent === student.id ? "default" : "outline"}
+                            className="w-full justify-start"
+                            onClick={() => handleStudentSelect(student.id)}
+                          >
+                            <UserPlusIcon className="h-4 w-4 mr-2" />
+                            {student.lastName} {student.firstName}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Форма добавления в класс и список классов ученика */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>
+                  {selectedStudent ? (
+                    <>Классы ученика: {getStudentName(selectedStudent)}</>
+                  ) : (
+                    <>Выберите ученика</>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {selectedStudent ? "Управление классами для выбранного ученика" : "Для управления классами сначала выберите ученика из списка слева"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {selectedStudent && (
+                  <>
+                    <Form {...studentClassForm}>
+                      <form onSubmit={studentClassForm.handleSubmit(onSubmitStudentClass)} className="space-y-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={studentClassForm.control}
+                            name="studentId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Ученик</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={selectedStudent?.toString() || field.value}
+                                  defaultValue={selectedStudent?.toString()}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Выберите ученика" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {students.map((student) => (
+                                      <SelectItem key={student.id} value={student.id.toString()}>
+                                        {student.lastName} {student.firstName}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={studentClassForm.control}
+                            name="classId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Класс</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Выберите класс" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {classes.map((cls) => (
+                                      <SelectItem 
+                                        key={cls.id} 
+                                        value={cls.id.toString()}
+                                        disabled={isStudentInClass(selectedStudent, cls.id)}
+                                      >
+                                        {cls.name} {isStudentInClass(selectedStudent, cls.id) && "(уже добавлен)"}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <Button type="submit" disabled={addStudentToClassMutation.isPending}>
+                          {addStudentToClassMutation.isPending ? "Добавление..." : "Добавить в класс"}
+                        </Button>
+                      </form>
+                    </Form>
+
+                    <div className="mt-6">
+                      <h3 className="text-lg font-medium mb-4">Текущие классы ученика</h3>
+                      {studentClassesLoading ? (
+                        <div className="text-center p-4">Загрузка классов...</div>
+                      ) : studentClasses.length === 0 ? (
+                        <div className="text-center p-4 text-gray-500">Ученик не добавлен ни в один класс</div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Класс</TableHead>
+                              <TableHead>Учебный год</TableHead>
+                              <TableHead>Уровень</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {studentClasses.map((cls) => (
+                              <TableRow key={cls.id}>
+                                <TableCell className="font-medium">{cls.name}</TableCell>
+                                <TableCell>{cls.academicYear}</TableCell>
+                                <TableCell>{cls.gradeLevel}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {!selectedStudent && (
+                  <div className="text-center py-8 text-gray-500">
+                    <BookOpen className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                    <p>Для управления классами выберите ученика из списка слева</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        {/* Parent-Students Tab */}
+        <TabsContent value="parent-students">
+          <div className="mb-6">
+            <h2 className="text-2xl font-heading font-bold text-gray-800">Управление связями родитель-ученик</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Список родителей */}
+            <Card className="md:col-span-1">
+              <CardHeader>
+                <CardTitle>Родители</CardTitle>
+                <CardDescription>Выберите родителя для управления связями с учениками</CardDescription>
+                <div className="relative mt-2">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Поиск родителя..."
+                    className="pl-8"
+                    value={searchParentTerm}
+                    onChange={(e) => setSearchParentTerm(e.target.value)}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px] overflow-y-auto">
+                  {isLoading ? (
+                    <div className="text-center p-4">Загрузка родителей...</div>
+                  ) : filteredParents.length === 0 ? (
+                    <div className="text-center p-4 text-gray-500">Родители не найдены</div>
+                  ) : (
+                    <ul className="space-y-2">
+                      {filteredParents.map((parent) => (
+                        <li key={parent.id}>
+                          <Button
+                            variant={selectedParent === parent.id ? "default" : "outline"}
+                            className="w-full justify-start"
+                            onClick={() => handleParentSelect(parent.id)}
+                          >
+                            <UserIcon className="h-4 w-4 mr-2" />
+                            {parent.lastName} {parent.firstName}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Форма добавления и список детей */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>
+                  {selectedParent ? (
+                    <>Дети родителя: {getStudentName(selectedParent)}</>
+                  ) : (
+                    <>Выберите родителя</>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {selectedParent 
+                    ? "Управление связями для выбранного родителя" 
+                    : "Для управления связями сначала выберите родителя из списка слева"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {selectedParent && (
+                  <>
+                    <Form {...parentStudentForm}>
+                      <form onSubmit={parentStudentForm.handleSubmit(onSubmitParentStudent)} className="space-y-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={parentStudentForm.control}
+                            name="parentId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Родитель</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  defaultValue={selectedParent?.toString()}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Выберите родителя" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {parents.map((parent) => (
+                                      <SelectItem key={parent.id} value={parent.id.toString()}>
+                                        {parent.lastName} {parent.firstName}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={parentStudentForm.control}
+                            name="studentId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Ученик</FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  defaultValue={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Выберите ученика" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {students.map((student) => (
+                                      <SelectItem 
+                                        key={student.id} 
+                                        value={student.id.toString()}
+                                        disabled={isStudentConnectedToParent(selectedParent, student.id)}
+                                      >
+                                        {student.lastName} {student.firstName} 
+                                        {isStudentConnectedToParent(selectedParent, student.id) && " (уже связан)"}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <Button type="submit" disabled={addParentStudentMutation.isPending}>
+                          {addParentStudentMutation.isPending ? "Добавление..." : "Добавить ребенка"}
+                        </Button>
+                      </form>
+                    </Form>
+
+                    <div className="mt-6">
+                      <h3 className="text-lg font-medium mb-4">Дети родителя</h3>
+                      {parentStudentsLoading ? (
+                        <div className="text-center p-4">Загрузка связей...</div>
+                      ) : parentStudents.length === 0 ? (
+                        <div className="text-center p-4 text-gray-500">У родителя нет связанных учеников</div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Ученик</TableHead>
+                              <TableHead>Email</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {getConnectedStudents().map((connection) => (
+                              <TableRow key={connection.id}>
+                                <TableCell className="font-medium">{connection.name}</TableCell>
+                                <TableCell>{connection.email || "-"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {!selectedParent && (
+                  <div className="text-center py-8 text-gray-500">
+                    <UsersIcon className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                    <p>Для управления связями выберите родителя из списка слева</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
       
       {/* Add User Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
