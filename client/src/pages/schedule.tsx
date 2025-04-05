@@ -192,6 +192,15 @@ export default function SchedulePage() {
     },
   });
   
+  // Функция для синхронизации дня недели с выбранной датой
+  const syncDayOfWeekWithDate = (date: Date) => {
+    // getDay() возвращает 0 для воскресенья, 1 для понедельника и т.д.
+    // Нужно преобразовать к нашему формату, где 1 - понедельник, 7 - воскресенье
+    let dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
+    form.setValue("dayOfWeek", dayOfWeek);
+    return dayOfWeek;
+  };
+  
   // Add schedule mutation
   const addScheduleMutation = useMutation({
     mutationFn: async (data: z.infer<typeof scheduleFormSchema>) => {
@@ -325,7 +334,18 @@ export default function SchedulePage() {
                 <Calendar
                   mode="single"
                   selected={selectedDate}
-                  onSelect={setSelectedDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      // Устанавливаем выбранную дату
+                      setSelectedDate(date);
+                      
+                      // Переключаемся на соответствующую вкладку дня недели
+                      let dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
+                      setCurrentTab(dayOfWeek.toString());
+                    } else {
+                      setSelectedDate(null);
+                    }
+                  }}
                   className="rounded-md border"
                 />
                 <div className="flex justify-end">
@@ -478,7 +498,13 @@ export default function SchedulePage() {
                         <Calendar
                           mode="single"
                           selected={field.value}
-                          onSelect={field.onChange}
+                          onSelect={(date) => {
+                            if (date) {
+                              field.onChange(date);
+                              // Автоматически устанавливаем день недели по дате
+                              syncDayOfWeekWithDate(date);
+                            }
+                          }}
                           initialFocus
                         />
                       </PopoverContent>
