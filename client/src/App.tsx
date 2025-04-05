@@ -18,6 +18,8 @@ import Settings from "@/pages/settings";
 import Support from "./pages/support-page";
 import Notifications from "./pages/notifications";
 import SystemLogs from "./pages/system-logs";
+import StudentClassAssignments from "./pages/student-class-assignments";
+import ParentStudentConnections from "./pages/parent-student-connections";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -39,6 +41,8 @@ function Router() {
       <ProtectedRoute path="/support" component={Support} />
       <ProtectedRoute path="/notifications" component={Notifications} />
       <ProtectedRoute path="/system-logs" component={SystemLogs} />
+      <ProtectedRoute path="/student-class-assignments" component={StudentClassAssignments} />
+      <ProtectedRoute path="/parent-student-connections" component={ParentStudentConnections} />
       <Route component={NotFound} />
     </Switch>
   );

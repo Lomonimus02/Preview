@@ -849,6 +849,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(201).json({ message: "Student added to class" });
   });
 
+  // GET student-classes - получение классов ученика или учеников класса
+  app.get("/api/student-classes", isAuthenticated, async (req, res) => {
+    const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : null;
+    const classId = req.query.classId ? parseInt(req.query.classId as string) : null;
+    
+    // Если запрашиваются классы ученика
+    if (studentId) {
+      // Проверка прав: только супер-админ, школьный админ, учитель, ученик (свои классы) и родитель (классы ребенка)
+      if (req.user.role === UserRoleEnum.STUDENT && req.user.id !== studentId) {
+        return res.status(403).json({ message: "You can only view your own classes" });
+      }
+      
+      if (req.user.role === UserRoleEnum.PARENT) {
+        // Проверяем, является ли запрашиваемый студент ребенком этого родителя
+        const relations = await dataStorage.getParentStudents(req.user.id);
+        const childIds = relations.map(r => r.studentId);
+        
+        if (!childIds.includes(studentId)) {
+          return res.status(403).json({ message: "You can only view your children's classes" });
+        }
+      }
+      
+      const classes = await dataStorage.getStudentClasses(studentId);
+      return res.json(classes);
+    }
+    
+    // Если запрашиваются ученики класса
+    if (classId) {
+      // Проверяем, имеет ли пользователь доступ к классу
+      if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+        const classObj = await dataStorage.getClass(classId);
+        if (!classObj || classObj.schoolId !== req.user.schoolId) {
+          return res.status(403).json({ message: "You can only view students in classes of your school" });
+        }
+      } else if (req.user.role === UserRoleEnum.TEACHER) {
+        // Учитель может видеть только учеников тех классов, где преподает
+        const schedules = await dataStorage.getSchedulesByTeacher(req.user.id);
+        const teacherClassIds = [...new Set(schedules.map(s => s.classId))];
+        
+        if (!teacherClassIds.includes(classId)) {
+          return res.status(403).json({ message: "You can only view students in classes you teach" });
+        }
+      } else if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+        return res.status(403).json({ message: "You don't have permission to view class students" });
+      }
+      
+      const students = await dataStorage.getClassStudents(classId);
+      return res.json(students);
+    }
+    
+    return res.status(400).json({ message: "Either studentId or classId must be provided" });
+  });
+
   // Teacher-subject relationships
   app.post("/api/teacher-subjects", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
     const { teacherId, subjectId } = req.body;
@@ -926,6 +979,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     res.status(201).json(relationship);
+  });
+
+  // GET parent-students - получение списка родителей/детей
+  app.get("/api/parent-students", isAuthenticated, async (req, res) => {
+    const parentId = req.query.parentId ? parseInt(req.query.parentId as string) : null;
+    const studentId = req.query.studentId ? parseInt(req.query.studentId as string) : null;
+    
+    // Если запрос для получения детей родителя
+    if (parentId) {
+      // Админ может видеть детей любого родителя
+      if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+        // Родитель может видеть только своих детей
+        if (req.user.role === UserRoleEnum.PARENT && req.user.id !== parentId) {
+          return res.status(403).json({ message: "You can only view your own parent-student connections" });
+        }
+      }
+      
+      const relations = await dataStorage.getParentStudents(parentId);
+      return res.json(relations);
+    }
+    
+    // Если запрос для получения родителей ученика
+    if (studentId) {
+      // Админ может видеть родителей любого ученика
+      if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL, UserRoleEnum.TEACHER].includes(req.user.role)) {
+        // Ученик может видеть только своих родителей
+        if (req.user.role === UserRoleEnum.STUDENT && req.user.id !== studentId) {
+          return res.status(403).json({ message: "You can only view your own parent-student connections" });
+        }
+        
+        // Родитель может видеть только родителей своих детей
+        if (req.user.role === UserRoleEnum.PARENT) {
+          const parentChildren = await dataStorage.getParentStudents(req.user.id);
+          const childIds = parentChildren.map(pc => pc.studentId);
+          
+          if (!childIds.includes(studentId)) {
+            return res.status(403).json({ message: "You can only view parent connections for your children" });
+          }
+        }
+      }
+      
+      const relations = await dataStorage.getStudentParents(studentId);
+      return res.json(relations);
+    }
+    
+    return res.status(400).json({ message: "Either parentId or studentId must be provided" });
   });
 
   // User roles API
