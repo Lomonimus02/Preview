@@ -145,7 +145,7 @@ export default function Users() {
       email: "",
       phone: "",
       role: UserRoleEnum.STUDENT,
-      schoolId: isSchoolAdmin() && user?.schoolId ? user.schoolId : null,
+      schoolId: user?.schoolId || null,
     });
   };
   
