@@ -418,6 +418,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.status(201).json(schedule);
   });
+  
+  // Удаление расписания
+  app.delete("/api/schedules/:id", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    const scheduleId = parseInt(req.params.id);
+    
+    // Проверяем, существует ли расписание
+    const schedule = await dataStorage.getSchedule(scheduleId);
+    if (!schedule) {
+      return res.status(404).json({ message: "Schedule not found" });
+    }
+    
+    // Проверяем права доступа для школьного администратора (школа должна совпадать)
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+      const scheduleClass = await dataStorage.getClass(schedule.classId);
+      if (!scheduleClass || scheduleClass.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "You can only delete schedules for your school" });
+      }
+    }
+    
+    // Удаляем расписание
+    const deletedSchedule = await dataStorage.deleteSchedule(scheduleId);
+    
+    // Логируем действие
+    await dataStorage.createSystemLog({
+      userId: req.user.id,
+      action: "schedule_deleted",
+      details: `Deleted schedule entry for ${schedule.scheduleDate || 'unspecified date'}, class ID: ${schedule.classId}`,
+      ipAddress: req.ip
+    });
+    
+    res.json(deletedSchedule);
+  });
 
   // Homework API
   app.get("/api/homework", isAuthenticated, async (req, res) => {

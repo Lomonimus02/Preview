@@ -18,9 +18,6 @@ import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { CalendarIcon, GraduationCapIcon, UsersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +43,9 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Table,
   TableBody,
@@ -136,23 +136,17 @@ export default function SchedulePage() {
   };
   
   // Add schedule mutation
-  // Define the schedule form schema
-  const scheduleFormSchema = z.object({
-    classId: z.number(),
-    subjectId: z.number(),
-    teacherId: z.number(),
-    dayOfWeek: z.number(),
-    scheduleDate: z.date(),
-    startTime: z.string(),
-    endTime: z.string(),
-    room: z.string().optional(),
-  });
-
-  // Type for the schedule form data
-  type ScheduleFormData = z.infer<typeof scheduleFormSchema>;
-
   const addScheduleMutation = useMutation({
-    mutationFn: async (data: ScheduleFormData) => {
+    mutationFn: async (data: z.infer<typeof z.object({
+      classId: z.number(),
+      subjectId: z.number(),
+      teacherId: z.number(),
+      dayOfWeek: z.number(),
+      scheduleDate: z.date(),
+      startTime: z.string(),
+      endTime: z.string(),
+      room: z.string().optional(),
+    })>) => {
       console.log("Добавление урока в расписание:", data);
       const res = await apiRequest("POST", "/api/schedules", data);
       return res.json();
@@ -293,7 +287,6 @@ export default function SchedulePage() {
             classes={classes}
             isAdmin={canEditSchedule}
             onAddSchedule={handleAddSchedule}
-            onDeleteSchedule={(scheduleId) => deleteScheduleMutation.mutate(scheduleId)}
           />
         )}
         

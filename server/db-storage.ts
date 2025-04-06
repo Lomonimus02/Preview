@@ -160,6 +160,13 @@ export class DatabaseStorage implements IStorage {
     console.log('Created schedule:', newSchedule);
     return newSchedule;
   }
+  
+  async deleteSchedule(id: number): Promise<Schedule | undefined> {
+    const [deletedSchedule] = await db.delete(schedules)
+      .where(eq(schedules.id, id))
+      .returning();
+    return deletedSchedule;
+  }
 
   // ===== Homework operations =====
   async getHomework(id: number): Promise<Homework | undefined> {
