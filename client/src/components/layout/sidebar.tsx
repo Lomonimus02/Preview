@@ -37,7 +37,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "user-roles", "schedule", "homework", "grades", "analytics", "messages", "notifications", "settings", "support"],
     [UserRoleEnum.TEACHER]: ["dashboard", "schedule", "homework", "messages", "documents", "support"],
     [UserRoleEnum.STUDENT]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
-    [UserRoleEnum.PARENT]: ["dashboard", "grades", "messages", "documents", "support"],
+    [UserRoleEnum.PARENT]: ["dashboard", "schedule", "grades", "homework", "messages", "documents", "support"],
     [UserRoleEnum.PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"],
     [UserRoleEnum.VICE_PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"]
   };

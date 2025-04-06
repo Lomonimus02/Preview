@@ -111,7 +111,7 @@ const gradeFormSchema = insertGradeSchema.extend({
 export default function SchedulePage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { isSuperAdmin, isSchoolAdmin, isTeacher } = useRoleCheck();
+  const { isSuperAdmin, isSchoolAdmin, isTeacher, isParent } = useRoleCheck();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [isClassStudentsDialogOpen, setIsClassStudentsDialogOpen] = useState(false);
@@ -120,6 +120,7 @@ export default function SchedulePage() {
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
   
   // Check access permissions
   const canEditSchedule = isSuperAdmin() || isSchoolAdmin();
@@ -134,6 +135,17 @@ export default function SchedulePage() {
     },
     enabled: !!user,
     staleTime: 5 * 60 * 1000 // Кэшируем на 5 минут
+  });
+  
+  // Fetch parent-children relationships for parent users
+  const { data: parentStudentRelations = [] } = useQuery<ParentStudent[]>({
+    queryKey: ["/api/parent-students"],
+    queryFn: async () => {
+      const res = await fetch(`/api/parent-students?parentId=${user?.id}`);
+      if (!res.ok) throw new Error("Failed to fetch parent-student relationships");
+      return res.json();
+    },
+    enabled: !!user && isParent()
   });
   
   // Filter schedules for teacher
@@ -280,14 +292,34 @@ export default function SchedulePage() {
     addGradeMutation.mutate(values);
   };
   
+  // Функция фильтрации расписания в зависимости от роли и выбранного ребенка
+  const getFilteredSchedules = (): ScheduleType[] => {
+    // Если пользователь - родитель и выбран ребенок
+    if (isParent() && selectedChildId) {
+      // Получаем классы выбранного ребенка
+      const studentClasses = users.find(u => u.id === selectedChildId)?.schoolId
+        ? classes.filter(c => c.schoolId === users.find(u => u.id === selectedChildId)?.schoolId)
+        : [];
+      
+      // Фильтруем расписание по классам ребенка
+      return schedules.filter(schedule => 
+        studentClasses.some(cls => cls.id === schedule.classId)
+      );
+    }
+    
+    // Для учителей
+    if (isTeacher()) {
+      return teacherSchedules;
+    }
+    
+    // Для всех остальных
+    return schedules;
+  };
+  
   // Filter schedules by day
   const getSchedulesByDay = (day: number) => {
-    // Используем соответствующее расписание в зависимости от роли пользователя
-    let schedulesToFilter = schedules;
-    
-    if (isTeacher()) {
-      schedulesToFilter = teacherSchedules;
-    }
+    // Используем отфильтрованное расписание
+    let schedulesToFilter = getFilteredSchedules();
     
     return schedulesToFilter
       .filter(schedule => schedule.dayOfWeek === day)
@@ -337,10 +369,53 @@ export default function SchedulePage() {
         </div>
       ) : (
         <div>
+          {/* Выбор ребенка для родителей */}
+          {isParent() && parentStudentRelations.length > 0 && (
+            <Card className="mb-6 p-6 border-b-4 border-b-primary">
+              <CardHeader className="p-0 mb-4">
+                <CardTitle className="text-xl">Просмотр расписания ребенка</CardTitle>
+                <CardDescription>
+                  Выберите ребенка, чтобы посмотреть его расписание занятий
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="flex flex-wrap gap-4">
+                  {parentStudentRelations.map(relation => {
+                    const student = users.find(u => u.id === relation.studentId);
+                    if (!student) return null;
+                    
+                    return (
+                      <Button
+                        key={relation.id}
+                        variant={selectedChildId === student.id ? "default" : "outline"}
+                        className="flex items-center gap-2"
+                        onClick={() => setSelectedChildId(student.id)}
+                      >
+                        <UsersIcon className="h-4 w-4" />
+                        {student.firstName} {student.lastName}
+                      </Button>
+                    );
+                  })}
+                  
+                  {selectedChildId && (
+                    <Button 
+                      variant="outline" 
+                      className="flex items-center gap-2 ml-auto"
+                      onClick={() => setSelectedChildId(null)}
+                    >
+                      <FilterIcon className="h-4 w-4" />
+                      Сбросить выбор
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           {/* Карусель расписания */}
           <Card className="mb-6 p-6">
             <ScheduleCarousel
-              schedules={isTeacher() ? teacherSchedules : schedules}
+              schedules={getFilteredSchedules()}
               subjects={subjects}
               classes={classes}
               users={users}
