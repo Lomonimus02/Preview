@@ -456,7 +456,12 @@ export default function SchedulePage() {
               <DialogHeader>
                 <DialogTitle>Информация об уроке</DialogTitle>
                 <DialogDescription>
-                  Детали выбранного урока
+                  {selectedSchedule && (
+                    <>
+                      {getSubjectName(selectedSchedule.subjectId)} ·{" "}
+                      {selectedSchedule.startTime} - {selectedSchedule.endTime}
+                    </>
+                  )}
                 </DialogDescription>
               </DialogHeader>
               
@@ -512,15 +517,44 @@ export default function SchedulePage() {
                     </div>
                   </div>
                   
-                  {/* Здесь можно добавить информацию о домашнем задании, если оно есть */}
-                  <div className="border-t pt-4 mt-4">
-                    <h4 className="font-medium leading-none mb-2">Домашнее задание</h4>
-                    <p className="text-sm text-gray-500">
-                      {Math.random() > 0.5 ? 
-                        "Прочитать параграф 10, выполнить упражнения 15-20" : 
-                        "Домашнее задание не задано"}
-                    </p>
-                  </div>
+                  {isTeacher() && (
+                    <div className="flex justify-end gap-2 mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedClassId(selectedSchedule.classId);
+                          setIsClassStudentsDialogOpen(true);
+                          setIsLessonDetailsOpen(false);
+                        }}
+                      >
+                        <UsersIcon className="h-4 w-4 mr-2" />
+                        Ученики класса
+                      </Button>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          setIsGradeDialogOpen(true);
+                          setIsLessonDetailsOpen(false);
+                          
+                          // Предзаполняем форму оценки
+                          gradeForm.reset({
+                            studentId: undefined,
+                            grade: undefined,
+                            comment: "",
+                            gradeType: "Текущая",
+                            classId: selectedSchedule.classId,
+                            subjectId: selectedSchedule.subjectId,
+                            teacherId: user?.id,
+                          });
+                        }}
+                      >
+                        <GraduationCapIcon className="h-4 w-4 mr-2" />
+                        Выставить оценку
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
                 
@@ -532,77 +566,7 @@ export default function SchedulePage() {
             </DialogContent>
           </Dialog>
           
-          {/* Панель детализации */}
-          {isTeacher() && selectedDate && (
-            <Card className="p-6 border-t-4 border-t-primary">
-              <CardHeader className="p-0 mb-4">
-                <CardTitle className="text-xl">Детали уроков</CardTitle>
-                <CardDescription>
-                  {selectedDate ? format(selectedDate, "dd MMMM yyyy", { locale: ru }) : "Выберите дату для просмотра деталей"}
-                </CardDescription>
-              </CardHeader>
-              
-              <CardContent className="p-0">
-                {getSchedulesByDay(selectedDate.getDay() === 0 ? 7 : selectedDate.getDay()).length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <CalendarIcon className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-                    <p>На этот день уроки не запланированы</p>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Время</TableHead>
-                        <TableHead>Предмет</TableHead>
-                        <TableHead>Класс</TableHead>
-                        <TableHead>Кабинет</TableHead>
-                        <TableHead>Действия</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {getSchedulesByDay(selectedDate.getDay() === 0 ? 7 : selectedDate.getDay())
-                        .filter(schedule => isTeacher() ? schedule.teacherId === user?.id : true)
-                        .map((schedule) => (
-                        <TableRow key={schedule.id}>
-                          <TableCell className="font-medium">
-                            {schedule.startTime} - {schedule.endTime}
-                          </TableCell>
-                          <TableCell>{getSubjectName(schedule.subjectId)}</TableCell>
-                          <TableCell>{getClassName(schedule.classId)}</TableCell>
-                          <TableCell>{schedule.room || "-"}</TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedSchedule(schedule);
-                                  setSelectedClassId(schedule.classId);
-                                  setIsClassStudentsDialogOpen(true);
-                                }}
-                              >
-                                <UsersIcon className="h-4 w-4 mr-1" /> Ученики
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedSchedule(schedule);
-                                  setIsGradeDialogOpen(true);
-                                }}
-                              >
-                                <GraduationCapIcon className="h-4 w-4 mr-1" /> Оценки
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-              </CardContent>
-            </Card>
-          )}
+          {/* Вместо панели деталей используем интерактивные карточки в расписании */}
         </div>
       )}
       

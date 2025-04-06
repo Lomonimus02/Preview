@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Schedule as ScheduleType, Subject, Class, User, UserRoleEnum } from "@shared/schema";
-import { Book, Check, Clock, GraduationCap, MapPin, Plus, Trash2, User as UserIcon } from "lucide-react";
+import { Book, BookOpen, Building2, Check, Clock, GraduationCap, MapPin, Plus, Trash2, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
   AlertDialog,
@@ -206,17 +206,18 @@ export function DayCard({
               sortedSchedules.map((schedule) => (
                 <div 
                   key={schedule.id} 
-                  className="p-2 rounded-md transition-colors bg-muted hover:bg-muted/70 cursor-pointer"
+                  className="p-3 rounded-md transition-colors bg-muted hover:bg-primary/10 cursor-pointer border border-transparent hover:border-primary/40"
                   onClick={() => onLessonClick && onLessonClick(schedule)}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="font-medium">
-                      {schedule.startTime} - {schedule.endTime}
+                  {/* Верхняя часть карточки: время и действия */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-primary" />
+                      <div className="font-medium">
+                        {schedule.startTime} - {schedule.endTime}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="text-xs opacity-80">
-                        Кабинет: {schedule.room || "—"}
-                      </div>
                       {isAdmin && (
                         <Button
                           variant="ghost"
@@ -233,12 +234,32 @@ export function DayCard({
                       )}
                     </div>
                   </div>
-                  <div className="font-semibold">
-                    {getSubjectName(schedule.subjectId)}
+                  
+                  {/* Информация о предмете и учителе */}
+                  <div className="mb-2">
+                    <div className="flex items-center gap-2 mb-1">
+                      <BookOpen className="h-4 w-4 text-primary" />
+                      <div className="font-semibold">
+                        {getSubjectName(schedule.subjectId)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <UserIcon className="h-4 w-4 text-primary" />
+                      <div className="text-sm">
+                        {getTeacherName(schedule.teacherId)}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm opacity-80 mt-1">
-                    {getTeacherName(schedule.teacherId)}
+                  
+                  {/* Информация о кабинете */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <Building2 className="h-4 w-4 text-primary" />
+                    <div className="text-sm">
+                      Кабинет: {schedule.room || "не указан"}
+                    </div>
                   </div>
+                  
+                  {/* Нижняя часть: статусы и бэйджи */}
                   <div className="flex items-center justify-end mt-1">
                     {/* Здесь можно добавить иконки статуса */}
                     {Math.random() > 0.5 ? (
@@ -247,7 +268,7 @@ export function DayCard({
                         Выполнено
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-xs h-5">
+                      <Badge variant="outline" className="text-xs h-5 bg-primary/5">
                         <Plus className="h-3 w-3 mr-1" />
                         Домашнее задание
                       </Badge>
