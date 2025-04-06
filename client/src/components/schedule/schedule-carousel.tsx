@@ -28,6 +28,10 @@ export function ScheduleCarousel({
     loop: false,
     align: "center",
     containScroll: "trimSnaps",
+    dragFree: true,          // Включаем режим свободного перетаскивания
+    duration: 40,            // Увеличиваем длительность анимации для плавности (в мс)
+    inViewThreshold: 0.7,    // Элемент считается видимым при показе 70% его ширины
+    slidesToScroll: 3,       // Количество слайдов для пролистывания кнопками или событиями
   });
   
   const [activeIndex, setActiveIndex] = useState(0);
@@ -98,6 +102,38 @@ export function ScheduleCarousel({
       emblaApi.reInit();
     }
   }, [emblaApi, weekDays, weekOffset]);
+  
+  // Добавляем обработчик колесика мыши для прокрутки карусели
+  useEffect(() => {
+    const handleWheel = (event: WheelEvent) => {
+      if (!emblaApi) return;
+      
+      // Предотвращаем стандартную прокрутку страницы
+      event.preventDefault();
+      
+      // Определяем направление прокрутки
+      if (event.deltaY < 0) {
+        // Прокрутка вверх - двигаемся влево
+        emblaApi.scrollPrev();
+      } else {
+        // Прокрутка вниз - двигаемся вправо
+        emblaApi.scrollNext();
+      }
+    };
+    
+    // Получаем DOM-элемент карусели
+    const emblaNode = emblaRef.current as HTMLElement | null;
+    
+    if (emblaNode) {
+      // Добавляем слушатель события колеса мыши
+      emblaNode.addEventListener('wheel', handleWheel, { passive: false });
+      
+      // Функция очистки при размонтировании компонента
+      return () => {
+        emblaNode.removeEventListener('wheel', handleWheel);
+      };
+    }
+  }, [emblaApi, emblaRef]);
   
   // Обработчики переключения недель
   const goToPrevWeek = () => {
