@@ -296,14 +296,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMessage(message: InsertMessage): Promise<Message> {
-    const [newMessage] = await db.insert(messages).values({
-      ...message,
-      content: message.message,  // Поле в БД называется content
-    }).returning();
-    return {
-      ...newMessage,
-      message: newMessage.content, // Преобразуем обратно для совместимости с интерфейсом
-    } as unknown as Message;
+    // Проверяем, есть ли содержимое сообщения и используем его прямо из объекта сообщения
+    if (!message.content && message.message) {
+      message.content = message.message;
+    }
+    
+    // Если content все еще не определен, задаем пустую строку чтобы избежать NULL
+    if (!message.content) {
+      message.content = "";
+    }
+    
+    const [newMessage] = await db.insert(messages).values(message).returning();
+    return newMessage;
   }
 
   async markMessageAsRead(id: number): Promise<Message | undefined> {
@@ -329,15 +333,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    const [newNotification] = await db.insert(notifications).values({
-      ...notification,
-      content: notification.message // Поле в БД называется content
-    }).returning();
+    // Убедимся, что у нас есть контент для уведомления
+    if (!notification.content && notification.message) {
+      notification.content = notification.message;
+    }
     
-    return {
-      ...newNotification,
-      message: newNotification.content // Преобразуем для совместимости с интерфейсом
-    } as unknown as Notification;
+    // Если content все еще не определен, установим пустую строку
+    if (!notification.content) {
+      notification.content = "";
+    }
+    
+    const [newNotification] = await db.insert(notifications).values(notification).returning();
+    return newNotification;
   }
 
   async markNotificationAsRead(id: number): Promise<Notification | undefined> {
@@ -346,10 +353,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(notifications.id, id))
       .returning();
     
-    return {
-      ...updatedNotification,
-      message: updatedNotification.content // Преобразуем для совместимости с интерфейсом
-    } as unknown as Notification;
+    return updatedNotification;
   }
 
   // ===== Parent-Student operations =====
