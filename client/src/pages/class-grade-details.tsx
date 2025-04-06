@@ -80,10 +80,17 @@ export default function ClassGradeDetailsPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [addAnotherGrade, setAddAnotherGrade] = useState(false);
-  const [lastAddedGradeInfo, setLastAddedGradeInfo] = useState<{ 
-    studentId: number | null; 
-    date: string | null 
-  }>({ studentId: null, date: null });
+  
+  // State to track last added grade info for optimistic rendering
+  const [lastAddedGradeInfo, setLastAddedGradeInfo] = useState<{
+    studentId: number | null;
+    date: string | null;
+    grade: number | null;
+  }>({
+    studentId: null,
+    date: null,
+    grade: null
+  });
   
   // Fetch class details
   const { data: classData, isLoading: isClassLoading } = useQuery<ClassType>({
@@ -228,7 +235,8 @@ export default function ClassGradeDetailsPage() {
       // Сохраняем ID и дату последней добавленной оценки для дальнейшего использования
       setLastAddedGradeInfo({
         studentId: newGrade.studentId,
-        date: selectedDate || null
+        date: selectedDate || null,
+        grade: newGrade.grade
       });
       
       // Если указано addAnotherGrade, не закрываем диалог
@@ -400,6 +408,18 @@ export default function ClassGradeDetailsPage() {
   // Get student grades for a specific date for the current subject
   const getStudentGradeForDate = (studentId: number, date: string) => {
     const dateObj = new Date(date);
+    // Проверяем оптимистично добавленные оценки для этой даты и этого студента
+    if (addAnotherGrade && 
+        lastAddedGradeInfo.studentId === studentId && 
+        lastAddedGradeInfo.date === date) {
+      // Включаем текущие оценки для этого студента/даты
+      return grades.filter(g => 
+        g.studentId === studentId && 
+        g.subjectId === subjectId && 
+        g.createdAt && new Date(g.createdAt).toDateString() === dateObj.toDateString()
+      );
+    }
+    
     // Фильтруем оценки по студенту, предмету и дате
     return grades.filter(g => 
       g.studentId === studentId && 
@@ -475,12 +495,6 @@ export default function ClassGradeDetailsPage() {
               Таблицы оценок учеников по предметам
             </p>
           </div>
-          
-          {canEditGrades && (
-            <Button onClick={() => setIsGradeDialogOpen(true)}>
-              Добавить оценку
-            </Button>
-          )}
         </div>
         
         {students.length === 0 ? (
