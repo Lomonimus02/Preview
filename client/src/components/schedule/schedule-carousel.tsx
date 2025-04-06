@@ -121,10 +121,8 @@ export function ScheduleCarousel({
       }
     };
     
-    // Получаем DOM-элемент карусели через querySelector
-    const containerSelector = () => document.querySelector("[data-embla-container]") as HTMLElement | null;
-    
-    const emblaNode = containerSelector();
+    // Получаем DOM-элемент карусели
+    const emblaNode = emblaRef.current as HTMLElement | null;
     
     if (emblaNode) {
       // Добавляем слушатель события колеса мыши
@@ -132,12 +130,10 @@ export function ScheduleCarousel({
       
       // Функция очистки при размонтировании компонента
       return () => {
-        // Ищем элемент снова, поскольку он может измениться
-        const node = containerSelector();
-        if (node) node.removeEventListener('wheel', handleWheel);
+        emblaNode.removeEventListener('wheel', handleWheel);
       };
     }
-  }, [emblaApi]);
+  }, [emblaApi, emblaRef]);
   
   // Обработчики переключения недель
   const goToPrevWeek = () => {
@@ -152,28 +148,9 @@ export function ScheduleCarousel({
   const handleDayClick = (date: Date, index: number) => {
     // Устанавливаем индекс текущего дня при клике
     if (emblaApi) {
-      // Сначала приостанавливаем автоскролл и свободное перетаскивание
-      emblaApi.reInit({ dragFree: false });
-      
-      // Используем scrollTo с опцией immediate: false для плавной анимации
-      // к выбранной карточке (гарантирует, что карточка будет отцентрирована)
-      emblaApi.scrollTo(index, true);
+      // Используем scrollTo вместо запроса новых данных
+      emblaApi.scrollTo(index);
       setActiveIndex(index);
-      
-      // Через 300мс возвращаем прежние настройки карусели
-      setTimeout(() => {
-        if (emblaApi) {
-          emblaApi.reInit({
-            loop: false,
-            align: "center",
-            containScroll: "trimSnaps",
-            dragFree: true,
-            duration: 40,
-            inViewThreshold: 0.7,
-            slidesToScroll: 3
-          });
-        }
-      }, 300);
     }
     
     // Обновляем выбранную дату в родительском компоненте
@@ -235,7 +212,7 @@ export function ScheduleCarousel({
         </Button>
       </div>
       
-      <div className="overflow-hidden" ref={emblaRef} data-embla-container>
+      <div className="overflow-hidden" ref={emblaRef}>
         <div className="flex gap-4">
           {weekDays.map((date, index) => {
             const day = getWeekDayIndex(date);
