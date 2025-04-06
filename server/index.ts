@@ -42,28 +42,74 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  try {
-    // Проверяем подключение к базе данных
-    console.log('Testing database connection...');
-    await testConnection();
-    console.log('Database connection successful.');
+  // Функция для повторной попытки подключения к базе данных
+  const tryConnectToDatabase = async (maxRetries = 5, retryInterval = 5000) => {
+    let currentRetry = 0;
     
-    // Устанавливаем PostgreSQL как основное хранилище данных
-    process.env.USE_DATABASE = "true";
+    while (currentRetry < maxRetries) {
+      try {
+        console.log(`Attempt ${currentRetry + 1}/${maxRetries} to connect to database...`);
+        const isConnected = await testConnection();
+        
+        if (isConnected) {
+          console.log('Database connection successful.');
+          // Устанавливаем PostgreSQL как основное хранилище данных
+          process.env.USE_DATABASE = "true";
+          return true;
+        }
+      } catch (error) {
+        console.error(`Database connection error (attempt ${currentRetry + 1}/${maxRetries}):`, error);
+        
+        // Для Neon Database это обычная ошибка при использовании serverless
+        if (error instanceof Error && 
+            (error.message.includes('terminating connection due to administrator command') || 
+             error.message.includes('57P01'))) {
+          console.log('Neon serverless database connection scaled down. Will retry...');
+        }
+      }
+      
+      currentRetry++;
+      
+      if (currentRetry < maxRetries) {
+        console.log(`Waiting ${retryInterval/1000} seconds before next attempt...`);
+        await new Promise(resolve => setTimeout(resolve, retryInterval));
+      }
+    }
+    
+    console.warn('Could not connect to database after multiple attempts. Starting without database connection.');
+    return false;
+  };
+  
+  try {
+    await tryConnectToDatabase();
   } catch (error) {
-    console.error('Database connection error:', error);
-    console.log('Error connecting to database:', error);
-    process.exit(1); // Завершаем приложение при ошибке подключения к БД
+    console.error('Fatal error during database connection attempts:', error);
+    console.log('Starting app with limited functionality...');
   }
   
   const server = await registerRoutes(app);
 
+  // Глобальный обработчик ошибок
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
+    
+    console.error('Server error:', err);
+    
+    // Проверка на ошибки соединения с базой данных Neon
+    if (err?.message?.includes('terminating connection due to administrator command') || 
+        err?.code === '57P01') {
+      console.log('Neon database connection was terminated. This is normal with serverless databases.');
+      // Не бросаем ошибку в случае, если это просто разрыв соединения с Neon
+    }
+    
+    // Отправляем ответ об ошибке клиенту
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
+    
+    // Не выбрасываем ошибку, чтобы не прерывать работу сервера
+    // throw err; - убрано
   });
 
   // importantly only setup vite in development and after
