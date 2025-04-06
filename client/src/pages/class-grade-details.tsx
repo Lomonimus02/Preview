@@ -226,7 +226,8 @@ export default function ClassGradeDetailsPage() {
         const optimisticGrade = {
           id: tempId,
           ...newGradeData,
-          createdAt: selectedDate || new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          gradeDate: selectedDate || null,
         } as Grade;
         
         // Добавляем новую оценку в кэш
@@ -429,16 +430,24 @@ export default function ClassGradeDetailsPage() {
         lastAddedGradeInfo.studentId === studentId && 
         lastAddedGradeInfo.date === date;
       
-      // Безопасное сравнение дат
+      // Безопасное сравнение дат - теперь используем gradeDate если он есть
       let dateMatches = false;
-      if (g.createdAt) {
+      
+      // Сначала проверяем gradeDate для точного совпадения даты урока
+      if (g.gradeDate) {
+        try {
+          dateMatches = g.gradeDate === date;
+        } catch (error) {
+          console.error("Ошибка при сравнении дат gradeDate:", error, g.gradeDate, date);
+        }
+      } 
+      // Если нет gradeDate, то пробуем по createdAt как раньше
+      else if (g.createdAt) {
         try {
           const createdAtDate = new Date(g.createdAt);
-          dateMatches = createdAtDate.toDateString() === dateObj.toDateString() ||
-            // Проверяем также совпадение по selectedDate, если он есть
-            (selectedDate && date === selectedDate);
+          dateMatches = createdAtDate.toDateString() === dateObj.toDateString();
         } catch (error) {
-          console.error("Ошибка при сравнении дат:", error, g.createdAt, dateObj);
+          console.error("Ошибка при сравнении дат createdAt:", error, g.createdAt, dateObj);
         }
       }
       
@@ -568,11 +577,18 @@ export default function ClassGradeDetailsPage() {
                                   {/* Отображаем оценки, если они есть */}
                                   {grades.filter(g => {
                                     let dateMatches = false;
-                                    if (g.studentId === student.id && g.subjectId === subjectId && g.createdAt) {
-                                      try {
-                                        dateMatches = new Date(g.createdAt).toDateString() === new Date(date).toDateString();
-                                      } catch (error) {
-                                        console.error("Ошибка при сравнении дат в списке оценок:", error, g.createdAt, date);
+                                    if (g.studentId === student.id && g.subjectId === subjectId) {
+                                      // Проверяем сначала по gradeDate (новое поле)
+                                      if (g.gradeDate) {
+                                        dateMatches = g.gradeDate === date;
+                                      } 
+                                      // Используем createdAt как fallback для обратной совместимости
+                                      else if (g.createdAt) {
+                                        try {
+                                          dateMatches = new Date(g.createdAt).toDateString() === new Date(date).toDateString();
+                                        } catch (error) {
+                                          console.error("Ошибка при сравнении дат в списке оценок:", error, g.createdAt, date);
+                                        }
                                       }
                                     }
                                     return g.studentId === student.id && g.subjectId === subjectId && dateMatches;
@@ -632,11 +648,18 @@ export default function ClassGradeDetailsPage() {
                                   {/* Если нет оценок и нельзя редактировать */}
                                   {!canEditGrades && grades.filter(g => {
                                     let dateMatches = false;
-                                    if (g.studentId === student.id && g.subjectId === subjectId && g.createdAt) {
-                                      try {
-                                        dateMatches = new Date(g.createdAt).toDateString() === new Date(date).toDateString();
-                                      } catch (error) {
-                                        console.error("Ошибка при сравнении дат в проверке пустых оценок:", error, g.createdAt, date);
+                                    if (g.studentId === student.id && g.subjectId === subjectId) {
+                                      // Проверяем сначала по gradeDate (новое поле)
+                                      if (g.gradeDate) {
+                                        dateMatches = g.gradeDate === date;
+                                      } 
+                                      // Используем createdAt как fallback для обратной совместимости
+                                      else if (g.createdAt) {
+                                        try {
+                                          dateMatches = new Date(g.createdAt).toDateString() === new Date(date).toDateString();
+                                        } catch (error) {
+                                          console.error("Ошибка при сравнении дат в проверке пустых оценок:", error, g.createdAt, date);
+                                        }
                                       }
                                     }
                                     return g.studentId === student.id && g.subjectId === subjectId && dateMatches;
