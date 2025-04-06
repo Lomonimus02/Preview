@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Schedule, UserRoleEnum } from "@shared/schema";
+import { Schedule } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
-import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
+import { ScheduleCard } from "@/components/schedule/schedule-card";
 import { AdminScheduleForm } from "@/components/schedule/admin-schedule-form";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Plus, CalendarDays } from "lucide-react";
-import { format } from "date-fns";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { format, addDays, isSameDay, startOfWeek } from "date-fns";
 import { ru } from "date-fns/locale";
 
 export default function ScheduleNew() {
@@ -17,7 +17,11 @@ export default function ScheduleNew() {
   const queryClient = useQueryClient();
   
   // Current date
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const today = new Date();
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+    // Устанавливаем начало недели на понедельник
+    return startOfWeek(today, { weekStartsOn: 1 });
+  });
   
   // State for admin schedule form
   const [isAdminFormOpen, setIsAdminFormOpen] = useState(false);
@@ -25,7 +29,7 @@ export default function ScheduleNew() {
   const [formMode, setFormMode] = useState<"add" | "edit">("add");
   
   // Check if user is admin
-  const isAdmin = user?.role === UserRoleEnum.ADMIN || user?.role === UserRoleEnum.SUPER_ADMIN;
+  const isAdmin = user?.role === "school_admin" || user?.role === "super_admin";
   
   // Get schedules, classes, subjects, and users data
   const { data: schedules = [], isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
@@ -45,9 +49,20 @@ export default function ScheduleNew() {
     enabled: isAdmin, // Only fetch users if admin
   });
   
-  // Handle date selection
-  const handleDateSelect = (date: Date) => {
-    setSelectedDate(date);
+  // Navigate to previous week
+  const navigateToPreviousWeek = () => {
+    setCurrentWeekStart(prevWeekStart => {
+      // Вычитаем 7 дней из текущего начала недели
+      return addDays(prevWeekStart, -7);
+    });
+  };
+  
+  // Navigate to next week
+  const navigateToNextWeek = () => {
+    setCurrentWeekStart(prevWeekStart => {
+      // Добавляем 7 дней к текущему началу недели
+      return addDays(prevWeekStart, 7);
+    });
   };
   
   // Handle add schedule
@@ -106,6 +121,41 @@ export default function ScheduleNew() {
     ? classes 
     : schedules.filter(schedule => schedule.teacherId === user?.id).map(schedule => schedule.classId);
   
+  // Фильтрация расписаний для конкретной даты
+  const getSchedulesForDate = (date: Date) => {
+    const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay(); // Воскресенье (0) преобразуем в 7
+    
+    return schedules.filter(schedule => {
+      // Проверяем, является ли это расписанием для конкретной даты
+      if (schedule.scheduleDate) {
+        const scheduleDate = new Date(schedule.scheduleDate);
+        return isSameDay(scheduleDate, date);
+      }
+      
+      // Иначе проверяем день недели
+      return schedule.dayOfWeek === dayOfWeek;
+    });
+  };
+  
+  // Получение дней недели (Пн, Вт, Ср) для отображения
+  const weekDays = [
+    {
+      day: "Понедельник",
+      date: addDays(currentWeekStart, 0),
+      isCurrentDay: isSameDay(addDays(currentWeekStart, 0), today)
+    },
+    {
+      day: "Вторник",
+      date: addDays(currentWeekStart, 1),
+      isCurrentDay: isSameDay(addDays(currentWeekStart, 1), today)
+    },
+    {
+      day: "Среда",
+      date: addDays(currentWeekStart, 2),
+      isCurrentDay: isSameDay(addDays(currentWeekStart, 2), today)
+    }
+  ];
+  
   // Render loading state
   if (isLoadingSchedules) {
     return (
@@ -121,42 +171,41 @@ export default function ScheduleNew() {
   
   return (
     <div className="container max-w-7xl mx-auto py-6">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Расписание</h1>
-          <p className="text-muted-foreground">
-            Просматривайте и управляйте расписанием занятий
-          </p>
-        </div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold tracking-tight">Расписание</h1>
         
         <div className="flex items-center gap-2">
-          <div className="hidden md:flex items-center rounded-lg bg-muted px-3 py-1 text-sm">
-            <CalendarDays className="mr-2 h-4 w-4 text-primary" />
-            <span>
-              Выбрано: {format(selectedDate, "d MMMM yyyy", { locale: ru })}
-            </span>
-          </div>
-          
-          {isAdmin && (
-            <Button onClick={handleAddSchedule}>
-              <Plus className="mr-2 h-4 w-4" />
-              Добавить урок
-            </Button>
-          )}
+          <Button variant="outline" onClick={navigateToPreviousWeek}>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Предыдущая неделя
+          </Button>
+          <Button variant="outline" onClick={navigateToNextWeek}>
+            Следующая неделя
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
         </div>
       </div>
       
-      <div className="bg-card rounded-lg border shadow-sm p-4 mb-8">
-        <ScheduleCarousel
-          schedules={schedules}
-          classes={classes}
-          subjects={subjects}
-          users={users}
-          selectedDate={selectedDate}
-          onDateSelect={handleDateSelect}
-          onEditSchedule={isAdmin ? handleEditSchedule : undefined}
-          onDeleteSchedule={isAdmin ? handleDeleteSchedule : undefined}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {weekDays.map((weekDay) => {
+          const daySchedules = getSchedulesForDate(weekDay.date);
+          
+          return (
+            <div key={weekDay.day} className="h-full">
+              <ScheduleCard
+                date={weekDay.date}
+                dayName={weekDay.day}
+                schedules={daySchedules}
+                classes={classes}
+                subjects={subjects}
+                users={users}
+                isCurrentDate={weekDay.isCurrentDay}
+                onEditSchedule={isAdmin ? handleEditSchedule : undefined}
+                onDeleteSchedule={isAdmin ? handleDeleteSchedule : undefined}
+              />
+            </div>
+          );
+        })}
       </div>
       
       {isAdmin && (

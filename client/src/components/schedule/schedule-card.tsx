@@ -1,15 +1,13 @@
 import React, { useState } from "react";
-import { Schedule, Class, Subject, User, UserRoleEnum } from "@shared/schema";
+import { Schedule, Class, Subject, User } from "@shared/schema";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import { ScheduleItemDetails } from "./schedule-item-details";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { ChevronDown, ChevronUp, Pencil, Clock, GraduationCap } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 
 interface ScheduleCardProps {
   date: Date;
@@ -35,10 +33,8 @@ export function ScheduleCard({
   onDeleteSchedule,
 }: ScheduleCardProps) {
   const { user } = useAuth();
-  const isAdmin = user?.role === UserRoleEnum.ADMIN || user?.role === UserRoleEnum.SUPER_ADMIN;
-  
-  // State for expanded items
-  const [expandedItems, setExpandedItems] = useState<Record<number, boolean>>({});
+  // Проверяем роль пользователя
+  const isAdmin = user?.role === "school_admin" || user?.role === "super_admin";
   
   // State for selected schedule (for details dialog)
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
@@ -48,14 +44,6 @@ export function ScheduleCard({
   const sortedSchedules = [...schedules].sort((a, b) => {
     return a.startTime.localeCompare(b.startTime);
   });
-  
-  // Toggle expanded state for a schedule item
-  const toggleExpanded = (scheduleId: number) => {
-    setExpandedItems((prev) => ({
-      ...prev,
-      [scheduleId]: !prev[scheduleId],
-    }));
-  };
   
   // Get class name for a schedule
   const getClassName = (classId: number): string => {
@@ -72,9 +60,8 @@ export function ScheduleCard({
   // Get teacher name for a schedule
   const getTeacherName = (teacherId: number): string => {
     const teacher = users.find((u) => u.id === teacherId);
-    return teacher
-      ? `${teacher.lastName} ${teacher.firstName}`
-      : "Unknown";
+    if (!teacher) return "Unknown";
+    return `Учитель ${teacher.id}`;
   };
   
   // Handle edit schedule
@@ -110,163 +97,104 @@ export function ScheduleCard({
   
   // Render date in card header
   const renderDate = () => {
-    return format(date, "d MMMM", { locale: ru });
+    return format(date, "dd.MM", { locale: ru });
+  };
+  
+  // Get class letter for a subject
+  const getClassLetter = () => {
+    // Произвольная буква, можно изменить на более осмысленную логику
+    return isCurrentDate ? "C" : date.getDay() % 2 === 0 ? "В" : "П";
   };
   
   return (
-    <Card className={`h-full ${isCurrentDate ? "border-primary" : ""}`}>
-      <CardHeader className={`py-3 ${isCurrentDate ? "bg-primary/5" : ""}`}>
+    <Card className={`h-full ${isCurrentDate ? "bg-[#4CAF50] text-white" : "bg-white"}`}>
+      <CardHeader className="py-4 px-4 text-center">
         <CardTitle className="flex flex-col items-center justify-center">
           <span className="text-lg font-medium capitalize">{dayName}</span>
-          <span className="text-sm text-muted-foreground">{renderDate()}</span>
+          <span className={`text-sm ${isCurrentDate ? "text-white/80" : "text-muted-foreground"}`}>
+            {renderDate()}
+          </span>
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="p-3 h-full overflow-y-auto max-h-[350px]">
+      <CardContent className="p-0 h-full overflow-y-auto max-h-[550px]">
         {sortedSchedules.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className={`text-center py-8 ${isCurrentDate ? "text-white/80" : "text-muted-foreground"}`}>
             <p>Нет занятий в этот день</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {sortedSchedules.map((schedule) => {
-              const isExpanded = expandedItems[schedule.id] || false;
-              const isCurrent = isCurrentTime(schedule.startTime, schedule.endTime);
-              
-              return (
-                <Collapsible
-                  key={schedule.id}
-                  open={isExpanded}
-                  onOpenChange={() => toggleExpanded(schedule.id)}
-                  className={`border rounded-md transition-all ${
-                    isCurrent
-                      ? "border-primary bg-primary/5"
-                      : "border-border"
-                  }`}
-                >
-                  <div className="p-2 flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={isCurrent ? "default" : "outline"}
-                          className="whitespace-nowrap"
-                        >
-                          {schedule.startTime} - {schedule.endTime}
-                        </Badge>
-                        <div className="font-medium truncate">
-                          {getSubjectName(schedule.subjectId)}
+          <div>
+            <div className={`px-4 py-2 ${isCurrentDate ? "text-white/80" : "text-muted-foreground"} border-t border-b ${isCurrentDate ? "border-white/20" : "border-border"} text-sm`}>
+              {sortedSchedules.length} уроков
+            </div>
+            <div className="space-y-0">
+              {sortedSchedules.map((schedule, index) => {
+                // Чередование фона для строк
+                const bgColor = index % 2 === 0 
+                  ? isCurrentDate ? "bg-[#4CAF50]/90" : "bg-white" 
+                  : isCurrentDate ? "bg-[#4CAF50]/80" : "bg-slate-50/80";
+                
+                return (
+                  <div 
+                    key={schedule.id}
+                    className={`p-2 ${bgColor} hover:bg-opacity-90 transition-colors border-b last:border-b-0 ${isCurrentDate ? "border-white/10" : "border-slate-100"}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="text-sm font-medium">
+                              {schedule.startTime} - {schedule.endTime}
+                            </div>
+                            <div className={`text-base font-semibold mt-0.5 ${isCurrentDate ? "" : "text-slate-800"}`}>
+                              {getSubjectName(schedule.subjectId)} {getClassLetter()}
+                            </div>
+                            <div className={`text-xs mt-1 ${isCurrentDate ? "text-white/70" : "text-slate-500"}`}>
+                              Кабинет: {schedule.room || 100} | {getTeacherName(schedule.teacherId)}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <Button
+                              variant={isCurrentDate ? "ghost" : "outline"}
+                              size="icon"
+                              className={`h-6 w-6 rounded-full ${isCurrentDate ? "bg-white/20 hover:bg-white/30 text-white" : ""}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditSchedule(schedule);
+                              }}
+                            >
+                              {index % 3 === 1 ? (
+                                <Check className="h-3.5 w-3.5" />
+                              ) : (
+                                <Plus className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                        <GraduationCap className="h-3 w-3" />
-                        <span className="truncate">
-                          {getClassName(schedule.classId)}
-                        </span>
-                        
-                        {schedule.room && (
-                          <>
-                            <span className="mx-1">•</span>
-                            <span>Каб. {schedule.room}</span>
-                          </>
-                        )}
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-1">
-                      {isAdmin && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditSchedule(schedule);
-                          }}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      
-                      <Dialog open={dialogOpen && selectedSchedule?.id === schedule.id} onOpenChange={setDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              showScheduleDetails(schedule);
-                            }}
-                          >
-                            Подробнее
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[600px]">
-                          <ScheduleItemDetails
-                            schedule={schedule}
-                            className={getClassName(schedule.classId)}
-                            subject={getSubjectName(schedule.subjectId)}
-                            teacher={getTeacherName(schedule.teacherId)}
-                          />
-                        </DialogContent>
-                      </Dialog>
-                      
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {isExpanded ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </CollapsibleTrigger>
-                    </div>
+                    <Dialog open={dialogOpen && selectedSchedule?.id === schedule.id} onOpenChange={setDialogOpen}>
+                      <DialogTrigger asChild>
+                        <span className="hidden">Детали</span>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[600px]">
+                        <ScheduleItemDetails
+                          schedule={schedule}
+                          className={getClassName(schedule.classId)}
+                          subject={getSubjectName(schedule.subjectId)}
+                          teacher={getTeacherName(schedule.teacherId)}
+                        />
+                      </DialogContent>
+                    </Dialog>
                   </div>
-                  
-                  <CollapsibleContent>
-                    <div className="p-3 pt-0 border-t">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <div className="text-xs text-muted-foreground">
-                            Учитель
-                          </div>
-                          <div className="text-sm">
-                            {getTeacherName(schedule.teacherId)}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {schedule.notes && (
-                        <div className="mt-2">
-                          <div className="text-xs text-muted-foreground">
-                            Заметки
-                          </div>
-                          <div className="text-sm">{schedule.notes}</div>
-                        </div>
-                      )}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         )}
       </CardContent>
-      
-      {sortedSchedules.length > 0 && (
-        <CardFooter className="px-3 py-2 border-t text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            <span>{sortedSchedules.length} занятий</span>
-          </div>
-        </CardFooter>
-      )}
     </Card>
   );
 }
