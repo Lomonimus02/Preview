@@ -65,7 +65,9 @@ const gradeFormSchema = z.object({
     required_error: "Укажите тип оценки",
   }),
   // Добавляем поле для даты (необязательное, будет устанавливаться программно)
-  date: z.string().optional(),
+  date: z.string().optional().nullable(),
+  // Добавляем поле scheduleId для связи с конкретным уроком
+  scheduleId: z.number().optional().nullable(),
 });
 
 export default function ClassGradeDetailsPage() {
@@ -142,16 +144,26 @@ export default function ClassGradeDetailsPage() {
     enabled: !!classId && !!subjectId && !!user,
   });
   
-  // Get unique dates from schedules for this class and subject
-  const lessonDates = useMemo(() => {
-    // Фильтруем расписания и получаем даты
-    const dates = schedules
+  // Get unique lesson slots (date + scheduleId pairs) from schedules for this class and subject
+  const lessonSlots = useMemo(() => {
+    // Фильтруем расписания для текущего предмета
+    return schedules
       .filter(s => s.scheduleDate && s.subjectId === subjectId) // Filter schedules for this subject only
-      .map(s => s.scheduleDate as string) // Уточняем тип, так как мы отфильтровали null значения выше
-      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    
-    // Remove duplicates using Array.from + Set
-    return Array.from(new Set(dates));
+      .sort((a, b) => {
+        // Сортируем по дате, затем по времени начала урока (если есть)
+        const dateCompare = new Date(a.scheduleDate as string).getTime() - new Date(b.scheduleDate as string).getTime();
+        if (dateCompare !== 0) return dateCompare;
+        
+        // Если даты одинаковые, сортируем по времени начала
+        return a.startTime && b.startTime ? 
+          a.startTime.localeCompare(b.startTime) : 0;
+      })
+      .map(s => ({
+        date: s.scheduleDate as string,
+        scheduleId: s.id,
+        startTime: s.startTime || '',
+        formattedDate: format(new Date(s.scheduleDate as string), "dd.MM", { locale: ru })
+      }));
   }, [schedules, subjectId]);
   
   // Группируем расписания учителя по предметам
@@ -202,16 +214,19 @@ export default function ClassGradeDetailsPage() {
       
       // Создаём временную оценку для оптимистичного обновления
       // Учитываем выбранную дату, если она есть
-      let createdAt = new Date();
+      let createdAtDate = new Date();
       
       // Если у нас есть selectedDate, используем его вместо текущей даты
       if (selectedDate) {
         // Правильная обработка строки даты - убеждаемся, что у нас всегда строка
         const dateString = selectedDate || '';
         if (dateString.trim() !== '') {
-          createdAt = new Date(dateString);
+          createdAtDate = new Date(dateString);
         }
       }
+      
+      // Преобразуем Date в строку ISO для совместимости с типом в Grade
+      const createdAt = createdAtDate.toISOString();
       
       // Создаём временную оценку для оптимистичного обновления интерфейса
       const tempGrade: Grade = {
@@ -223,9 +238,11 @@ export default function ClassGradeDetailsPage() {
         grade: newGradeData.grade!,
         comment: newGradeData.comment || "",
         gradeType: newGradeData.gradeType || "Текущая",
+        // Добавляем scheduleId для привязки к конкретному уроку
+        scheduleId: newGradeData.scheduleId || null,
         // Используем строковое представление даты для отображения в UI
         // В БД сама дата будет приведена к нужному типу
-        createdAt: createdAt.toISOString(),
+        createdAt: createdAt as unknown as Date,
       };
       
       // Оптимистично обновляем кеш react-query для обоих запросов
@@ -429,8 +446,8 @@ export default function ClassGradeDetailsPage() {
     }
   };
   
-  // Open grade dialog for a specific student and date
-  const openGradeDialog = (studentId: number, date?: string) => {
+  // Open grade dialog for a specific student, date and scheduleId
+  const openGradeDialog = (studentId: number, date: string | undefined, scheduleId: number | undefined) => {
     setSelectedStudentId(studentId);
     setSelectedDate(date || null);
     setEditingGradeId(null);
@@ -440,6 +457,7 @@ export default function ClassGradeDetailsPage() {
       subjectId: subjectId,
       classId: classId,
       teacherId: user?.id,
+      scheduleId: scheduleId || null, // Добавляем scheduleId в форму с проверкой на undefined
       grade: undefined,
       comment: "",
       gradeType: "Текущая",
@@ -463,6 +481,7 @@ export default function ClassGradeDetailsPage() {
       grade: grade.grade,
       comment: grade.comment || "",
       gradeType: grade.gradeType || "Текущая",
+      scheduleId: grade.scheduleId, // Добавляем scheduleId при редактировании
     });
     
     setIsGradeDialogOpen(true);
@@ -475,30 +494,15 @@ export default function ClassGradeDetailsPage() {
     }
   };
   
-  // Get student grades for a specific date for the current subject
-  const getStudentGradeForDate = (studentId: number, date: string) => {
-    // Преобразуем дату в строку формата "YYYY-MM-DD" для более надежного сравнения
-    const formatDateForCompare = (dateInput: string | Date) => {
-      // Если передали null или undefined
-      if (!dateInput) return ''; 
-      
-      // Если передали дату как объект
-      const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
-      
-      // Проверяем, что дата действительна
-      if (isNaN(d.getTime())) return '';
-      
-      // Форматируем дату в строку формата YYYY-MM-DD
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    };
-    
-    const formattedDate = formatDateForCompare(date);
-    
-    // Фильтруем оценки по студенту, предмету и дате
+  // Get student grades for a specific lesson slot (scheduleId)
+  const getStudentGradeForSlot = (studentId: number, slot: { date: string, scheduleId: number }) => {
+    // Фильтруем оценки по студенту, предмету и scheduleId
+    // Теперь привязка идет только к scheduleId, дата не учитывается, так как
+    // scheduleId уже однозначно определяет урок в конкретную дату
     return grades.filter(g => 
       g.studentId === studentId && 
-      g.subjectId === subjectId && // Добавляем фильтр по предмету
-      g.createdAt && formatDateForCompare(g.createdAt) === formattedDate
+      g.subjectId === subjectId && 
+      g.scheduleId === slot.scheduleId
     );
   };
   
@@ -604,9 +608,10 @@ export default function ClassGradeDetailsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-[180px] bg-muted/50">Ученик</TableHead>
-                        {lessonDates.map((date) => (
-                          <TableHead key={date} className="text-center">
-                            {formatDate(date)}
+                        {lessonSlots.map((slot) => (
+                          <TableHead key={`${slot.date}-${slot.scheduleId}`} className="text-center">
+                            {slot.formattedDate}
+                            {slot.startTime && <span className="text-xs ml-1">({slot.startTime.slice(0, 5)})</span>}
                           </TableHead>
                         ))}
                         <TableHead className="text-center sticky right-0 bg-muted/50">
@@ -620,10 +625,10 @@ export default function ClassGradeDetailsPage() {
                           <TableCell className="font-medium bg-muted/20">
                             {student.lastName} {student.firstName}
                           </TableCell>
-                          {lessonDates.map((date) => {
-                            const studentGrades = getStudentGradeForDate(student.id, date);
+                          {lessonSlots.map((slot) => {
+                            const studentGrades = getStudentGradeForSlot(student.id, slot);
                             return (
-                              <TableCell key={date} className="text-center">
+                              <TableCell key={`${slot.date}-${slot.scheduleId}`} className="text-center">
                                 {studentGrades.length > 0 ? (
                                   <div className="flex flex-wrap justify-center gap-1 items-center">
                                     {studentGrades.map((grade) => (
@@ -666,13 +671,13 @@ export default function ClassGradeDetailsPage() {
                                         )}
                                       </div>
                                     ))}
-                                    {/* Кнопка "+" для добавления еще одной оценки в тот же день */}
+                                    {/* Кнопка "+" для добавления еще одной оценки в тот же дату и урок */}
                                     {canEditGrades && (
                                       <Button 
                                         variant="ghost" 
                                         size="sm" 
                                         className="h-5 w-5 p-0 rounded-full ml-1"
-                                        onClick={() => openGradeDialog(student.id, date)}
+                                        onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
                                         title="Добавить еще одну оценку"
                                       >
                                         +
@@ -684,7 +689,7 @@ export default function ClassGradeDetailsPage() {
                                     variant="ghost" 
                                     size="sm" 
                                     className="h-7 w-7 p-0 rounded-full"
-                                    onClick={() => openGradeDialog(student.id, date)}
+                                    onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
                                   >
                                     +
                                   </Button>

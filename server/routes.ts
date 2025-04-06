@@ -727,6 +727,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Если указана дата, используем её для установки createdAt
       let gradeData = { ...req.body, teacherId: req.user.id };
       
+      // Если не передан scheduleId, установим его как null (опционально)
+      if (gradeData.scheduleId === undefined) {
+        gradeData.scheduleId = null;
+      }
+      
       if (gradeData.date) {
         try {
           // Преобразуем дату урока в объект Date
@@ -787,8 +792,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Вы можете редактировать только выставленные вами оценки" });
       }
       
+      let updateData = { ...req.body };
+      
+      // Убедимся, что scheduleId корректно обрабатывается 
+      if (updateData.scheduleId === undefined) {
+        // Если scheduleId не передан, сохраняем текущее значение
+        updateData.scheduleId = existingGrade.scheduleId;
+      }
+      
       // Обновляем оценку
-      const updatedGrade = await dataStorage.updateGrade(gradeId, req.body);
+      const updatedGrade = await dataStorage.updateGrade(gradeId, updateData);
       
       // Уведомляем ученика об изменении оценки
       await dataStorage.createNotification({

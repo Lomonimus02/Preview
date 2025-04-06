@@ -117,6 +117,7 @@ export const grades = pgTable("grades", {
   subjectId: integer("subject_id").notNull(),
   classId: integer("class_id").notNull(),
   teacherId: integer("teacher_id").notNull(),
+  scheduleId: integer("schedule_id"), // Связь с уроком в расписании (опционально)
   grade: integer("grade").notNull(),
   comment: text("comment"),
   gradeType: text("grade_type").notNull(), // e.g., "homework", "test", "exam"
