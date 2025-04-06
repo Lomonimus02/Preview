@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +14,6 @@ interface DayCardProps {
   subjects: Subject[];
   classes: Class[];
   users: User[];
-  isActive?: boolean;
-  activeCardIndex?: number;
-  cardIndex?: number;
 }
 
 export function DayCard({
@@ -26,10 +23,10 @@ export function DayCard({
   subjects,
   classes,
   users,
-  isActive = false,
-  activeCardIndex,
-  cardIndex,
 }: DayCardProps) {
+  // Состояние для отслеживания наведения курсора
+  const [isHovered, setIsHovered] = useState(false);
+  
   // Получаем название дня недели
   const dayName = useMemo(() => {
     const days = [
@@ -73,44 +70,30 @@ export function DayCard({
   // Рассчитываем, сколько всего уроков
   const lessonsCount = sortedSchedules.length;
 
-  // Определяем цвет карточки
-  const cardClass = isActive 
-    ? "bg-primary text-primary-foreground border-primary" 
-    : "bg-card";
-
-  // Определяем анимацию карточки относительно активной карточки
-  const getCardAnimation = () => {
-    if (activeCardIndex === undefined || cardIndex === undefined) {
-      return {
-        scale: 1,
-        opacity: 1,
-        transition: { duration: 0.2, ease: "easeInOut" }
-      };
-    }
-
-    const distance = cardIndex - activeCardIndex;
-    return {
-      scale: isActive ? 1 : 0.95 - Math.abs(distance) * 0.02,
-      opacity: isActive ? 1 : 0.9 - Math.abs(distance) * 0.1,
-      transition: { 
-        duration: 0.25, 
-        ease: "easeOut",
-        opacity: { duration: 0.15 }
-      }
-    };
-  };
-
   return (
     <motion.div
       className="h-full w-full"
-      animate={getCardAnimation()}
+      whileHover={{ 
+        scale: 1.03,
+        transition: { 
+          type: "spring", 
+          stiffness: 500, 
+          damping: 17 
+        } 
+      }}
+      onHoverStart={() => setIsHovered(true)}
+      onHoverEnd={() => setIsHovered(false)}
     >
-      <Card className={`h-full overflow-hidden transition-colors duration-300 ${cardClass}`}>
+      <Card 
+        className={`h-full overflow-hidden transition-all duration-200 ${
+          isHovered ? "border-primary border-2" : "border"
+        }`}
+      >
         <CardHeader className="pb-2">
           <div className="flex justify-between items-center">
             <CardTitle className="text-xl">{dayName}</CardTitle>
             {formattedDate && (
-              <Badge variant={isActive ? "outline" : "secondary"} className="font-normal">
+              <Badge variant="secondary" className="font-normal">
                 {formattedDate}
               </Badge>
             )}
@@ -127,7 +110,7 @@ export function DayCard({
               sortedSchedules.map((schedule) => (
                 <div 
                   key={schedule.id} 
-                  className={`p-2 rounded-md transition-colors ${isActive ? 'bg-primary-foreground/10' : 'bg-muted'}`}
+                  className="p-2 rounded-md transition-colors bg-muted hover:bg-muted/70"
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div className="font-medium">
@@ -151,7 +134,7 @@ export function DayCard({
                         Выполнено
                       </Badge>
                     ) : (
-                      <Badge variant={isActive ? "secondary" : "outline"} className="text-xs h-5">
+                      <Badge variant="outline" className="text-xs h-5">
                         <Plus className="h-3 w-3 mr-1" />
                         Домашнее задание
                       </Badge>

@@ -34,7 +34,7 @@ export function ScheduleCarousel({
     slidesToScroll: 3,       // Количество слайдов для пролистывания кнопками или событиями
   });
   
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [weekOffset, setWeekOffset] = useState(0);
   
   // Если selectedDate не задан, используем текущую дату
@@ -70,21 +70,6 @@ export function ScheduleCarousel({
     return index !== -1 ? index : getWeekDayIndex(selectedDate) - 1;
   }, [selectedDate, weekDays]);
   
-  // Обработчик прокрутки карусели
-  const onScroll = useCallback(() => {
-    if (!emblaApi) return;
-    setActiveIndex(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
-  
-  // Подписка на события прокрутки
-  useEffect(() => {
-    if (!emblaApi) return;
-    emblaApi.on("select", onScroll);
-    return () => {
-      emblaApi.off("select", onScroll);
-    };
-  }, [emblaApi, onScroll]);
-  
   // Устанавливаем начальный индекс при изменении currentDayIndex
   useEffect(() => {
     if (!emblaApi) return;
@@ -93,6 +78,9 @@ export function ScheduleCarousel({
     requestAnimationFrame(() => {
       emblaApi.scrollTo(currentDayIndex);
     });
+    
+    // Обновляем выбранный индекс
+    setSelectedIndex(currentDayIndex);
   }, [emblaApi, currentDayIndex, weekOffset]);
   
   // Предварительно загружаем данные для всех дней недели
@@ -148,15 +136,12 @@ export function ScheduleCarousel({
     setWeekOffset(prev => prev + 1);
   };
   
-  // Обработчик клика по дню - только обновляет выбранную дату и активный индекс
-  // без прокрутки карусели к выбранной карточке
+  // Обработчик клика по дню - только обновляет выбранную дату
   const handleDayClick = (date: Date, index: number) => {
-    // Устанавливаем индекс текущего дня при клике для цветового выделения
-    setActiveIndex(index);
-    
     // Обновляем выбранную дату в родительском компоненте
     // без запроса новых данных (данные уже загружены для всей недели)
     onDateChange(date);
+    setSelectedIndex(index);
   };
   
   // Форматируем даты для отображения диапазона недели
@@ -232,9 +217,6 @@ export function ScheduleCarousel({
                   subjects={subjects}
                   classes={classes}
                   users={users}
-                  isActive={index === activeIndex}
-                  activeCardIndex={activeIndex}
-                  cardIndex={index}
                 />
               </div>
             );
