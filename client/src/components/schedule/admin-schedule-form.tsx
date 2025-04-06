@@ -1,22 +1,24 @@
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
-import { Schedule, Class, Subject, User } from "@shared/schema";
+import React, { useState } from "react";
+import { Schedule, Class, Subject, User, UserRoleEnum } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ClockIcon, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import { ru } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { format, parse } from "date-fns";
+import { ru } from "date-fns/locale";
+import { CalendarIcon, Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 
 interface AdminScheduleFormProps {
   isOpen: boolean;
@@ -25,21 +27,24 @@ interface AdminScheduleFormProps {
   subjects: Subject[];
   teachers: User[];
   selectedSchedule?: Schedule | null;
-  mode?: 'add' | 'edit';
+  mode: "add" | "edit";
 }
 
-// Form schema
+// Create the validation schema for the schedule form
 const scheduleFormSchema = z.object({
-  classId: z.coerce.number().positive("Класс обязателен"),
-  subjectId: z.coerce.number().positive("Предмет обязателен"),
-  teacherId: z.coerce.number().positive("Учитель обязателен"),
+  classId: z.coerce.number().min(1, "Класс обязателен"),
+  subjectId: z.coerce.number().min(1, "Предмет обязателен"),
+  teacherId: z.coerce.number().min(1, "Учитель обязателен"),
   dayOfWeek: z.coerce.number().min(1).max(7, "День недели должен быть от 1 до 7"),
-  scheduleDate: z.date().optional(),
-  startTime: z.string().min(1, "Время начала обязательно"),
-  endTime: z.string().min(1, "Время окончания обязательно"),
+  startTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Неверный формат времени (HH:MM)"),
+  endTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Неверный формат времени (HH:MM)"),
   room: z.string().optional(),
+  notes: z.string().optional(),
+  isSpecificDate: z.boolean().default(false),
+  scheduleDate: z.date().nullable().optional(),
 });
 
+// Derive the type from the schema
 type ScheduleFormValues = z.infer<typeof scheduleFormSchema>;
 
 export function AdminScheduleForm({
@@ -49,151 +54,138 @@ export function AdminScheduleForm({
   subjects,
   teachers,
   selectedSchedule,
-  mode = 'add',
+  mode,
 }: AdminScheduleFormProps) {
   const { toast } = useToast();
-  const [date, setDate] = useState<Date | undefined>(
-    selectedSchedule?.scheduleDate ? new Date(selectedSchedule.scheduleDate) : undefined
-  );
+  const queryClient = useQueryClient();
+  const [isSpecificDate, setIsSpecificDate] = useState(selectedSchedule?.scheduleDate ? true : false);
 
-  // Initialize form
+  // Define form
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
     defaultValues: {
-      classId: selectedSchedule?.classId || undefined,
-      subjectId: selectedSchedule?.subjectId || undefined,
-      teacherId: selectedSchedule?.teacherId || undefined,
-      dayOfWeek: selectedSchedule?.dayOfWeek || new Date().getDay() || 7,
-      scheduleDate: selectedSchedule?.scheduleDate ? new Date(selectedSchedule.scheduleDate) : undefined,
-      startTime: selectedSchedule?.startTime || "",
-      endTime: selectedSchedule?.endTime || "",
+      classId: selectedSchedule?.classId || 0,
+      subjectId: selectedSchedule?.subjectId || 0,
+      teacherId: selectedSchedule?.teacherId || 0,
+      dayOfWeek: selectedSchedule?.dayOfWeek || new Date().getDay() || 1,
+      startTime: selectedSchedule?.startTime || "08:00",
+      endTime: selectedSchedule?.endTime || "08:45",
       room: selectedSchedule?.room || "",
-    }
+      notes: selectedSchedule?.notes || "",
+      isSpecificDate: selectedSchedule?.scheduleDate ? true : false,
+      scheduleDate: selectedSchedule?.scheduleDate ? new Date(selectedSchedule.scheduleDate) : null,
+    },
   });
 
-  // Reset form when selectedSchedule changes
-  useEffect(() => {
-    if (selectedSchedule) {
-      form.reset({
-        classId: selectedSchedule.classId,
-        subjectId: selectedSchedule.subjectId,
-        teacherId: selectedSchedule.teacherId,
-        dayOfWeek: selectedSchedule.dayOfWeek,
-        scheduleDate: selectedSchedule.scheduleDate ? new Date(selectedSchedule.scheduleDate) : undefined,
-        startTime: selectedSchedule.startTime,
-        endTime: selectedSchedule.endTime,
-        room: selectedSchedule.room || undefined,
-      });
-      
-      if (selectedSchedule.scheduleDate) {
-        setDate(new Date(selectedSchedule.scheduleDate));
-      }
-    } else {
-      form.reset({
-        classId: undefined,
-        subjectId: undefined,
-        teacherId: undefined,
-        dayOfWeek: new Date().getDay() || 7,
-        scheduleDate: undefined,
-        startTime: "",
-        endTime: "",
-        room: "",
-      });
-      setDate(undefined);
-    }
-  }, [selectedSchedule, form]);
-
-  // Sync day of week with date
-  const syncDayOfWeekWithDate = (date: Date) => {
-    const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
-    form.setValue("dayOfWeek", dayOfWeek);
-    form.setValue("scheduleDate", date);
-    setDate(date);
-  };
-
-  // Create schedule mutation
-  const createMutation = useMutation({
+  // Create/update schedule mutation
+  const mutation = useMutation({
     mutationFn: async (data: ScheduleFormValues) => {
-      const response = await apiRequest("POST", "/api/schedules", data);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Ошибка при создании расписания");
+      // Convert data for API
+      const scheduleData = {
+        ...data,
+        scheduleDate: data.isSpecificDate && data.scheduleDate ? data.scheduleDate.toISOString() : null,
+      };
+
+      // If editing, update the schedule
+      if (mode === "edit" && selectedSchedule) {
+        const res = await apiRequest("PATCH", `/api/schedules/${selectedSchedule.id}`, scheduleData);
+        return await res.json();
+      } else {
+        // Otherwise, create a new schedule
+        const res = await apiRequest("POST", "/api/schedules", scheduleData);
+        return await res.json();
       }
-      return await response.json();
     },
     onSuccess: () => {
+      // Show success toast
       toast({
-        title: "Успешно",
-        description: "Урок добавлен в расписание",
+        title: mode === "edit" ? "Расписание обновлено" : "Расписание добавлено",
+        description: mode === "edit" ? "Расписание успешно обновлено" : "Расписание успешно добавлено",
       });
+
+      // Invalidate schedules query to refresh data
       queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+
+      // Close the dialog
       onClose();
     },
-    onError: (error: Error) => {
+    onError: (error) => {
+      console.error("Error submitting schedule:", error);
       toast({
         title: "Ошибка",
-        description: error.message,
+        description: "Произошла ошибка при сохранении расписания. Пожалуйста, попробуйте еще раз.",
         variant: "destructive",
       });
-    }
+    },
   });
 
-  // Update schedule mutation
-  const updateMutation = useMutation({
-    mutationFn: async (data: ScheduleFormValues & { id: number }) => {
-      const response = await apiRequest("PATCH", `/api/schedules/${data.id}`, data);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Ошибка при обновлении расписания");
-      }
-      return await response.json();
+  // Delete schedule mutation
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedSchedule) return;
+      const res = await apiRequest("DELETE", `/api/schedules/${selectedSchedule.id}`);
+      return await res.json();
     },
     onSuccess: () => {
+      // Show success toast
       toast({
-        title: "Успешно",
-        description: "Расписание обновлено",
+        title: "Расписание удалено",
+        description: "Расписание успешно удалено",
       });
+
+      // Invalidate schedules query to refresh data
       queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+
+      // Close the dialog
       onClose();
     },
-    onError: (error: Error) => {
+    onError: (error) => {
+      console.error("Error deleting schedule:", error);
       toast({
         title: "Ошибка",
-        description: error.message,
+        description: "Произошла ошибка при удалении расписания. Пожалуйста, попробуйте еще раз.",
         variant: "destructive",
       });
-    }
+    },
   });
 
   // Handle form submission
   const onSubmit = (values: ScheduleFormValues) => {
-    if (mode === 'edit' && selectedSchedule) {
-      updateMutation.mutate({ ...values, id: selectedSchedule.id });
-    } else {
-      createMutation.mutate(values);
+    if (!values.isSpecificDate) {
+      values.scheduleDate = null;
+    }
+    mutation.mutate(values);
+  };
+
+  // Handle delete
+  const handleDelete = () => {
+    if (window.confirm("Вы уверены, что хотите удалить это расписание?")) {
+      deleteMutation.mutate();
     }
   };
 
-  // Get day name from day number
-  const getDayName = (day: number) => {
-    const days = [
-      "Понедельник", "Вторник", "Среда", "Четверг", 
-      "Пятница", "Суббота", "Воскресенье"
-    ];
-    return days[day - 1];
-  };
-
-  const isLoading = createMutation.isPending || updateMutation.isPending;
+  // Day of week options
+  const dayOfWeekOptions = [
+    { value: "1", label: "Понедельник" },
+    { value: "2", label: "Вторник" },
+    { value: "3", label: "Среда" },
+    { value: "4", label: "Четверг" },
+    { value: "5", label: "Пятница" },
+    { value: "6", label: "Суббота" },
+    { value: "7", label: "Воскресенье" },
+  ];
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[600px]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'add' ? "Добавить урок" : "Редактировать урок"}
+            {mode === "edit" ? "Редактировать расписание" : "Добавить расписание"}
           </DialogTitle>
           <DialogDescription>
-            Заполните форму для {mode === 'add' ? "добавления нового урока" : "редактирования урока"} в расписании.
+            {mode === "edit"
+              ? "Редактируйте детали расписания урока"
+              : "Заполните детали нового урока в расписании"}
           </DialogDescription>
         </DialogHeader>
 
@@ -206,10 +198,9 @@ export function AdminScheduleForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Класс</FormLabel>
-                    <Select 
+                    <Select
                       onValueChange={(value) => field.onChange(parseInt(value))}
-                      value={field.value?.toString()}
-                      disabled={isLoading}
+                      defaultValue={field.value?.toString()}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -235,10 +226,9 @@ export function AdminScheduleForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Предмет</FormLabel>
-                    <Select 
+                    <Select
                       onValueChange={(value) => field.onChange(parseInt(value))}
-                      value={field.value?.toString()}
-                      disabled={isLoading}
+                      defaultValue={field.value?.toString()}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -264,10 +254,9 @@ export function AdminScheduleForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Учитель</FormLabel>
-                    <Select 
+                    <Select
                       onValueChange={(value) => field.onChange(parseInt(value))}
-                      value={field.value?.toString()}
-                      disabled={isLoading}
+                      defaultValue={field.value?.toString()}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -287,93 +276,98 @@ export function AdminScheduleForm({
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="room"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Кабинет</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Номер кабинета" disabled={isLoading} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="dayOfWeek"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>День недели</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(parseInt(value))}
-                      value={field.value?.toString()}
-                      disabled={isLoading}
-                    >
+              <div>
+                <FormField
+                  control={form.control}
+                  name="isSpecificDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-1">
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите день недели" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-                          <SelectItem key={day} value={day.toString()}>
-                            {getDayName(day)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="scheduleDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Дата (опционально)</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "pl-3 text-left font-normal",
-                              !date && "text-muted-foreground"
-                            )}
-                            disabled={isLoading}
-                          >
-                            {date ? (
-                              format(date, "PPP", { locale: ru })
-                            ) : (
-                              <span>Выберите дату</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={date}
-                          onSelect={(date) => date && syncDayOfWeekWithDate(date)}
-                          disabled={isLoading}
-                          locale={ru}
-                          initialFocus
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            setIsSpecificDate(!!checked);
+                          }}
                         />
-                      </PopoverContent>
-                    </Popover>
-                    <FormDescription>
-                      При выборе даты будет автоматически установлен день недели
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Конкретная дата</FormLabel>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                {isSpecificDate ? (
+                  <FormField
+                    control={form.control}
+                    name="scheduleDate"
+                    render={({ field }) => (
+                      <FormItem className="mt-2">
+                        <FormLabel>Дата</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "d MMMM yyyy", { locale: ru })
+                                ) : (
+                                  <span>Выберите дату</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value as Date}
+                              onSelect={field.onChange}
+                              initialFocus
+                              locale={ru}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="dayOfWeek"
+                    render={({ field }) => (
+                      <FormItem className="mt-2">
+                        <FormLabel>День недели</FormLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(parseInt(value))}
+                          defaultValue={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Выберите день недели" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {dayOfWeekOptions.map((day) => (
+                              <SelectItem key={day.value} value={day.value}>
+                                {day.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
+              </div>
 
               <FormField
                 control={form.control}
@@ -382,14 +376,7 @@ export function AdminScheduleForm({
                   <FormItem>
                     <FormLabel>Время начала</FormLabel>
                     <FormControl>
-                      <div className="flex items-center">
-                        <ClockIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                          {...field} 
-                          type="time" 
-                          disabled={isLoading} 
-                        />
-                      </div>
+                      <Input placeholder="09:00" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -403,14 +390,21 @@ export function AdminScheduleForm({
                   <FormItem>
                     <FormLabel>Время окончания</FormLabel>
                     <FormControl>
-                      <div className="flex items-center">
-                        <ClockIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                          {...field} 
-                          type="time" 
-                          disabled={isLoading} 
-                        />
-                      </div>
+                      <Input placeholder="09:45" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="room"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Кабинет</FormLabel>
+                    <FormControl>
+                      <Input placeholder="101" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -418,19 +412,54 @@ export function AdminScheduleForm({
               />
             </div>
 
-            <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose}
-                disabled={isLoading}
-              >
-                Отмена
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {mode === 'add' ? "Добавить" : "Сохранить"}
-              </Button>
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Заметки</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Дополнительная информация о занятии"
+                      className="resize-none"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter className="gap-2 sm:space-x-0">
+              {mode === "edit" && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleDelete}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Удалить
+                </Button>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  disabled={mutation.isPending}
+                >
+                  Отмена
+                </Button>
+                <Button type="submit" disabled={mutation.isPending}>
+                  {mutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {mode === "edit" ? "Сохранить" : "Добавить"}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </Form>
