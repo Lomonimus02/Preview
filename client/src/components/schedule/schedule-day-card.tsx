@@ -69,7 +69,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           }}
         >
           {isCompleted ? (
-            <FiCheck className="text-green-500 w-5 h-5" />
+            <FiEdit3 className="text-orange-500 w-5 h-5" title="Редактировать домашнее задание" />
           ) : (
             <FiPlus className="text-orange-500 w-5 h-5" title="Добавить домашнее задание" />
           )}
@@ -283,6 +283,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
           {selectedSchedule && currentUser && isTeacher() && (
             <HomeworkForm 
               schedule={selectedSchedule}
+              existingHomework={getScheduleHomework(selectedSchedule)}
               onClose={() => setIsHomeworkDialogOpen(false)}
             />
           )}
