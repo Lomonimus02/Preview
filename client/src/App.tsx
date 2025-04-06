@@ -11,6 +11,8 @@ import UserRoles from "@/pages/user-roles";
 import SchedulePage from "@/pages/schedule";
 import ClassGradeDetailsPage from "@/pages/class-grade-details";
 import Grades from "@/pages/grades";
+import StudentGrades from "@/pages/student-grades";
+import ParentSchedule from "@/pages/parent-schedule";
 import Homework from "@/pages/homework";
 import Messages from "@/pages/messages";
 import Documents from "@/pages/documents";
@@ -35,6 +37,8 @@ function Router() {
       <ProtectedRoute path="/schedule" component={SchedulePage} />
       <ProtectedRoute path="/class-grade-details/:classId/:subjectId" component={ClassGradeDetailsPage} />
       <ProtectedRoute path="/grades" component={Grades} />
+      <ProtectedRoute path="/student-grades" component={StudentGrades} />
+      <ProtectedRoute path="/parent-schedule" component={ParentSchedule} />
       <ProtectedRoute path="/homework" component={Homework} />
       <ProtectedRoute path="/messages" component={Messages} />
       <ProtectedRoute path="/documents" component={Documents} />
