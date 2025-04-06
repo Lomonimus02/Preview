@@ -51,8 +51,10 @@ export function ScheduleCarousel({
   
   // Преобразуем день недели из Date в формат 1-7 (пн-вс)
   const getWeekDayIndex = (date: Date) => {
-    const day = getDay(date);
-    return day === 0 ? 7 : day;
+    // getDay() возвращает 0 для воскресенья, 1-6 для пн-сб
+    const dayOfWeek = getDay(date);
+    // Преобразуем в формат 1-7 (пн-вс)
+    return dayOfWeek === 0 ? 7 : dayOfWeek;
   };
   
   // Определяем индекс для текущего дня
@@ -110,10 +112,13 @@ export function ScheduleCarousel({
   const handleDayClick = (date: Date, index: number) => {
     // Устанавливаем индекс текущего дня при клике
     if (emblaApi) {
+      // Используем scrollTo вместо запроса новых данных
       emblaApi.scrollTo(index);
+      setActiveIndex(index);
     }
     
     // Обновляем выбранную дату в родительском компоненте
+    // без запроса новых данных (данные уже загружены для всей недели)
     onDateChange(date);
   };
   
@@ -126,9 +131,12 @@ export function ScheduleCarousel({
   
   // Фильтрация расписаний по дню
   const getSchedulesByDay = (day: number, date: Date) => {
+    // Проверяем что день в диапазоне 1-7
+    const validDay = day >= 1 && day <= 7 ? day : 1;
+    
     return schedules.filter(schedule => {
       // Проверяем совпадение по дню недели
-      if (schedule.dayOfWeek !== day) return false;
+      if (schedule.dayOfWeek !== validDay) return false;
       
       // Если есть конкретная дата в расписании, проверяем её
       if (schedule.scheduleDate) {

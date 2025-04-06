@@ -124,17 +124,16 @@ export default function SchedulePage() {
   // Check access permissions
   const canEditSchedule = isSuperAdmin() || isSchoolAdmin();
   
-  // Fetch schedules
+  // Fetch all schedules once - без привязки к selectedDate
   const { data: schedules = [], isLoading } = useQuery<ScheduleType[]>({
-    queryKey: ["/api/schedules", selectedDate ? format(selectedDate, "yyyy-MM-dd") : null],
-    queryFn: async ({ queryKey }) => {
-      const dateParam = queryKey[1];
-      const url = dateParam ? `/api/schedules?scheduleDate=${dateParam}` : "/api/schedules";
-      const res = await fetch(url);
+    queryKey: ["/api/schedules"],
+    queryFn: async () => {
+      const res = await fetch("/api/schedules");
       if (!res.ok) throw new Error("Failed to fetch schedules");
       return res.json();
     },
-    enabled: !!user
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000 // Кэшируем на 5 минут
   });
   
   // Filter schedules for teacher
