@@ -556,61 +556,74 @@ export default function ClassGradeDetailsPage() {
                             const studentGrades = getStudentGradeForDate(student.id, date);
                             return (
                               <TableCell key={date} className="text-center">
-                                {studentGrades.length > 0 ? (
-                                  <div className="flex flex-wrap justify-center gap-1">
-                                    {studentGrades.map((grade) => (
-                                      <div key={grade.id} className="relative group">
-                                        <span 
-                                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
-                                          title={grade.comment || ""}
-                                        >
-                                          {grade.grade}
-                                        </span>
-                                        
-                                        {canEditGrades && (
-                                          <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
-                                            <Button
-                                              variant="outline"
-                                              size="icon"
-                                              className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
-                                              onClick={() => openEditGradeDialog(grade)}
-                                              title="Редактировать оценку"
-                                            >
-                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M12 20h9"></path>
-                                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                                              </svg>
-                                            </Button>
-                                            <Button
-                                              variant="outline"
-                                              size="icon"
-                                              className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
-                                              onClick={() => handleDeleteGrade(grade.id)}
-                                              title="Удалить оценку"
-                                            >
-                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M3 6h18"></path>
-                                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                                              </svg>
-                                            </Button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : canEditGrades ? (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-7 w-7 p-0 rounded-full"
-                                    onClick={() => openGradeDialog(student.id, date)}
-                                  >
-                                    +
-                                  </Button>
-                                ) : (
-                                  "-"
-                                )}
+                                <div className="flex flex-wrap justify-center gap-1 items-center">
+                                  {/* Отображаем оценки, если они есть */}
+                                  {grades.filter(g => 
+                                    g.studentId === student.id && 
+                                    g.subjectId === subjectId &&
+                                    g.createdAt && new Date(g.createdAt).toDateString() === new Date(date).toDateString()
+                                  ).map((grade) => (
+                                    <div key={grade.id} className="relative group">
+                                      <span 
+                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
+                                        title={grade.comment || ""}
+                                      >
+                                        {grade.grade}
+                                      </span>
+                                      
+                                      {canEditGrades && (
+                                        <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
+                                          <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
+                                            onClick={() => openEditGradeDialog(grade)}
+                                            title="Редактировать оценку"
+                                          >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                              <path d="M12 20h9"></path>
+                                              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                                            </svg>
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
+                                            onClick={() => handleDeleteGrade(grade.id)}
+                                            title="Удалить оценку"
+                                          >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                              <path d="M3 6h18"></path>
+                                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                            </svg>
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                  
+                                  {/* Кнопка "+" всегда отображается для учителей */}
+                                  {canEditGrades && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 w-7 p-0 rounded-full"
+                                      onClick={() => openGradeDialog(student.id, date)}
+                                    >
+                                      +
+                                    </Button>
+                                  )}
+                                  
+                                  {/* Если нет оценок и нельзя редактировать */}
+                                  {!canEditGrades && grades.filter(g => 
+                                    g.studentId === student.id && 
+                                    g.subjectId === subjectId &&
+                                    g.createdAt && new Date(g.createdAt).toDateString() === new Date(date).toDateString()
+                                  ).length === 0 && (
+                                    <span>-</span>
+                                  )}
+                                </div>
                               </TableCell>
                             );
                           })}
