@@ -337,6 +337,22 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                 </div>
               </div>
               
+              {/* Отображение информации о домашнем задании */}
+              {getScheduleHomework(selectedSchedule) && (
+                <div className="mt-4 p-4 bg-orange-50 rounded-lg border border-orange-100">
+                  <h3 className="text-lg font-medium text-orange-800 mb-2">Домашнее задание</h3>
+                  <div className="space-y-2">
+                    <p className="font-medium">{getScheduleHomework(selectedSchedule)?.title}</p>
+                    <p className="text-sm text-gray-700">{getScheduleHomework(selectedSchedule)?.description}</p>
+                    {getScheduleHomework(selectedSchedule)?.dueDate && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        Срок сдачи: {format(new Date(getScheduleHomework(selectedSchedule)?.dueDate || ''), "dd.MM.yyyy")}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
               <DialogFooter className="flex flex-wrap justify-between gap-2 sm:justify-between">
                 {isAdmin && (
                   <Button 
@@ -354,17 +370,40 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                 )}
                 
                 {isTeacher() && (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => {
-                      navigate(`/class-grade-details/${selectedSchedule.classId}/${selectedSchedule.subjectId}`);
-                      setIsDetailsOpen(false);
-                    }}
-                  >
-                    <FiList className="mr-2" />
-                    Оценки класса
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => {
+                        navigate(`/class-grade-details/${selectedSchedule.classId}/${selectedSchedule.subjectId}`);
+                        setIsDetailsOpen(false);
+                      }}
+                    >
+                      <FiList className="mr-2" />
+                      Оценки класса
+                    </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => {
+                        setIsDetailsOpen(false);
+                        setIsHomeworkDialogOpen(true);
+                      }}
+                    >
+                      {getScheduleHomework(selectedSchedule) ? (
+                        <>
+                          <FiEdit3 className="mr-2" />
+                          Изменить задание
+                        </>
+                      ) : (
+                        <>
+                          <FiPlus className="mr-2" />
+                          Добавить задание
+                        </>
+                      )}
+                    </Button>
+                  </>
                 )}
                 
                 {isAdmin && (
