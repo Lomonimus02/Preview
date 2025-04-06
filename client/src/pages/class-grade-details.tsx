@@ -189,7 +189,35 @@ export default function ClassGradeDetailsPage() {
       const res = await apiRequest("POST", "/api/grades", data);
       return res.json();
     },
-    onSuccess: () => {
+    onMutate: async (newGradeData) => {
+      // Отменяем исходящие запросы за оценками
+      await queryClient.cancelQueries({ queryKey: ["/api/grades"] });
+      
+      // Сохраняем предыдущее состояние
+      const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]) || [];
+      
+      // Создаём временную оценку для оптимистичного обновления
+      const tempGrade: Grade = {
+        id: Date.now(), // Временный ID
+        studentId: newGradeData.studentId!, 
+        subjectId: newGradeData.subjectId!,
+        classId: newGradeData.classId!,
+        teacherId: newGradeData.teacherId!,
+        grade: newGradeData.grade!,
+        comment: newGradeData.comment || "",
+        gradeType: newGradeData.gradeType || "Текущая",
+        createdAt: new Date().toISOString(),
+        // Другие поля оценки с placeholder значениями
+      };
+      
+      // Оптимистично обновляем кеш react-query
+      queryClient.setQueryData<Grade[]>(["/api/grades"], [...previousGrades, tempGrade]);
+      
+      // Возвращаем контекст с предыдущим состоянием
+      return { previousGrades };
+    },
+    onSuccess: (newGrade) => {
+      // После успешного запроса обновляем кеш актуальными данными
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
       setIsGradeDialogOpen(false);
       gradeForm.reset({
@@ -206,12 +234,21 @@ export default function ClassGradeDetailsPage() {
         description: "Оценка успешно добавлена",
       });
     },
-    onError: (error) => {
+    onError: (error, newGrade, context) => {
+      // При ошибке возвращаем предыдущее состояние
+      if (context?.previousGrades) {
+        queryClient.setQueryData(["/api/grades"], context.previousGrades);
+      }
+      
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось добавить оценку",
         variant: "destructive",
       });
+    },
+    // Всегда возвращаемся к актуальному состоянию после выполнения мутации
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
     },
   });
   
@@ -220,6 +257,32 @@ export default function ClassGradeDetailsPage() {
     mutationFn: async ({ id, data }: { id: number, data: Partial<z.infer<typeof gradeFormSchema>> }) => {
       const res = await apiRequest("PUT", `/api/grades/${id}`, data);
       return res.json();
+    },
+    onMutate: async ({ id, data }) => {
+      // Отменяем исходящие запросы
+      await queryClient.cancelQueries({ queryKey: ["/api/grades"] });
+      
+      // Сохраняем предыдущее состояние
+      const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]) || [];
+      
+      // Оптимистично обновляем кеш
+      queryClient.setQueryData<Grade[]>(["/api/grades"], (oldData = []) => {
+        return oldData.map(grade => {
+          if (grade.id === id) {
+            // Обновляем существующую оценку
+            return {
+              ...grade,
+              ...data,
+              grade: data.grade || grade.grade, // Обновляем оценку, если она есть в data
+              comment: data.comment !== undefined ? data.comment : grade.comment,
+              gradeType: data.gradeType || grade.gradeType,
+            };
+          }
+          return grade;
+        });
+      });
+      
+      return { previousGrades };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
@@ -239,12 +302,20 @@ export default function ClassGradeDetailsPage() {
         description: "Оценка успешно обновлена",
       });
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      // При ошибке возвращаем предыдущее состояние
+      if (context?.previousGrades) {
+        queryClient.setQueryData(["/api/grades"], context.previousGrades);
+      }
+      
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось обновить оценку",
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
     },
   });
   
@@ -254,6 +325,20 @@ export default function ClassGradeDetailsPage() {
       const res = await apiRequest("DELETE", `/api/grades/${id}`);
       return res.json();
     },
+    onMutate: async (id) => {
+      // Отменяем исходящие запросы
+      await queryClient.cancelQueries({ queryKey: ["/api/grades"] });
+      
+      // Сохраняем предыдущее состояние
+      const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]) || [];
+      
+      // Оптимистично обновляем кеш удаляя оценку
+      queryClient.setQueryData<Grade[]>(["/api/grades"], (oldData = []) => {
+        return oldData.filter(grade => grade.id !== id);
+      });
+      
+      return { previousGrades };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
       toast({
@@ -261,12 +346,20 @@ export default function ClassGradeDetailsPage() {
         description: "Оценка успешно удалена",
       });
     },
-    onError: (error) => {
+    onError: (error, id, context) => {
+      // При ошибке возвращаем предыдущее состояние
+      if (context?.previousGrades) {
+        queryClient.setQueryData(["/api/grades"], context.previousGrades);
+      }
+      
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось удалить оценку",
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
     },
   });
   
