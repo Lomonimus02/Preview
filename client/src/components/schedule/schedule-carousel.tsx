@@ -34,7 +34,8 @@ export function ScheduleCarousel({
     slidesToScroll: 3,       // Количество слайдов для пролистывания кнопками или событиями
   });
   
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null); // Теперь активный индекс может быть null (нет активной карточки)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null); // Индекс карточки, над которой находится курсор
   const [weekOffset, setWeekOffset] = useState(0);
   
   // Если selectedDate не задан, используем текущую дату
@@ -70,28 +71,32 @@ export function ScheduleCarousel({
     return index !== -1 ? index : getWeekDayIndex(selectedDate) - 1;
   }, [selectedDate, weekDays]);
   
-  // Обработчик прокрутки карусели
-  const onScroll = useCallback(() => {
-    if (!emblaApi) return;
-    setActiveIndex(emblaApi.selectedScrollSnap());
-  }, [emblaApi]);
-  
-  // Подписка на события прокрутки
+  // Подписка на события прокрутки, но без автоматического выделения
+  // Только для обновления видимого дня
   useEffect(() => {
     if (!emblaApi) return;
-    emblaApi.on("select", onScroll);
-    return () => {
-      emblaApi.off("select", onScroll);
+    
+    const onSelect = () => {
+      const currentDate = weekDays[emblaApi.selectedScrollSnap()];
+      onDateChange(currentDate);
+      // Не обновляем activeIndex, т.к. карточка должна выделиться только при клике
     };
-  }, [emblaApi, onScroll]);
+    
+    emblaApi.on("select", onSelect);
+    return () => {
+      emblaApi.off("select", onSelect);
+    };
+  }, [emblaApi, onDateChange, weekDays]);
   
-  // Устанавливаем начальный индекс при изменении currentDayIndex
+  // Устанавливаем начальный индекс при изменении недели, но без выделения
   useEffect(() => {
     if (!emblaApi) return;
     
     // Используем requestAnimationFrame для плавного перехода
     requestAnimationFrame(() => {
       emblaApi.scrollTo(currentDayIndex);
+      // Не выделяем активную карточку при переходе к новой неделе
+      setActiveIndex(null);
     });
   }, [emblaApi, currentDayIndex, weekOffset]);
   
@@ -241,11 +246,17 @@ export function ScheduleCarousel({
             const day = getWeekDayIndex(date);
             const daySchedules = getSchedulesByDay(day, date);
             
+            // Определяем, является ли карточка активной или наведенной
+            const isActive = index === activeIndex;
+            const isHovered = index === hoveredIndex;
+            
             return (
               <div 
                 key={index} 
                 className="min-w-[300px] flex-[0_0_300px] md:min-w-[350px] md:flex-[0_0_350px] h-[580px] cursor-pointer"
                 onClick={() => handleDayClick(date, index)}
+                onMouseEnter={() => setHoveredIndex(index)}
+                onMouseLeave={() => setHoveredIndex(null)}
               >
                 <DayCard
                   day={day}
@@ -254,7 +265,8 @@ export function ScheduleCarousel({
                   subjects={subjects}
                   classes={classes}
                   users={users}
-                  isActive={index === activeIndex}
+                  isActive={isActive}
+                  isHovered={isHovered}
                   activeCardIndex={activeIndex}
                   cardIndex={index}
                 />
