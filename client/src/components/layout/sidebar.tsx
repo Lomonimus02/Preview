@@ -66,8 +66,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
   );
 
   const sidebarClass = isOpen 
-    ? "fixed inset-0 z-40 md:relative w-64 md:translate-x-0 transform transition duration-200 ease-in-out"
-    : "fixed inset-0 z-40 md:relative w-64 -translate-x-full md:-translate-x-full transform transition duration-200 ease-in-out";
+    ? "fixed inset-0 z-40 md:relative w-64 translate-x-0 transform transition duration-200 ease-in-out"
+    : "fixed inset-0 z-40 md:relative w-0 opacity-0 -translate-x-full transform transition duration-200 ease-in-out";
 
   // Role display names in Russian
   const roleNames = {
