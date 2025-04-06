@@ -148,33 +148,11 @@ export function ScheduleCarousel({
     setWeekOffset(prev => prev + 1);
   };
   
-  // Обработчик клика по дню - обновляет выбранную дату и активный индекс
+  // Обработчик клика по дню - только обновляет выбранную дату и активный индекс
+  // без прокрутки карусели к выбранной карточке
   const handleDayClick = (date: Date, index: number) => {
-    // Устанавливаем индекс текущего дня при клике
-    if (emblaApi) {
-      // Сначала приостанавливаем автоскролл и свободное перетаскивание
-      emblaApi.reInit({ dragFree: false });
-      
-      // Используем scrollTo с опцией immediate: false для плавной анимации
-      // к выбранной карточке (гарантирует, что карточка будет отцентрирована)
-      emblaApi.scrollTo(index, true);
-      setActiveIndex(index);
-      
-      // Через 300мс возвращаем прежние настройки карусели
-      setTimeout(() => {
-        if (emblaApi) {
-          emblaApi.reInit({
-            loop: false,
-            align: "center",
-            containScroll: "trimSnaps",
-            dragFree: true,
-            duration: 40,
-            inViewThreshold: 0.7,
-            slidesToScroll: 3
-          });
-        }
-      }, 300);
-    }
+    // Устанавливаем индекс текущего дня при клике для цветового выделения
+    setActiveIndex(index);
     
     // Обновляем выбранную дату в родительском компоненте
     // без запроса новых данных (данные уже загружены для всей недели)
