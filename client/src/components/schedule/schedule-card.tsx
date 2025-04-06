@@ -8,6 +8,7 @@ import { ScheduleItemDetails } from "./schedule-item-details";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Check, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ScheduleCardProps {
   date: Date;
@@ -107,73 +108,98 @@ export function ScheduleCard({
   };
   
   return (
-    <Card className={`h-full ${isCurrentDate ? "bg-[#4CAF50] text-white" : "bg-white"}`}>
+    <Card className={cn(
+      "h-full w-full min-w-[270px] overflow-hidden",
+      isCurrentDate ? "bg-[#4CAF50] text-white" : "bg-white shadow-sm"
+    )}>
       <CardHeader className="py-4 px-4 text-center">
         <CardTitle className="flex flex-col items-center justify-center">
-          <span className="text-lg font-medium capitalize">{dayName}</span>
-          <span className={`text-sm ${isCurrentDate ? "text-white/80" : "text-muted-foreground"}`}>
-            {renderDate()}
+          <span className="text-lg font-medium">{dayName}</span>
+          <span className={cn(
+            "text-sm", 
+            isCurrentDate ? "text-white/80" : "text-muted-foreground"
+          )}>
+            {format(date, "dd.MM", { locale: ru })}
           </span>
         </CardTitle>
       </CardHeader>
       
       <CardContent className="p-0 h-full overflow-y-auto max-h-[550px]">
         {sortedSchedules.length === 0 ? (
-          <div className={`text-center py-8 ${isCurrentDate ? "text-white/80" : "text-muted-foreground"}`}>
+          <div className={cn(
+            "text-center py-8",
+            isCurrentDate ? "text-white/80" : "text-muted-foreground"
+          )}>
             <p>Нет занятий в этот день</p>
           </div>
         ) : (
           <div>
-            <div className={`px-4 py-2 ${isCurrentDate ? "text-white/80" : "text-muted-foreground"} border-t border-b ${isCurrentDate ? "border-white/20" : "border-border"} text-sm`}>
+            <div className={cn(
+              "px-4 py-2 text-sm border-t border-b",
+              isCurrentDate ? "text-white/80 border-white/20" : "text-muted-foreground border-gray-100"
+            )}>
               {sortedSchedules.length} уроков
             </div>
             <div className="space-y-0">
               {sortedSchedules.map((schedule, index) => {
-                // Чередование фона для строк
-                const bgColor = index % 2 === 0 
-                  ? isCurrentDate ? "bg-[#4CAF50]/90" : "bg-white" 
-                  : isCurrentDate ? "bg-[#4CAF50]/80" : "bg-slate-50/80";
+                // Определяем класс фона для полос (чередование)
+                const isEvenRow = index % 2 === 0;
+                const bgColorClass = isCurrentDate 
+                  ? isEvenRow ? "bg-[#4CAF50]" : "bg-[#4CAF50]/90"
+                  : isEvenRow ? "bg-white" : "bg-[#f9f9f9]";
+                
+                // Определяем иконку кнопки (чек или плюс)
+                const isCompleted = index % 3 === 1; // Условная логика
                 
                 return (
                   <div 
                     key={schedule.id}
-                    className={`p-2 ${bgColor} hover:bg-opacity-90 transition-colors border-b last:border-b-0 ${isCurrentDate ? "border-white/10" : "border-slate-100"} schedule-item`}
+                    className={cn(
+                      bgColorClass,
+                      "group py-2 px-3 border-b last:border-b-0 schedule-item hover:bg-opacity-95 transition-colors",
+                      isCurrentDate ? "border-white/10" : "border-gray-100"
+                    )}
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="text-sm font-medium">
-                              {schedule.startTime} - {schedule.endTime}
-                            </div>
-                            <div className={`text-base font-semibold mt-0.5 ${isCurrentDate ? "" : "text-slate-800"}`}>
-                              {getSubjectName(schedule.subjectId)} {getClassLetter()}
-                            </div>
-                            <div className={`text-xs mt-1 ${isCurrentDate ? "text-white/70" : "text-slate-500"}`}>
-                              Кабинет: {schedule.room || 100} | {getTeacherName(schedule.teacherId)}
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <Button
-                              variant={isCurrentDate ? "ghost" : "outline"}
-                              size="icon"
-                              className={`h-6 w-6 rounded-full ${isCurrentDate ? "bg-white/20 hover:bg-white/30 text-white" : ""}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditSchedule(schedule);
-                              }}
-                            >
-                              {index % 3 === 1 ? (
-                                <Check className="h-3.5 w-3.5" />
-                              ) : (
-                                <Plus className="h-3.5 w-3.5" />
-                              )}
-                            </Button>
-                          </div>
+                        <div className="text-sm font-medium">
+                          {schedule.startTime} - {schedule.endTime}
+                        </div>
+                        <div className={cn(
+                          "text-base font-semibold mt-0.5",
+                          isCurrentDate ? "" : "text-slate-800"
+                        )}>
+                          {getSubjectName(schedule.subjectId)} {getClassLetter()}
+                        </div>
+                        <div className={cn(
+                          "text-xs mt-1",
+                          isCurrentDate ? "text-white/70" : "text-slate-500"
+                        )}>
+                          Кабинет: {schedule.room || 100} | {getTeacherName(schedule.teacherId)}
                         </div>
                       </div>
+                      
+                      <Button
+                        variant={isCurrentDate ? "ghost" : "outline"}
+                        size="icon"
+                        className={cn(
+                          "h-6 w-6 rounded-full",
+                          isCurrentDate 
+                            ? isCompleted ? "bg-white text-green-600" : "bg-white/20 hover:bg-white/30 text-white" 
+                            : isCompleted ? "bg-[#4CAF50] text-white" : "bg-white border-gray-200"
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditSchedule(schedule);
+                        }}
+                      >
+                        {isCompleted ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <Plus className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
                     </div>
                     
                     <Dialog open={dialogOpen && selectedSchedule?.id === schedule.id} onOpenChange={setDialogOpen}>

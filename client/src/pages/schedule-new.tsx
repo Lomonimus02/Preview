@@ -18,12 +18,13 @@ export default function ScheduleNew() {
   const queryClient = useQueryClient();
   
   // Адаптивное количество отображаемых дней в зависимости от размера экрана
-  const isDesktop = useMediaQuery("(min-width: 1200px)");
+  const isLargeDesktop = useMediaQuery("(min-width: 1536px)");
+  const isDesktop = useMediaQuery("(min-width: 1280px)");
   const isTablet = useMediaQuery("(min-width: 768px)");
   const isMobile = useMediaQuery("(min-width: 480px)");
   
   // Количество видимых дней
-  const visibleDays = isDesktop ? 5 : isTablet ? 3 : 1;
+  const visibleDays = isLargeDesktop ? 4 : isDesktop ? 3 : isTablet ? 2 : 1;
   
   // Current date
   const today = new Date();
@@ -305,27 +306,33 @@ export default function ScheduleNew() {
   
   return (
     <div className="container max-w-7xl mx-auto py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Расписание</h1>
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-4 md:mb-0">Расписание</h1>
         
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={navigateToPreviousWeek}>
-            <ChevronLeft className="h-4 w-4 mr-1" />
+        <div className="flex items-center gap-2 self-end">
+          <Button 
+            variant="outline" 
+            className="text-sm px-3 h-9"
+            onClick={navigateToPreviousWeek}
+          >
             Предыдущая неделя
           </Button>
-          <Button variant="outline" onClick={navigateToNextWeek}>
+          <Button 
+            variant="outline" 
+            className="text-sm px-3 h-9"
+            onClick={navigateToNextWeek}
+          >
             Следующая неделя
-            <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
       </div>
       
-      <div className="relative mb-8">
+      <div className="relative mb-4">
         {/* Кнопки навигации влево/вправо */}
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
-          className="absolute -left-4 top-1/2 transform -translate-y-1/2 h-8 w-8 hidden md:flex z-10"
+          className="absolute -left-3 md:-left-5 top-1/2 transform -translate-y-1/2 h-8 w-8 hidden md:flex z-10 rounded-full bg-white/80 backdrop-blur-sm border-gray-200 shadow-sm"
           onClick={() => navigateDays('prev')}
           disabled={currentIndex === 0 && currentWeekStart <= today}
         >
@@ -353,11 +360,12 @@ export default function ScheduleNew() {
           >
             {weekDays.map((weekDay) => {
               const daySchedules = getSchedulesForDate(weekDay.date);
+              const formattedDate = format(weekDay.date, "dd.MM", { locale: ru });
               
               return (
                 <div 
                   key={weekDay.day} 
-                  className="flex-shrink-0 schedule-slide"
+                  className="flex-shrink-0 schedule-slide px-1"
                   style={{ width: `${100 / weekDays.length * visibleDays}%` }}
                 >
                   <ScheduleCard
@@ -378,9 +386,9 @@ export default function ScheduleNew() {
         </div>
         
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
-          className="absolute -right-4 top-1/2 transform -translate-y-1/2 h-8 w-8 hidden md:flex z-10"
+          className="absolute -right-3 md:-right-5 top-1/2 transform -translate-y-1/2 h-8 w-8 hidden md:flex z-10 rounded-full bg-white/80 backdrop-blur-sm border-gray-200 shadow-sm"
           onClick={() => navigateDays('next')}
           disabled={currentIndex >= weekDays.length - visibleDays}
         >
@@ -389,21 +397,44 @@ export default function ScheduleNew() {
       </div>
       
       {/* Индикаторы текущей позиции */}
-      <div className="flex justify-center gap-1 mt-2 mb-8">
+      <div className="flex justify-center gap-1 mt-2 mb-6">
         {weekDays.map((weekDay, index) => (
           <button
             key={index}
-            className={`h-2 rounded-full transition-all ${
+            className={`h-1.5 rounded-full transition-all ${
               index >= currentIndex && index < currentIndex + visibleDays
                 ? weekDay.isCurrentDay
-                  ? "w-6 bg-primary"
-                  : "w-3 bg-primary/60"
-                : "w-3 bg-muted"
+                  ? "w-5 bg-[#4CAF50]"
+                  : "w-2.5 bg-[#4CAF50]/60"
+                : "w-2.5 bg-gray-200"
             }`}
             onClick={() => setCurrentIndex(Math.min(index, weekDays.length - visibleDays))}
             title={format(weekDay.date, "d MMMM", { locale: ru })}
           />
         ))}
+      </div>
+      
+      {/* Мобильные кнопки навигации */}
+      <div className="flex justify-between md:hidden px-2 mb-8">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 rounded-full"
+          onClick={() => navigateDays('prev')}
+          disabled={currentIndex === 0 && currentWeekStart <= today}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 rounded-full"
+          onClick={() => navigateDays('next')}
+          disabled={currentIndex >= weekDays.length - visibleDays}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
       
       {isAdmin && (
