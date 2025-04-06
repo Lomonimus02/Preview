@@ -137,7 +137,8 @@ export function ScheduleCard({
                 return (
                   <div 
                     key={schedule.id}
-                    className={`p-2 ${bgColor} hover:bg-opacity-90 transition-colors border-b last:border-b-0 ${isCurrentDate ? "border-white/10" : "border-slate-100"}`}
+                    className={`p-2 ${bgColor} hover:bg-opacity-90 transition-colors border-b last:border-b-0 ${isCurrentDate ? "border-white/10" : "border-slate-100"} schedule-item`}
+                    style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
