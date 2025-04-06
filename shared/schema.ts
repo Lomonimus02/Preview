@@ -120,7 +120,6 @@ export const grades = pgTable("grades", {
   comment: text("comment"),
   gradeType: text("grade_type").notNull(), // e.g., "homework", "test", "exam"
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  gradeDate: date("grade_date"), // Дата занятия, к которому относится оценка
 });
 
 // Attendance table

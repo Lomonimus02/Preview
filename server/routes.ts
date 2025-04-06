@@ -666,34 +666,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/grades", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
     try {
-      // Используем явную дату, если она передана через gradeDate
-      let creationDataOverride = {};
-      if (req.body.gradeDate) {
-        try {
-          // Устанавливаем createdAt в начало дня, чтобы сравнение дат работало корректно
-          const gradeDate = new Date(req.body.gradeDate);
-          gradeDate.setHours(0, 0, 0, 0);
-          // Передаем строку в формате ISO без использования метода toISOString
-          creationDataOverride = {
-            createdAt: gradeDate.getFullYear() + '-' + 
-                      String(gradeDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                      String(gradeDate.getDate()).padStart(2, '0') + ' ' + 
-                      String(gradeDate.getHours()).padStart(2, '0') + ':' + 
-                      String(gradeDate.getMinutes()).padStart(2, '0') + ':' + 
-                      String(gradeDate.getSeconds()).padStart(2, '0')
-          };
-          // Удаляем временное поле gradeDate из данных
-          delete req.body.gradeDate;
-        } catch (error) {
-          console.error("Ошибка при обработке даты оценки:", error);
-          return res.status(400).json({ message: "Неверный формат даты оценки" });
-        }
-      }
-      
       const grade = await dataStorage.createGrade({
         ...req.body,
-        teacherId: req.user.id,
-        ...creationDataOverride
+        teacherId: req.user.id
       });
       
       // Notify the student

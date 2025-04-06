@@ -78,20 +78,7 @@ export default function ClassGradeDetailsPage() {
   
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
-  // Используем строковый формат для даты, а не смешанный null | string
-  const [selectedDate, setSelectedDate] = useState<string>("");
-  const [addAnotherGrade, setAddAnotherGrade] = useState(false);
-  
-  // State to track last added grade info for optimistic rendering
-  const [lastAddedGradeInfo, setLastAddedGradeInfo] = useState<{
-    studentId: number | null;
-    date: string | "";
-    grade: number | null;
-  }>({
-    studentId: null,
-    date: "",
-    grade: null
-  });
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   
   // Fetch class details
   const { data: classData, isLoading: isClassLoading } = useQuery<ClassType>({
@@ -157,12 +144,11 @@ export default function ClassGradeDetailsPage() {
   const lessonDates = useMemo(() => {
     const dates = schedules
       .filter(s => s.scheduleDate && s.subjectId === subjectId) // Filter schedules for this subject only
-      .map(s => s.scheduleDate || "")
-      .filter(date => date !== "") // Удаляем пустые значения
+      .map(s => s.scheduleDate)
       .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     
-    // Remove duplicates using Array.from to avoid issues with Set iteration
-    return Array.from(new Set(dates));
+    // Remove duplicates
+    return [...new Set(dates)];
   }, [schedules, subjectId]);
   
   // Группируем расписания учителя по предметам
@@ -200,91 +186,27 @@ export default function ClassGradeDetailsPage() {
   // Mutation to add grade
   const addGradeMutation = useMutation({
     mutationFn: async (data: z.infer<typeof gradeFormSchema>) => {
-      // Если у нас есть selectedDate (дата занятия), добавляем ее к данным оценки
-      const gradeData = {
-        ...data,
-        // Если есть selectedDate, добавляем ее как gradeDate
-        ...(selectedDate && { gradeDate: selectedDate })
-      };
-      
-      const res = await apiRequest("POST", "/api/grades", gradeData);
+      const res = await apiRequest("POST", "/api/grades", data);
       return res.json();
     },
-    onMutate: async (newGradeData) => {
-      // Отменяем все запросы на получение оценок, чтобы они не перезаписали наше оптимистичное обновление
-      await queryClient.cancelQueries({ queryKey: ["/api/grades"] });
-      
-      // Сохраняем предыдущее состояние оценок
-      const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades", { classId, subjectId }]);
-      
-      // Оптимистично обновляем кэш
-      if (previousGrades) {
-        // Создаем временный ID (отрицательный, чтобы не перекрывал реальные ID)
-        const tempId = -Date.now();
-        
-        // Создаем оптимистичную оценку с временным ID
-        const optimisticGrade = {
-          id: tempId,
-          ...newGradeData,
-          createdAt: new Date().toISOString(),
-          gradeDate: selectedDate || null,
-        } as Grade;
-        
-        // Добавляем новую оценку в кэш
-        queryClient.setQueryData<Grade[]>(["/api/grades", { classId, subjectId }], [...previousGrades, optimisticGrade]);
-      }
-      
-      // Возвращаем контекст для onError
-      return { previousGrades };
-    },
-    onSuccess: (newGrade) => {
-      // Обновляем кэш с реальными данными от сервера
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
-      
-      // Сохраняем ID и дату последней добавленной оценки для дальнейшего использования
-      setLastAddedGradeInfo({
-        studentId: newGrade.studentId,
-        date: selectedDate || "",
-        grade: newGrade.grade
+      setIsGradeDialogOpen(false);
+      gradeForm.reset({
+        studentId: undefined,
+        grade: undefined,
+        comment: "",
+        gradeType: "Текущая",
+        subjectId: subjectId,
+        classId: classId,
+        teacherId: user?.id,
       });
-      
-      // Если указано addAnotherGrade, не закрываем диалог
-      if (!addAnotherGrade) {
-        setIsGradeDialogOpen(false);
-      } else {
-        // Просто сбрасываем значение оценки, но сохраняем остальные поля
-        const currentValues = gradeForm.getValues();
-        gradeForm.setValue('grade', undefined as any);
-        toast({
-          title: "Оценка добавлена",
-          description: "Теперь вы можете добавить ещё одну оценку для этого ученика",
-        });
-      }
-      
-      if (!addAnotherGrade) {
-        // Сбрасываем форму только если не добавляем ещё одну оценку
-        gradeForm.reset({
-          studentId: undefined,
-          grade: undefined,
-          comment: "",
-          gradeType: "Текущая",
-          subjectId: subjectId,
-          classId: classId,
-          teacherId: user?.id,
-        });
-        
-        toast({
-          title: "Оценка добавлена",
-          description: "Оценка успешно добавлена",
-        });
-      }
+      toast({
+        title: "Оценка добавлена",
+        description: "Оценка успешно добавлена",
+      });
     },
-    onError: (error, variables, context) => {
-      // При ошибке возвращаем предыдущее состояние
-      if (context?.previousGrades) {
-        queryClient.setQueryData<Grade[]>(["/api/grades", { classId, subjectId }], context.previousGrades);
-      }
-      
+    onError: (error) => {
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось добавить оценку",
@@ -368,13 +290,8 @@ export default function ClassGradeDetailsPage() {
   // Open grade dialog for a specific student and date
   const openGradeDialog = (studentId: number, date?: string) => {
     setSelectedStudentId(studentId);
-    setSelectedDate(date || "");
+    setSelectedDate(date || null);
     setEditingGradeId(null);
-    // Сбрасываем флаг добавления еще одной оценки
-    setAddAnotherGrade(false);
-    
-    const today = new Date();
-    const formattedDate = today.toISOString().split('T')[0]; // YYYY-MM-DD format
     
     gradeForm.reset({
       studentId: studentId,
@@ -384,8 +301,6 @@ export default function ClassGradeDetailsPage() {
       grade: undefined,
       comment: "",
       gradeType: "Текущая",
-      // Устанавливаем дату явно, если передана
-      ...(date && { date: date }),
     });
     
     setIsGradeDialogOpen(true);
@@ -394,10 +309,8 @@ export default function ClassGradeDetailsPage() {
   // Open grade dialog to edit existing grade
   const openEditGradeDialog = (grade: Grade) => {
     setSelectedStudentId(grade.studentId);
-    setSelectedDate("");
+    setSelectedDate(null);
     setEditingGradeId(grade.id);
-    // При редактировании всегда отключаем добавление еще одной оценки
-    setAddAnotherGrade(false);
     
     gradeForm.reset({
       studentId: grade.studentId,
@@ -422,39 +335,12 @@ export default function ClassGradeDetailsPage() {
   // Get student grades for a specific date for the current subject
   const getStudentGradeForDate = (studentId: number, date: string) => {
     const dateObj = new Date(date);
-    
     // Фильтруем оценки по студенту, предмету и дате
-    return grades.filter(g => {
-      // Проверка, соответствует ли это последней добавленной оценке в режиме "добавить еще одну"
-      const isLastAddedGrade = addAnotherGrade && 
-        lastAddedGradeInfo.studentId === studentId && 
-        lastAddedGradeInfo.date === date;
-      
-      // Безопасное сравнение дат - теперь используем gradeDate если он есть
-      let dateMatches = false;
-      
-      // Сначала проверяем gradeDate для точного совпадения даты урока
-      if (g.gradeDate) {
-        try {
-          dateMatches = g.gradeDate === date;
-        } catch (error) {
-          console.error("Ошибка при сравнении дат gradeDate:", error, g.gradeDate, date);
-        }
-      } 
-      // Если нет gradeDate, то пробуем по createdAt как раньше
-      else if (g.createdAt) {
-        try {
-          const createdAtDate = new Date(g.createdAt);
-          dateMatches = createdAtDate.toDateString() === dateObj.toDateString();
-        } catch (error) {
-          console.error("Ошибка при сравнении дат createdAt:", error, g.createdAt, dateObj);
-        }
-      }
-      
-      return g.studentId === studentId && 
-             g.subjectId === subjectId && 
-             (dateMatches || isLastAddedGrade);
-    });
+    return grades.filter(g => 
+      g.studentId === studentId && 
+      g.subjectId === subjectId && // Добавляем фильтр по предмету
+      g.createdAt && new Date(g.createdAt).toDateString() === dateObj.toDateString()
+    );
   };
   
   // Calculate average grade for a student for the current subject
@@ -524,6 +410,12 @@ export default function ClassGradeDetailsPage() {
               Таблицы оценок учеников по предметам
             </p>
           </div>
+          
+          {canEditGrades && (
+            <Button onClick={() => setIsGradeDialogOpen(true)}>
+              Добавить оценку
+            </Button>
+          )}
         </div>
         
         {students.length === 0 ? (
@@ -573,100 +465,61 @@ export default function ClassGradeDetailsPage() {
                             const studentGrades = getStudentGradeForDate(student.id, date);
                             return (
                               <TableCell key={date} className="text-center">
-                                <div className="flex flex-wrap justify-center gap-1 items-center">
-                                  {/* Отображаем оценки, если они есть */}
-                                  {grades.filter(g => {
-                                    let dateMatches = false;
-                                    if (g.studentId === student.id && g.subjectId === subjectId) {
-                                      // Проверяем сначала по gradeDate (новое поле)
-                                      if (g.gradeDate) {
-                                        dateMatches = g.gradeDate === date;
-                                      } 
-                                      // Используем createdAt как fallback для обратной совместимости
-                                      else if (g.createdAt) {
-                                        try {
-                                          dateMatches = new Date(g.createdAt).toDateString() === new Date(date).toDateString();
-                                        } catch (error) {
-                                          console.error("Ошибка при сравнении дат в списке оценок:", error, g.createdAt, date);
-                                        }
-                                      }
-                                    }
-                                    return g.studentId === student.id && g.subjectId === subjectId && dateMatches;
-                                  }).map((grade) => (
-                                    <div key={grade.id} className="relative group">
-                                      <span 
-                                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
-                                        title={grade.comment || ""}
-                                      >
-                                        {grade.grade}
-                                      </span>
-                                      
-                                      {canEditGrades && (
-                                        <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
-                                          <Button
-                                            variant="outline"
-                                            size="icon"
-                                            className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
-                                            onClick={() => openEditGradeDialog(grade)}
-                                            title="Редактировать оценку"
-                                          >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                              <path d="M12 20h9"></path>
-                                              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                                            </svg>
-                                          </Button>
-                                          <Button
-                                            variant="outline"
-                                            size="icon"
-                                            className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
-                                            onClick={() => handleDeleteGrade(grade.id)}
-                                            title="Удалить оценку"
-                                          >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                              <path d="M3 6h18"></path>
-                                              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                                            </svg>
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                  
-                                  {/* Кнопка "+" всегда отображается для учителей */}
-                                  {canEditGrades && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      className="h-7 w-7 p-0 rounded-full"
-                                      onClick={() => openGradeDialog(student.id, date)}
-                                    >
-                                      +
-                                    </Button>
-                                  )}
-                                  
-                                  {/* Если нет оценок и нельзя редактировать */}
-                                  {!canEditGrades && grades.filter(g => {
-                                    let dateMatches = false;
-                                    if (g.studentId === student.id && g.subjectId === subjectId) {
-                                      // Проверяем сначала по gradeDate (новое поле)
-                                      if (g.gradeDate) {
-                                        dateMatches = g.gradeDate === date;
-                                      } 
-                                      // Используем createdAt как fallback для обратной совместимости
-                                      else if (g.createdAt) {
-                                        try {
-                                          dateMatches = new Date(g.createdAt).toDateString() === new Date(date).toDateString();
-                                        } catch (error) {
-                                          console.error("Ошибка при сравнении дат в проверке пустых оценок:", error, g.createdAt, date);
-                                        }
-                                      }
-                                    }
-                                    return g.studentId === student.id && g.subjectId === subjectId && dateMatches;
-                                  }).length === 0 && (
-                                    <span>-</span>
-                                  )}
-                                </div>
+                                {studentGrades.length > 0 ? (
+                                  <div className="flex flex-wrap justify-center gap-1">
+                                    {studentGrades.map((grade) => (
+                                      <div key={grade.id} className="relative group">
+                                        <span 
+                                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
+                                          title={grade.comment || ""}
+                                        >
+                                          {grade.grade}
+                                        </span>
+                                        
+                                        {canEditGrades && (
+                                          <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
+                                            <Button
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
+                                              onClick={() => openEditGradeDialog(grade)}
+                                              title="Редактировать оценку"
+                                            >
+                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M12 20h9"></path>
+                                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                                              </svg>
+                                            </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
+                                              onClick={() => handleDeleteGrade(grade.id)}
+                                              title="Удалить оценку"
+                                            >
+                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M3 6h18"></path>
+                                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                              </svg>
+                                            </Button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : canEditGrades ? (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-7 w-7 p-0 rounded-full"
+                                    onClick={() => openGradeDialog(student.id, date)}
+                                  >
+                                    +
+                                  </Button>
+                                ) : (
+                                  "-"
+                                )}
                               </TableCell>
                             );
                           })}
@@ -823,24 +676,7 @@ export default function ClassGradeDetailsPage() {
                   </div>
                 )}
                 
-                <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
-                  {!editingGradeId && (
-                    <div className="flex items-center space-x-2 mr-auto">
-                      <label 
-                        htmlFor="add-another-grade" 
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        Добавить ещё одну оценку
-                      </label>
-                      <input
-                        id="add-another-grade"
-                        type="checkbox"
-                        className="accent-primary h-4 w-4 rounded border-gray-300"
-                        checked={addAnotherGrade}
-                        onChange={(e) => setAddAnotherGrade(e.target.checked)}
-                      />
-                    </div>
-                  )}
+                <DialogFooter>
                   <Button type="submit" disabled={addGradeMutation.isPending || updateGradeMutation.isPending}>
                     {addGradeMutation.isPending || updateGradeMutation.isPending 
                       ? 'Сохранение...' 
