@@ -195,6 +195,21 @@ export class DatabaseStorage implements IStorage {
     const [newHomework] = await db.insert(homework).values(homeworkData).returning();
     return newHomework;
   }
+  
+  async updateHomework(id: number, homeworkData: Partial<InsertHomework>): Promise<Homework | undefined> {
+    const [updatedHomework] = await db.update(homework)
+      .set(homeworkData)
+      .where(eq(homework.id, id))
+      .returning();
+    return updatedHomework;
+  }
+  
+  async deleteHomework(id: number): Promise<Homework | undefined> {
+    const [deletedHomework] = await db.delete(homework)
+      .where(eq(homework.id, id))
+      .returning();
+    return deletedHomework;
+  }
 
   // ===== Homework submission operations =====
   async getHomeworkSubmission(id: number): Promise<HomeworkSubmission | undefined> {

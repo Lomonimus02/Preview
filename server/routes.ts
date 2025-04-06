@@ -513,6 +513,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.status(201).json(homework);
   });
+  
+  // Update homework
+  app.patch("/api/homework/:id", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+    const homeworkId = parseInt(req.params.id);
+    
+    // Check if homework exists
+    const existingHomework = await dataStorage.getHomework(homeworkId);
+    if (!existingHomework) {
+      return res.status(404).json({ message: "Homework not found" });
+    }
+    
+    // Check if current user is the teacher who created this homework
+    if (existingHomework.teacherId !== req.user.id) {
+      return res.status(403).json({ message: "You can only update your own homework assignments" });
+    }
+    
+    // Update the homework
+    const updatedHomework = await dataStorage.updateHomework(homeworkId, req.body);
+    
+    // Log the action
+    await dataStorage.createSystemLog({
+      userId: req.user.id,
+      action: "homework_updated",
+      details: `Updated homework: ${updatedHomework.title}`,
+      ipAddress: req.ip
+    });
+    
+    res.json(updatedHomework);
+  });
+  
+  // Delete homework
+  app.delete("/api/homework/:id", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+    const homeworkId = parseInt(req.params.id);
+    
+    // Check if homework exists
+    const existingHomework = await dataStorage.getHomework(homeworkId);
+    if (!existingHomework) {
+      return res.status(404).json({ message: "Homework not found" });
+    }
+    
+    // Check if current user is the teacher who created this homework
+    if (existingHomework.teacherId !== req.user.id) {
+      return res.status(403).json({ message: "You can only delete your own homework assignments" });
+    }
+    
+    // Delete the homework
+    const deletedHomework = await dataStorage.deleteHomework(homeworkId);
+    
+    // Log the action
+    await dataStorage.createSystemLog({
+      userId: req.user.id,
+      action: "homework_deleted",
+      details: `Deleted homework: ${deletedHomework.title}`,
+      ipAddress: req.ip
+    });
+    
+    res.json(deletedHomework);
+  });
 
   // Homework submissions API
   app.get("/api/homework-submissions", isAuthenticated, async (req, res) => {

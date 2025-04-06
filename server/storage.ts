@@ -64,6 +64,8 @@ export interface IStorage {
   getHomeworkByTeacher(teacherId: number): Promise<Homework[]>;
   getHomeworkByStudent(studentId: number): Promise<Homework[]>;
   createHomework(homework: InsertHomework): Promise<Homework>;
+  updateHomework(id: number, homework: Partial<InsertHomework>): Promise<Homework | undefined>;
+  deleteHomework(id: number): Promise<Homework | undefined>;
   
   // Homework submission operations
   getHomeworkSubmission(id: number): Promise<HomeworkSubmission | undefined>;
@@ -374,6 +376,23 @@ export class MemStorage implements IStorage {
     const newHomework: Homework = { ...homework, id, createdAt: new Date() };
     this.homework.set(id, newHomework);
     return newHomework;
+  }
+  
+  async updateHomework(id: number, homework: Partial<InsertHomework>): Promise<Homework | undefined> {
+    const existingHomework = this.homework.get(id);
+    if (!existingHomework) return undefined;
+    
+    const updatedHomework: Homework = { ...existingHomework, ...homework };
+    this.homework.set(id, updatedHomework);
+    return updatedHomework;
+  }
+  
+  async deleteHomework(id: number): Promise<Homework | undefined> {
+    const homework = this.homework.get(id);
+    if (!homework) return undefined;
+    
+    this.homework.delete(id);
+    return homework;
   }
   
   // Homework submission operations
