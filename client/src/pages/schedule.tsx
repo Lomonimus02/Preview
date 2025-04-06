@@ -71,6 +71,7 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
+import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
 
 const scheduleFormSchema = insertScheduleSchema.extend({
   classId: z.number({
@@ -123,17 +124,16 @@ export default function SchedulePage() {
   // Check access permissions
   const canEditSchedule = isSuperAdmin() || isSchoolAdmin();
   
-  // Fetch schedules
+  // Fetch all schedules once - без привязки к selectedDate
   const { data: schedules = [], isLoading } = useQuery<ScheduleType[]>({
-    queryKey: ["/api/schedules", selectedDate ? format(selectedDate, "yyyy-MM-dd") : null],
-    queryFn: async ({ queryKey }) => {
-      const dateParam = queryKey[1];
-      const url = dateParam ? `/api/schedules?scheduleDate=${dateParam}` : "/api/schedules";
-      const res = await fetch(url);
+    queryKey: ["/api/schedules"],
+    queryFn: async () => {
+      const res = await fetch("/api/schedules");
       if (!res.ok) throw new Error("Failed to fetch schedules");
       return res.json();
     },
-    enabled: !!user
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000 // Кэшируем на 5 минут
   });
   
   // Filter schedules for teacher
@@ -322,45 +322,6 @@ export default function SchedulePage() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-heading font-bold text-gray-800">Расписание</h2>
         <div className="flex gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="flex gap-2 items-center">
-                <FilterIcon className="h-4 w-4" />
-                {selectedDate ? format(selectedDate, "dd.MM.yyyy") : "Выберите дату"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <div className="p-4 flex flex-col gap-2">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    if (date) {
-                      // Устанавливаем выбранную дату
-                      setSelectedDate(date);
-                      
-                      // Переключаемся на соответствующую вкладку дня недели
-                      let dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
-                      setCurrentTab(dayOfWeek.toString());
-                    } else {
-                      setSelectedDate(null);
-                    }
-                  }}
-                  className="rounded-md border"
-                />
-                <div className="flex justify-end">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setSelectedDate(null)}
-                  >
-                    Сбросить
-                  </Button>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
-          
           {canEditSchedule && (
             <Button onClick={() => setIsAddDialogOpen(true)}>
               <PlusIcon className="mr-2 h-4 w-4" /> Добавить урок
@@ -369,61 +330,63 @@ export default function SchedulePage() {
         </div>
       </div>
       
-      {/* Weekly Schedule Tabs */}
-      <Tabs 
-        defaultValue="1" 
-        value={currentTab} 
-        onValueChange={setCurrentTab} 
-        className="mb-6"
-      >
-        <TabsList className="grid grid-cols-7">
-          {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-            <TabsTrigger key={day} value={day.toString()}>
-              {getDayName(day)}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        
-        {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-          <TabsContent key={day} value={day.toString()}>
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <h3 className="text-lg font-semibold mb-4">{getDayName(day)}</h3>
+      {isLoading ? (
+        <div className="text-center py-8">
+          <CalendarIcon className="h-10 w-10 text-primary mx-auto mb-2 animate-pulse" />
+          <p>Загрузка расписания...</p>
+        </div>
+      ) : (
+        <div>
+          {/* Карусель расписания */}
+          <Card className="mb-6 p-6">
+            <ScheduleCarousel
+              schedules={isTeacher() ? teacherSchedules : schedules}
+              subjects={subjects}
+              classes={classes}
+              users={users}
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+            />
+          </Card>
+          
+          {/* Панель детализации */}
+          {isTeacher() && selectedDate && (
+            <Card className="p-6 border-t-4 border-t-primary">
+              <CardHeader className="p-0 mb-4">
+                <CardTitle className="text-xl">Детали уроков</CardTitle>
+                <CardDescription>
+                  {selectedDate ? format(selectedDate, "dd MMMM yyyy", { locale: ru }) : "Выберите дату для просмотра деталей"}
+                </CardDescription>
+              </CardHeader>
               
-              {isLoading ? (
-                <div className="text-center py-8">
-                  <CalendarIcon className="h-10 w-10 text-primary mx-auto mb-2" />
-                  <p>Загрузка расписания...</p>
-                </div>
-              ) : getSchedulesByDay(day).length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <CalendarIcon className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-                  <p>На этот день уроки не запланированы</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Время</TableHead>
-                      <TableHead>Предмет</TableHead>
-                      <TableHead>Класс</TableHead>
-                      <TableHead>Учитель</TableHead>
-                      <TableHead>Кабинет</TableHead>
-                      {isTeacher() && (
+              <CardContent className="p-0">
+                {getSchedulesByDay(selectedDate.getDay() === 0 ? 7 : selectedDate.getDay()).length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <CalendarIcon className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                    <p>На этот день уроки не запланированы</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Время</TableHead>
+                        <TableHead>Предмет</TableHead>
+                        <TableHead>Класс</TableHead>
+                        <TableHead>Кабинет</TableHead>
                         <TableHead>Действия</TableHead>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {getSchedulesByDay(day).map((schedule) => (
-                      <TableRow key={schedule.id}>
-                        <TableCell className="font-medium">
-                          {schedule.startTime} - {schedule.endTime}
-                        </TableCell>
-                        <TableCell>{getSubjectName(schedule.subjectId)}</TableCell>
-                        <TableCell>{getClassName(schedule.classId)}</TableCell>
-                        <TableCell>{getTeacherName(schedule.teacherId)}</TableCell>
-                        <TableCell>{schedule.room || "-"}</TableCell>
-                        {isTeacher() && user?.id === schedule.teacherId && (
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {getSchedulesByDay(selectedDate.getDay() === 0 ? 7 : selectedDate.getDay())
+                        .filter(schedule => isTeacher() ? schedule.teacherId === user?.id : true)
+                        .map((schedule) => (
+                        <TableRow key={schedule.id}>
+                          <TableCell className="font-medium">
+                            {schedule.startTime} - {schedule.endTime}
+                          </TableCell>
+                          <TableCell>{getSubjectName(schedule.subjectId)}</TableCell>
+                          <TableCell>{getClassName(schedule.classId)}</TableCell>
+                          <TableCell>{schedule.room || "-"}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
                               <Button 
@@ -449,16 +412,16 @@ export default function SchedulePage() {
                               </Button>
                             </div>
                           </TableCell>
-                        )}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
       
       {/* Add Schedule Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -506,6 +469,7 @@ export default function SchedulePage() {
                             }
                           }}
                           initialFocus
+                          disabled={false}
                         />
                       </PopoverContent>
                     </Popover>
