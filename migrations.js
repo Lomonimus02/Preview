@@ -1,19 +1,43 @@
-import { db } from './server/db.js';
+import { db } from './server/db';
+import { sql } from 'drizzle-orm';
 
 async function addScheduleDateColumn() {
   try {
-    console.log('Running migration: Adding schedule_date column to schedules table');
-    
-    await db.execute`
-      ALTER TABLE schedules 
-      ADD COLUMN IF NOT EXISTS schedule_date DATE;
+    console.log('Проверяем наличие колонки schedule_date в таблице schedules...');
+    const checkColumnExistsQuery = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'schedules' AND column_name = 'schedule_date'
     `;
     
-    console.log('Migration completed successfully');
+    const result = await db.execute(sql.raw(checkColumnExistsQuery));
+    
+    if (result.length === 0) {
+      console.log('Колонка schedule_date не найдена, добавляем...');
+      const addColumnQuery = `
+        ALTER TABLE schedules 
+        ADD COLUMN schedule_date DATE
+      `;
+      await db.execute(sql.raw(addColumnQuery));
+      console.log('Колонка schedule_date успешно добавлена');
+    } else {
+      console.log('Колонка schedule_date уже существует');
+    }
   } catch (error) {
-    console.error('Migration failed:', error);
-    process.exit(1);
+    console.error('Ошибка при добавлении колонки schedule_date:', error);
+    throw error;
   }
 }
 
-addScheduleDateColumn();
+async function runMigrations() {
+  try {
+    console.log('Запуск миграций...');
+    await addScheduleDateColumn();
+    console.log('Миграции успешно выполнены');
+  } catch (error) {
+    console.error('Ошибка при выполнении миграций:', error);
+  }
+}
+
+// Запускаем миграции
+runMigrations();
