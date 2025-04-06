@@ -16,16 +16,7 @@ import {
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  CalendarIcon, 
-  PlusIcon, 
-  ClockIcon, 
-  GraduationCapIcon, 
-  UsersIcon, 
-  FilterIcon, 
-  BookOpenIcon,
-  Building2Icon
-} from "lucide-react";
+import { CalendarIcon, PlusIcon, ClockIcon, GraduationCapIcon, UsersIcon, FilterIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -80,7 +71,6 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
 
 const scheduleFormSchema = insertScheduleSchema.extend({
   classId: z.number({
@@ -120,42 +110,30 @@ const gradeFormSchema = insertGradeSchema.extend({
 export default function SchedulePage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { isSuperAdmin, isSchoolAdmin, isTeacher, isParent, isStudent } = useRoleCheck();
+  const { isSuperAdmin, isSchoolAdmin, isTeacher } = useRoleCheck();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [isClassStudentsDialogOpen, setIsClassStudentsDialogOpen] = useState(false);
-  const [isLessonDetailsOpen, setIsLessonDetailsOpen] = useState(false); // Состояние для модального окна деталей урока
   const [currentTab, setCurrentTab] = useState("1"); // 1 to 7 for days of week
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleType | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedChildId, setSelectedChildId] = useState<number | null>(null);
   
   // Check access permissions
   const canEditSchedule = isSuperAdmin() || isSchoolAdmin();
   
-  // Fetch all schedules once - без привязки к selectedDate
+  // Fetch schedules
   const { data: schedules = [], isLoading } = useQuery<ScheduleType[]>({
-    queryKey: ["/api/schedules"],
-    queryFn: async () => {
-      const res = await fetch("/api/schedules");
+    queryKey: ["/api/schedules", selectedDate ? format(selectedDate, "yyyy-MM-dd") : null],
+    queryFn: async ({ queryKey }) => {
+      const dateParam = queryKey[1];
+      const url = dateParam ? `/api/schedules?scheduleDate=${dateParam}` : "/api/schedules";
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch schedules");
       return res.json();
     },
-    enabled: !!user,
-    staleTime: 5 * 60 * 1000 // Кэшируем на 5 минут
-  });
-  
-  // Fetch parent-children relationships for parent users
-  const { data: parentStudentRelations = [] } = useQuery<ParentStudent[]>({
-    queryKey: ["/api/parent-students"],
-    queryFn: async () => {
-      const res = await fetch(`/api/parent-students?parentId=${user?.id}`);
-      if (!res.ok) throw new Error("Failed to fetch parent-student relationships");
-      return res.json();
-    },
-    enabled: !!user && isParent()
+    enabled: !!user
   });
   
   // Filter schedules for teacher
@@ -226,39 +204,13 @@ export default function SchedulePage() {
   // Add schedule mutation
   const addScheduleMutation = useMutation({
     mutationFn: async (data: z.infer<typeof scheduleFormSchema>) => {
-      console.log('Добавление урока в расписание:', data); // Логирование данных
       const res = await apiRequest("POST", "/api/schedules", data);
       return res.json();
     },
-    onSuccess: (newSchedule) => {
-      // Немедленно обновляем кэш React Query, добавляя новый урок
-      queryClient.setQueryData<ScheduleType[]>(['/api/schedules'], (oldData) => {
-        const currentData = oldData || [];
-        return [...currentData, newSchedule];
-      });
-      
-      // Также запрашиваем обновление с сервера
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
-      
-      // Принудительно обновляем карусель, чтобы отобразить новый урок
-      // Если выбранная дата совпадает с днем недели нового урока, обновим UI
-      if (selectedDate) {
-        // Получаем день недели из даты (1-7, где 1 - понедельник, 7 - воскресенье)
-        const day = selectedDate.getDay();
-        const dayOfWeekFromDate = day === 0 ? 7 : day; // Преобразуем в формат 1-7 для понедельника-воскресенья
-        
-        if (dayOfWeekFromDate === newSchedule.dayOfWeek) {
-          // Создаем копию даты чтобы вызвать обновление состояния
-          const refreshDate = new Date(selectedDate);
-          setSelectedDate(refreshDate);
-        }
-      }
-      
-      // Закрываем диалог и сбрасываем форму
       setIsAddDialogOpen(false);
       form.reset();
-      
-      // Показываем уведомление
       toast({
         title: "Расписание добавлено",
         description: "Новый урок успешно добавлен в расписание",
@@ -328,60 +280,14 @@ export default function SchedulePage() {
     addGradeMutation.mutate(values);
   };
   
-  // Получаем данные о связях студент-класс
-  const { data: studentClassAssignments = [] } = useQuery({
-    queryKey: ['/api/student-class-assignments'],
-    queryFn: async () => {
-      const res = await fetch('/api/student-class-assignments');
-      if (!res.ok) throw new Error("Не удалось загрузить связи студент-класс");
-      return res.json();
-    },
-    enabled: !!user && isParent(),
-    staleTime: 5 * 60 * 1000 // Кэшируем на 5 минут
-  });
-
-  // Функция фильтрации расписания в зависимости от роли и выбранного ребенка
-  const getFilteredSchedules = (): ScheduleType[] => {
-    // Если пользователь - родитель и выбран ребенок
-    if (isParent() && selectedChildId) {
-      // Находим данные выбранного ребенка
-      const selectedChild = users.find(u => u.id === selectedChildId);
-      
-      if (selectedChild?.schoolId) {
-        // Получаем записи ученик-класс для выбранного ребенка
-        const childClassAssignments = studentClassAssignments.filter(
-          (sca: {studentId: number, classId: number}) => sca.studentId === selectedChildId
-        );
-        
-        // Находим ID классов, к которым прикреплен выбранный ребенок
-        const childClassIds = childClassAssignments.map(
-          (sca: {studentId: number, classId: number}) => sca.classId
-        );
-        
-        console.log('Классы выбранного ребенка:', childClassIds);
-        
-        // Фильтруем расписание по классам ребенка
-        return schedules.filter(schedule => 
-          childClassIds.includes(schedule.classId)
-        );
-      }
-      
-      return [];
-    }
-    
-    // Для учителей
-    if (isTeacher()) {
-      return teacherSchedules;
-    }
-    
-    // Для всех остальных
-    return schedules;
-  };
-  
   // Filter schedules by day
   const getSchedulesByDay = (day: number) => {
-    // Используем отфильтрованное расписание
-    let schedulesToFilter = getFilteredSchedules();
+    // Используем соответствующее расписание в зависимости от роли пользователя
+    let schedulesToFilter = schedules;
+    
+    if (isTeacher()) {
+      schedulesToFilter = teacherSchedules;
+    }
     
     return schedulesToFilter
       .filter(schedule => schedule.dayOfWeek === day)
@@ -416,6 +322,45 @@ export default function SchedulePage() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-heading font-bold text-gray-800">Расписание</h2>
         <div className="flex gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="flex gap-2 items-center">
+                <FilterIcon className="h-4 w-4" />
+                {selectedDate ? format(selectedDate, "dd.MM.yyyy") : "Выберите дату"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <div className="p-4 flex flex-col gap-2">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      // Устанавливаем выбранную дату
+                      setSelectedDate(date);
+                      
+                      // Переключаемся на соответствующую вкладку дня недели
+                      let dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
+                      setCurrentTab(dayOfWeek.toString());
+                    } else {
+                      setSelectedDate(null);
+                    }
+                  }}
+                  className="rounded-md border"
+                />
+                <div className="flex justify-end">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedDate(null)}
+                  >
+                    Сбросить
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+          
           {canEditSchedule && (
             <Button onClick={() => setIsAddDialogOpen(true)}>
               <PlusIcon className="mr-2 h-4 w-4" /> Добавить урок
@@ -424,191 +369,96 @@ export default function SchedulePage() {
         </div>
       </div>
       
-      {isLoading ? (
-        <div className="text-center py-8">
-          <CalendarIcon className="h-10 w-10 text-primary mx-auto mb-2 animate-pulse" />
-          <p>Загрузка расписания...</p>
-        </div>
-      ) : (
-        <div>
-          {/* Выбор ребенка для родителей */}
-          {isParent() && parentStudentRelations.length > 0 && (
-            <Card className="mb-6 p-6 border-b-4 border-b-primary">
-              <CardHeader className="p-0 mb-4">
-                <CardTitle className="text-xl">Просмотр расписания ребенка</CardTitle>
-                <CardDescription>
-                  Выберите ребенка, чтобы посмотреть его расписание занятий
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="flex flex-wrap gap-4">
-                  {parentStudentRelations.map(relation => {
-                    const student = users.find(u => u.id === relation.studentId);
-                    if (!student) return null;
-                    
-                    return (
-                      <Button
-                        key={relation.id}
-                        variant={selectedChildId === student.id ? "default" : "outline"}
-                        className="flex items-center gap-2"
-                        onClick={() => setSelectedChildId(student.id)}
-                      >
-                        <UsersIcon className="h-4 w-4" />
-                        {student.firstName} {student.lastName}
-                      </Button>
-                    );
-                  })}
-                  
-                  {selectedChildId && (
-                    <Button 
-                      variant="outline" 
-                      className="flex items-center gap-2 ml-auto"
-                      onClick={() => setSelectedChildId(null)}
-                    >
-                      <FilterIcon className="h-4 w-4" />
-                      Сбросить выбор
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* Карусель расписания */}
-          <Card className="mb-6 p-6">
-            <ScheduleCarousel
-              schedules={getFilteredSchedules()}
-              subjects={subjects}
-              classes={classes}
-              users={users}
-              selectedDate={selectedDate}
-              onDateChange={setSelectedDate}
-              onLessonClick={(schedule) => {
-                setSelectedSchedule(schedule);
-                setIsLessonDetailsOpen(true);
-              }}
-            />
-          </Card>
-          
-          {/* Модальное окно с деталями урока для учеников и родителей */}
-          <Dialog open={isLessonDetailsOpen} onOpenChange={setIsLessonDetailsOpen}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Информация об уроке</DialogTitle>
-                <DialogDescription>
-                  {selectedSchedule && (
-                    <>
-                      {getSubjectName(selectedSchedule.subjectId)} ·{" "}
-                      {selectedSchedule.startTime} - {selectedSchedule.endTime}
-                    </>
-                  )}
-                </DialogDescription>
-              </DialogHeader>
+      {/* Weekly Schedule Tabs */}
+      <Tabs 
+        defaultValue="1" 
+        value={currentTab} 
+        onValueChange={setCurrentTab} 
+        className="mb-6"
+      >
+        <TabsList className="grid grid-cols-7">
+          {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+            <TabsTrigger key={day} value={day.toString()}>
+              {getDayName(day)}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        
+        {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+          <TabsContent key={day} value={day.toString()}>
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <h3 className="text-lg font-semibold mb-4">{getDayName(day)}</h3>
               
-              {selectedSchedule && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-[20px_1fr] items-start gap-4">
-                    <ClockIcon className="h-5 w-5 text-primary" />
-                    <div>
-                      <h4 className="font-medium leading-none mb-1">Время проведения</h4>
-                      <p className="text-sm text-gray-500">
-                        {selectedSchedule.startTime} - {selectedSchedule.endTime}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-[20px_1fr] items-start gap-4">
-                    <BookOpenIcon className="h-5 w-5 text-primary" />
-                    <div>
-                      <h4 className="font-medium leading-none mb-1">Предмет</h4>
-                      <p className="text-sm text-gray-500">
-                        {getSubjectName(selectedSchedule.subjectId)}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-[20px_1fr] items-start gap-4">
-                    <UsersIcon className="h-5 w-5 text-primary" />
-                    <div>
-                      <h4 className="font-medium leading-none mb-1">Преподаватель</h4>
-                      <p className="text-sm text-gray-500">
-                        {getTeacherName(selectedSchedule.teacherId)}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-[20px_1fr] items-start gap-4">
-                    <Building2Icon className="h-5 w-5 text-primary" />
-                    <div>
-                      <h4 className="font-medium leading-none mb-1">Кабинет</h4>
-                      <p className="text-sm text-gray-500">
-                        {selectedSchedule.room || "Не указан"}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-[20px_1fr] items-start gap-4">
-                    <GraduationCapIcon className="h-5 w-5 text-primary" />
-                    <div>
-                      <h4 className="font-medium leading-none mb-1">Класс</h4>
-                      <p className="text-sm text-gray-500">
-                        {getClassName(selectedSchedule.classId)}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {isTeacher() && (
-                    <div className="flex justify-end gap-2 mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedClassId(selectedSchedule.classId);
-                          setIsClassStudentsDialogOpen(true);
-                          setIsLessonDetailsOpen(false);
-                        }}
-                      >
-                        <UsersIcon className="h-4 w-4 mr-2" />
-                        Ученики класса
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => {
-                          setIsGradeDialogOpen(true);
-                          setIsLessonDetailsOpen(false);
-                          
-                          // Предзаполняем форму оценки
-                          gradeForm.reset({
-                            studentId: undefined,
-                            grade: undefined,
-                            comment: "",
-                            gradeType: "Текущая",
-                            classId: selectedSchedule.classId,
-                            subjectId: selectedSchedule.subjectId,
-                            teacherId: user?.id,
-                          });
-                        }}
-                      >
-                        <GraduationCapIcon className="h-4 w-4 mr-2" />
-                        Выставить оценку
-                      </Button>
-                    </div>
-                  )}
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <CalendarIcon className="h-10 w-10 text-primary mx-auto mb-2" />
+                  <p>Загрузка расписания...</p>
                 </div>
+              ) : getSchedulesByDay(day).length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <CalendarIcon className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                  <p>На этот день уроки не запланированы</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Время</TableHead>
+                      <TableHead>Предмет</TableHead>
+                      <TableHead>Класс</TableHead>
+                      <TableHead>Учитель</TableHead>
+                      <TableHead>Кабинет</TableHead>
+                      {isTeacher() && (
+                        <TableHead>Действия</TableHead>
+                      )}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {getSchedulesByDay(day).map((schedule) => (
+                      <TableRow key={schedule.id}>
+                        <TableCell className="font-medium">
+                          {schedule.startTime} - {schedule.endTime}
+                        </TableCell>
+                        <TableCell>{getSubjectName(schedule.subjectId)}</TableCell>
+                        <TableCell>{getClassName(schedule.classId)}</TableCell>
+                        <TableCell>{getTeacherName(schedule.teacherId)}</TableCell>
+                        <TableCell>{schedule.room || "-"}</TableCell>
+                        {isTeacher() && user?.id === schedule.teacherId && (
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedSchedule(schedule);
+                                  setSelectedClassId(schedule.classId);
+                                  setIsClassStudentsDialogOpen(true);
+                                }}
+                              >
+                                <UsersIcon className="h-4 w-4 mr-1" /> Ученики
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedSchedule(schedule);
+                                  setIsGradeDialogOpen(true);
+                                }}
+                              >
+                                <GraduationCapIcon className="h-4 w-4 mr-1" /> Оценки
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
-                
-              <DialogFooter className="mt-6">
-                <Button onClick={() => setIsLessonDetailsOpen(false)}>
-                  Закрыть
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          
-          {/* Вместо панели деталей используем интерактивные карточки в расписании */}
-        </div>
-      )}
+            </div>
+          </TabsContent>
+        ))}
+      </Tabs>
       
       {/* Add Schedule Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -656,7 +506,6 @@ export default function SchedulePage() {
                             }
                           }}
                           initialFocus
-                          disabled={false}
                         />
                       </PopoverContent>
                     </Popover>
@@ -665,8 +514,33 @@ export default function SchedulePage() {
                 )}
               />
               
-              {/* Поле dayOfWeek скрыто, так как оно определяется автоматически из выбранной даты */}
-              <input type="hidden" {...form.register("dayOfWeek")} />
+              <FormField
+                control={form.control}
+                name="dayOfWeek"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>День недели</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      defaultValue={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите день недели" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7].map((day) => (
+                          <SelectItem key={day} value={day.toString()}>
+                            {getDayName(day)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
               <div className="grid grid-cols-2 gap-4">
                 <FormField

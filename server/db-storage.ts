@@ -160,11 +160,6 @@ export class DatabaseStorage implements IStorage {
     console.log('Created schedule:', newSchedule);
     return newSchedule;
   }
-  
-  async deleteSchedule(id: number): Promise<void> {
-    console.log('Deleting schedule with ID:', id);
-    await db.delete(schedules).where(eq(schedules.id, id));
-  }
 
   // ===== Homework operations =====
   async getHomework(id: number): Promise<Homework | undefined> {
@@ -301,18 +296,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMessage(message: InsertMessage): Promise<Message> {
-    // Проверяем, есть ли содержимое сообщения и используем его прямо из объекта сообщения
-    if (!message.content && message.message) {
-      message.content = message.message;
-    }
-    
-    // Если content все еще не определен, задаем пустую строку чтобы избежать NULL
-    if (!message.content) {
-      message.content = "";
-    }
-    
-    const [newMessage] = await db.insert(messages).values(message).returning();
-    return newMessage;
+    const [newMessage] = await db.insert(messages).values({
+      ...message,
+      content: message.message,  // Поле в БД называется content
+    }).returning();
+    return {
+      ...newMessage,
+      message: newMessage.content, // Преобразуем обратно для совместимости с интерфейсом
+    } as unknown as Message;
   }
 
   async markMessageAsRead(id: number): Promise<Message | undefined> {
@@ -338,18 +329,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    // Убедимся, что у нас есть контент для уведомления
-    if (!notification.content && notification.message) {
-      notification.content = notification.message;
-    }
+    const [newNotification] = await db.insert(notifications).values({
+      ...notification,
+      content: notification.message // Поле в БД называется content
+    }).returning();
     
-    // Если content все еще не определен, установим пустую строку
-    if (!notification.content) {
-      notification.content = "";
-    }
-    
-    const [newNotification] = await db.insert(notifications).values(notification).returning();
-    return newNotification;
+    return {
+      ...newNotification,
+      message: newNotification.content // Преобразуем для совместимости с интерфейсом
+    } as unknown as Notification;
   }
 
   async markNotificationAsRead(id: number): Promise<Notification | undefined> {
@@ -358,7 +346,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(notifications.id, id))
       .returning();
     
-    return updatedNotification;
+    return {
+      ...updatedNotification,
+      message: updatedNotification.content // Преобразуем для совместимости с интерфейсом
+    } as unknown as Notification;
   }
 
   // ===== Parent-Student operations =====
