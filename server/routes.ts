@@ -304,6 +304,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.json(subjects);
   });
+  
+  // Get a specific subject by ID
+  app.get("/api/subjects/:id", isAuthenticated, async (req, res) => {
+    try {
+      const subjectId = parseInt(req.params.id);
+      if (isNaN(subjectId)) {
+        return res.status(400).json({ message: "Invalid subject ID" });
+      }
+      
+      const subject = await dataStorage.getSubject(subjectId);
+      if (!subject) {
+        return res.status(404).json({ message: "Subject not found" });
+      }
+      
+      res.json(subject);
+    } catch (error) {
+      console.error("Error fetching subject:", error);
+      res.status(500).json({ message: "Failed to fetch subject" });
+    }
+  });
 
   app.post("/api/subjects", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
     // Validate school access
