@@ -429,10 +429,18 @@ export default function ClassGradeDetailsPage() {
         lastAddedGradeInfo.studentId === studentId && 
         lastAddedGradeInfo.date === date;
       
-      const dateMatches = g.createdAt && 
-        (new Date(g.createdAt).toDateString() === dateObj.toDateString() ||
-        // Проверяем также совпадение по selectedDate, если он есть
-        (selectedDate && g.createdAt && date === selectedDate));
+      // Безопасное сравнение дат
+      let dateMatches = false;
+      if (g.createdAt) {
+        try {
+          const createdAtDate = new Date(g.createdAt);
+          dateMatches = createdAtDate.toDateString() === dateObj.toDateString() ||
+            // Проверяем также совпадение по selectedDate, если он есть
+            (selectedDate && date === selectedDate);
+        } catch (error) {
+          console.error("Ошибка при сравнении дат:", error, g.createdAt, dateObj);
+        }
+      }
       
       return g.studentId === studentId && 
              g.subjectId === subjectId && 
@@ -558,11 +566,17 @@ export default function ClassGradeDetailsPage() {
                               <TableCell key={date} className="text-center">
                                 <div className="flex flex-wrap justify-center gap-1 items-center">
                                   {/* Отображаем оценки, если они есть */}
-                                  {grades.filter(g => 
-                                    g.studentId === student.id && 
-                                    g.subjectId === subjectId &&
-                                    g.createdAt && new Date(g.createdAt).toDateString() === new Date(date).toDateString()
-                                  ).map((grade) => (
+                                  {grades.filter(g => {
+                                    let dateMatches = false;
+                                    if (g.studentId === student.id && g.subjectId === subjectId && g.createdAt) {
+                                      try {
+                                        dateMatches = new Date(g.createdAt).toDateString() === new Date(date).toDateString();
+                                      } catch (error) {
+                                        console.error("Ошибка при сравнении дат в списке оценок:", error, g.createdAt, date);
+                                      }
+                                    }
+                                    return g.studentId === student.id && g.subjectId === subjectId && dateMatches;
+                                  }).map((grade) => (
                                     <div key={grade.id} className="relative group">
                                       <span 
                                         className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
@@ -616,11 +630,17 @@ export default function ClassGradeDetailsPage() {
                                   )}
                                   
                                   {/* Если нет оценок и нельзя редактировать */}
-                                  {!canEditGrades && grades.filter(g => 
-                                    g.studentId === student.id && 
-                                    g.subjectId === subjectId &&
-                                    g.createdAt && new Date(g.createdAt).toDateString() === new Date(date).toDateString()
-                                  ).length === 0 && (
+                                  {!canEditGrades && grades.filter(g => {
+                                    let dateMatches = false;
+                                    if (g.studentId === student.id && g.subjectId === subjectId && g.createdAt) {
+                                      try {
+                                        dateMatches = new Date(g.createdAt).toDateString() === new Date(date).toDateString();
+                                      } catch (error) {
+                                        console.error("Ошибка при сравнении дат в проверке пустых оценок:", error, g.createdAt, date);
+                                      }
+                                    }
+                                    return g.studentId === student.id && g.subjectId === subjectId && dateMatches;
+                                  }).length === 0 && (
                                     <span>-</span>
                                   )}
                                 </div>
