@@ -85,7 +85,7 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({ schedule, existingHo
     if (!currentHomework) return;
     
     try {
-      await apiRequest(`/api/homework/${currentHomework.id}`, 'DELETE');
+      await apiRequest('/api/homework/' + currentHomework.id, 'DELETE');
       
       // Обновляем данные на клиенте
       queryClient.invalidateQueries({ queryKey: ['/api/homework'] });
@@ -112,7 +112,7 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({ schedule, existingHo
     try {
       if (currentHomework) {
         // Обновляем существующее задание
-        await apiRequest(`/api/homework/${currentHomework.id}`, 'PATCH', data);
+        await apiRequest('/api/homework/' + currentHomework.id, 'PATCH', data);
         toast({
           title: "Домашнее задание обновлено",
           description: "Задание успешно обновлено"
