@@ -666,9 +666,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/grades", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
     try {
+      // Используем явную дату, если она передана через gradeDate
+      let creationDataOverride = {};
+      if (req.body.gradeDate) {
+        // Устанавливаем createdAt в начало дня, чтобы сравнение дат работало корректно
+        const gradeDate = new Date(req.body.gradeDate);
+        gradeDate.setHours(0, 0, 0, 0);
+        creationDataOverride = {
+          createdAt: gradeDate.toISOString()
+        };
+        // Удаляем временное поле gradeDate из данных
+        delete req.body.gradeDate;
+      }
+      
       const grade = await dataStorage.createGrade({
         ...req.body,
-        teacherId: req.user.id
+        teacherId: req.user.id,
+        ...creationDataOverride
       });
       
       // Notify the student

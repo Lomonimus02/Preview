@@ -78,17 +78,18 @@ export default function ClassGradeDetailsPage() {
   
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Используем строковый формат для даты, а не смешанный null | string
+  const [selectedDate, setSelectedDate] = useState<string>("");
   const [addAnotherGrade, setAddAnotherGrade] = useState(false);
   
   // State to track last added grade info for optimistic rendering
   const [lastAddedGradeInfo, setLastAddedGradeInfo] = useState<{
     studentId: number | null;
-    date: string | null;
+    date: string | "";
     grade: number | null;
   }>({
     studentId: null,
-    date: null,
+    date: "",
     grade: null
   });
   
@@ -156,11 +157,12 @@ export default function ClassGradeDetailsPage() {
   const lessonDates = useMemo(() => {
     const dates = schedules
       .filter(s => s.scheduleDate && s.subjectId === subjectId) // Filter schedules for this subject only
-      .map(s => s.scheduleDate)
+      .map(s => s.scheduleDate || "")
+      .filter(date => date !== "") // Удаляем пустые значения
       .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     
-    // Remove duplicates
-    return [...new Set(dates)];
+    // Remove duplicates using Array.from to avoid issues with Set iteration
+    return Array.from(new Set(dates));
   }, [schedules, subjectId]);
   
   // Группируем расписания учителя по предметам
@@ -198,7 +200,14 @@ export default function ClassGradeDetailsPage() {
   // Mutation to add grade
   const addGradeMutation = useMutation({
     mutationFn: async (data: z.infer<typeof gradeFormSchema>) => {
-      const res = await apiRequest("POST", "/api/grades", data);
+      // Если у нас есть selectedDate (дата занятия), добавляем ее к данным оценки
+      const gradeData = {
+        ...data,
+        // Если есть selectedDate, добавляем ее как gradeDate
+        ...(selectedDate && { gradeDate: selectedDate })
+      };
+      
+      const res = await apiRequest("POST", "/api/grades", gradeData);
       return res.json();
     },
     onMutate: async (newGradeData) => {
@@ -206,7 +215,7 @@ export default function ClassGradeDetailsPage() {
       await queryClient.cancelQueries({ queryKey: ["/api/grades"] });
       
       // Сохраняем предыдущее состояние оценок
-      const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]);
+      const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades", { classId, subjectId }]);
       
       // Оптимистично обновляем кэш
       if (previousGrades) {
@@ -214,15 +223,14 @@ export default function ClassGradeDetailsPage() {
         const tempId = -Date.now();
         
         // Создаем оптимистичную оценку с временным ID
-        const optimisticGrade: Grade = {
+        const optimisticGrade = {
           id: tempId,
           ...newGradeData,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
+          createdAt: selectedDate || new Date().toISOString(),
+        } as Grade;
         
         // Добавляем новую оценку в кэш
-        queryClient.setQueryData<Grade[]>(["/api/grades"], [...previousGrades, optimisticGrade]);
+        queryClient.setQueryData<Grade[]>(["/api/grades", { classId, subjectId }], [...previousGrades, optimisticGrade]);
       }
       
       // Возвращаем контекст для onError
@@ -235,7 +243,7 @@ export default function ClassGradeDetailsPage() {
       // Сохраняем ID и дату последней добавленной оценки для дальнейшего использования
       setLastAddedGradeInfo({
         studentId: newGrade.studentId,
-        date: selectedDate || null,
+        date: selectedDate || "",
         grade: newGrade.grade
       });
       
@@ -245,7 +253,7 @@ export default function ClassGradeDetailsPage() {
       } else {
         // Просто сбрасываем значение оценки, но сохраняем остальные поля
         const currentValues = gradeForm.getValues();
-        gradeForm.setValue('grade', undefined);
+        gradeForm.setValue('grade', undefined as any);
         toast({
           title: "Оценка добавлена",
           description: "Теперь вы можете добавить ещё одну оценку для этого ученика",
@@ -273,7 +281,7 @@ export default function ClassGradeDetailsPage() {
     onError: (error, variables, context) => {
       // При ошибке возвращаем предыдущее состояние
       if (context?.previousGrades) {
-        queryClient.setQueryData<Grade[]>(["/api/grades"], context.previousGrades);
+        queryClient.setQueryData<Grade[]>(["/api/grades", { classId, subjectId }], context.previousGrades);
       }
       
       toast({
@@ -359,10 +367,13 @@ export default function ClassGradeDetailsPage() {
   // Open grade dialog for a specific student and date
   const openGradeDialog = (studentId: number, date?: string) => {
     setSelectedStudentId(studentId);
-    setSelectedDate(date || null);
+    setSelectedDate(date || "");
     setEditingGradeId(null);
     // Сбрасываем флаг добавления еще одной оценки
     setAddAnotherGrade(false);
+    
+    const today = new Date();
+    const formattedDate = today.toISOString().split('T')[0]; // YYYY-MM-DD format
     
     gradeForm.reset({
       studentId: studentId,
@@ -372,6 +383,8 @@ export default function ClassGradeDetailsPage() {
       grade: undefined,
       comment: "",
       gradeType: "Текущая",
+      // Устанавливаем дату явно, если передана
+      ...(date && { date: date }),
     });
     
     setIsGradeDialogOpen(true);
@@ -380,7 +393,7 @@ export default function ClassGradeDetailsPage() {
   // Open grade dialog to edit existing grade
   const openEditGradeDialog = (grade: Grade) => {
     setSelectedStudentId(grade.studentId);
-    setSelectedDate(null);
+    setSelectedDate("");
     setEditingGradeId(grade.id);
     // При редактировании всегда отключаем добавление еще одной оценки
     setAddAnotherGrade(false);
@@ -408,24 +421,23 @@ export default function ClassGradeDetailsPage() {
   // Get student grades for a specific date for the current subject
   const getStudentGradeForDate = (studentId: number, date: string) => {
     const dateObj = new Date(date);
-    // Проверяем оптимистично добавленные оценки для этой даты и этого студента
-    if (addAnotherGrade && 
-        lastAddedGradeInfo.studentId === studentId && 
-        lastAddedGradeInfo.date === date) {
-      // Включаем текущие оценки для этого студента/даты
-      return grades.filter(g => 
-        g.studentId === studentId && 
-        g.subjectId === subjectId && 
-        g.createdAt && new Date(g.createdAt).toDateString() === dateObj.toDateString()
-      );
-    }
     
     // Фильтруем оценки по студенту, предмету и дате
-    return grades.filter(g => 
-      g.studentId === studentId && 
-      g.subjectId === subjectId && // Добавляем фильтр по предмету
-      g.createdAt && new Date(g.createdAt).toDateString() === dateObj.toDateString()
-    );
+    return grades.filter(g => {
+      // Проверка, соответствует ли это последней добавленной оценке в режиме "добавить еще одну"
+      const isLastAddedGrade = addAnotherGrade && 
+        lastAddedGradeInfo.studentId === studentId && 
+        lastAddedGradeInfo.date === date;
+      
+      const dateMatches = g.createdAt && 
+        (new Date(g.createdAt).toDateString() === dateObj.toDateString() ||
+        // Проверяем также совпадение по selectedDate, если он есть
+        (selectedDate && g.createdAt && date === selectedDate));
+      
+      return g.studentId === studentId && 
+             g.subjectId === subjectId && 
+             (dateMatches || isLastAddedGrade);
+    });
   };
   
   // Calculate average grade for a student for the current subject
