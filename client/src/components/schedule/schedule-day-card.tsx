@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FiClock, FiMapPin, FiUser, FiCheck, FiPlus, FiList, FiEdit3 } from "react-icons/fi";
-import { Schedule, User, Subject, Class, UserRoleEnum, Grade } from "@shared/schema";
+import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework } from "@shared/schema";
 import { HomeworkForm } from "./homework-form";
 
 interface ScheduleItemProps {
@@ -28,6 +28,7 @@ interface ScheduleItemProps {
   teacherName: string;
   room: string;
   grades?: Grade[];
+  homework?: Homework | undefined;
   isCompleted?: boolean;
   onClick: (e?: React.MouseEvent, actionType?: string) => void;
 }
@@ -38,6 +39,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
   teacherName,
   room,
   grades = [],
+  homework,
   isCompleted = false,
   onClick,
 }) => {
@@ -113,6 +115,7 @@ interface ScheduleDayCardProps {
   teachers: User[];
   classes: Class[];
   grades?: Grade[];
+  homework?: Homework[];
   currentUser?: User | null;
   isAdmin?: boolean;
   onAddSchedule?: (date: Date) => void;
@@ -127,6 +130,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   teachers,
   classes,
   grades = [],
+  homework = [],
   currentUser = null,
   isAdmin = false,
   onAddSchedule,
@@ -178,6 +182,16 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     }
     
     return [];
+  };
+  
+  // Функция для получения домашнего задания для конкретного расписания
+  const getScheduleHomework = (schedule: Schedule) => {
+    if (!homework?.length) return undefined;
+    
+    return homework.find(hw => 
+      hw.classId === schedule.classId && 
+      hw.subjectId === schedule.subjectId
+    );
   };
 
   // Состояние для диалогового окна добавления домашнего задания
@@ -231,7 +245,8 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   teacherName={getTeacherName(schedule.teacherId)}
                   room={schedule.room || ""}
                   grades={getScheduleGrades(schedule)}
-                  isCompleted={false} // Здесь можно добавить логику для определения завершенных уроков
+                  homework={getScheduleHomework(schedule)}
+                  isCompleted={getScheduleHomework(schedule) !== undefined} // Урок считается выполненным, если есть домашнее задание
                   onClick={(e, actionType) => handleScheduleClick(schedule, actionType)}
                 />
               ))}

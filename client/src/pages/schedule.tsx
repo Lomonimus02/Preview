@@ -10,6 +10,7 @@ import {
   User,
   insertGradeSchema,
   Grade,
+  Homework,
 } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -121,6 +122,12 @@ export default function SchedulePage() {
   const { data: grades = [] } = useQuery<Grade[]>({
     queryKey: ["/api/grades"],
     // Теперь запрашиваем оценки для всех пользователей, а не только для учителя
+    enabled: !!user
+  });
+  
+  // Получаем список домашних заданий
+  const { data: homework = [] } = useQuery<Homework[]>({
+    queryKey: ["/api/homework"],
     enabled: !!user
   });
   
@@ -293,6 +300,7 @@ export default function SchedulePage() {
             teachers={teachers}
             classes={classes}
             grades={grades}
+            homework={homework}
             currentUser={user}
             isAdmin={canEditSchedule}
             onAddSchedule={handleAddSchedule}
