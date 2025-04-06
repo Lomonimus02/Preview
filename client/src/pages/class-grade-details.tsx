@@ -79,6 +79,11 @@ export default function ClassGradeDetailsPage() {
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [addAnotherGrade, setAddAnotherGrade] = useState(false);
+  const [lastAddedGradeInfo, setLastAddedGradeInfo] = useState<{ 
+    studentId: number | null; 
+    date: string | null 
+  }>({ studentId: null, date: null });
   
   // Fetch class details
   const { data: classData, isLoading: isClassLoading } = useQuery<ClassType>({
@@ -189,24 +194,80 @@ export default function ClassGradeDetailsPage() {
       const res = await apiRequest("POST", "/api/grades", data);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
-      setIsGradeDialogOpen(false);
-      gradeForm.reset({
-        studentId: undefined,
-        grade: undefined,
-        comment: "",
-        gradeType: "Текущая",
-        subjectId: subjectId,
-        classId: classId,
-        teacherId: user?.id,
-      });
-      toast({
-        title: "Оценка добавлена",
-        description: "Оценка успешно добавлена",
-      });
+    onMutate: async (newGradeData) => {
+      // Отменяем все запросы на получение оценок, чтобы они не перезаписали наше оптимистичное обновление
+      await queryClient.cancelQueries({ queryKey: ["/api/grades"] });
+      
+      // Сохраняем предыдущее состояние оценок
+      const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]);
+      
+      // Оптимистично обновляем кэш
+      if (previousGrades) {
+        // Создаем временный ID (отрицательный, чтобы не перекрывал реальные ID)
+        const tempId = -Date.now();
+        
+        // Создаем оптимистичную оценку с временным ID
+        const optimisticGrade: Grade = {
+          id: tempId,
+          ...newGradeData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        
+        // Добавляем новую оценку в кэш
+        queryClient.setQueryData<Grade[]>(["/api/grades"], [...previousGrades, optimisticGrade]);
+      }
+      
+      // Возвращаем контекст для onError
+      return { previousGrades };
     },
-    onError: (error) => {
+    onSuccess: (newGrade) => {
+      // Обновляем кэш с реальными данными от сервера
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      
+      // Сохраняем ID и дату последней добавленной оценки для дальнейшего использования
+      setLastAddedGradeInfo({
+        studentId: newGrade.studentId,
+        date: selectedDate || null
+      });
+      
+      // Если указано addAnotherGrade, не закрываем диалог
+      if (!addAnotherGrade) {
+        setIsGradeDialogOpen(false);
+      } else {
+        // Просто сбрасываем значение оценки, но сохраняем остальные поля
+        const currentValues = gradeForm.getValues();
+        gradeForm.setValue('grade', undefined);
+        toast({
+          title: "Оценка добавлена",
+          description: "Теперь вы можете добавить ещё одну оценку для этого ученика",
+        });
+      }
+      
+      if (!addAnotherGrade) {
+        // Сбрасываем форму только если не добавляем ещё одну оценку
+        gradeForm.reset({
+          studentId: undefined,
+          grade: undefined,
+          comment: "",
+          gradeType: "Текущая",
+          subjectId: subjectId,
+          classId: classId,
+          teacherId: user?.id,
+        });
+        
+        toast({
+          title: "Оценка добавлена",
+          description: "Оценка успешно добавлена",
+        });
+      }
+    },
+    onError: (error, variables, context) => {
+      // При ошибке возвращаем предыдущее состояние
+      if (context?.previousGrades) {
+        queryClient.setQueryData<Grade[]>(["/api/grades"], context.previousGrades);
+      }
+      
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось добавить оценку",
@@ -292,6 +353,8 @@ export default function ClassGradeDetailsPage() {
     setSelectedStudentId(studentId);
     setSelectedDate(date || null);
     setEditingGradeId(null);
+    // Сбрасываем флаг добавления еще одной оценки
+    setAddAnotherGrade(false);
     
     gradeForm.reset({
       studentId: studentId,
@@ -311,6 +374,8 @@ export default function ClassGradeDetailsPage() {
     setSelectedStudentId(grade.studentId);
     setSelectedDate(null);
     setEditingGradeId(grade.id);
+    // При редактировании всегда отключаем добавление еще одной оценки
+    setAddAnotherGrade(false);
     
     gradeForm.reset({
       studentId: grade.studentId,
@@ -676,7 +741,24 @@ export default function ClassGradeDetailsPage() {
                   </div>
                 )}
                 
-                <DialogFooter>
+                <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:gap-0">
+                  {!editingGradeId && (
+                    <div className="flex items-center space-x-2 mr-auto">
+                      <label 
+                        htmlFor="add-another-grade" 
+                        className="text-sm font-medium cursor-pointer"
+                      >
+                        Добавить ещё одну оценку
+                      </label>
+                      <input
+                        id="add-another-grade"
+                        type="checkbox"
+                        className="accent-primary h-4 w-4 rounded border-gray-300"
+                        checked={addAnotherGrade}
+                        onChange={(e) => setAddAnotherGrade(e.target.checked)}
+                      />
+                    </div>
+                  )}
                   <Button type="submit" disabled={addGradeMutation.isPending || updateGradeMutation.isPending}>
                     {addGradeMutation.isPending || updateGradeMutation.isPending 
                       ? 'Сохранение...' 
