@@ -1,168 +1,168 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Schedule, Class, Subject, User } from "@shared/schema";
-import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
-import { UserRoleEnum } from "@shared/schema";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, Plus, Loader2, CalendarIcon } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import { AdminScheduleForm } from "@/components/schedule/admin-schedule-form";
+import { Schedule, UserRoleEnum } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
+import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
+import { AdminScheduleForm } from "@/components/schedule/admin-schedule-form";
+import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Plus, CalendarDays } from "lucide-react";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 
-export default function ScheduleNewPage() {
+export default function ScheduleNew() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const queryClient = useQueryClient();
+  
+  // Current date
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  
+  // State for admin schedule form
+  const [isAdminFormOpen, setIsAdminFormOpen] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
-  const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
-
-  // Get user role
-  const isTeacher = user?.role === UserRoleEnum.TEACHER;
+  const [formMode, setFormMode] = useState<"add" | "edit">("add");
+  
+  // Check if user is admin
   const isAdmin = user?.role === UserRoleEnum.ADMIN || user?.role === UserRoleEnum.SUPER_ADMIN;
-  const isStudent = user?.role === UserRoleEnum.STUDENT;
-  const isParent = user?.role === UserRoleEnum.PARENT;
-
-  // Get day of week (1-7 where 1 is Monday and 7 is Sunday)
-  const getDayOfWeek = (date: Date) => {
-    const day = date.getDay();
-    return day === 0 ? 7 : day;
-  };
-
-  // Get schedules
-  const {
-    data: schedules = [],
-    isLoading: isLoadingSchedules,
-    error: schedulesError,
-  } = useQuery({
+  
+  // Get schedules, classes, subjects, and users data
+  const { data: schedules = [], isLoading: isLoadingSchedules } = useQuery<Schedule[]>({
     queryKey: ["/api/schedules"],
   });
-
-  // Get classes
-  const {
-    data: classes = [],
-    isLoading: isLoadingClasses,
-    error: classesError,
-  } = useQuery({
+  
+  const { data: classes = [] } = useQuery({
     queryKey: ["/api/classes"],
   });
-
-  // Get subjects
-  const {
-    data: subjects = [],
-    isLoading: isLoadingSubjects,
-    error: subjectsError,
-  } = useQuery({
+  
+  const { data: subjects = [] } = useQuery({
     queryKey: ["/api/subjects"],
   });
-
-  // Get users (teachers)
-  const {
-    data: users = [],
-    isLoading: isLoadingUsers,
-    error: usersError,
-  } = useQuery({
-    queryKey: ["/api/users"],
-  });
-
-  // Filter users to get only teachers
-  const teachers = users?.filter(u => u.role === UserRoleEnum.TEACHER) || [];
-
-  // Filter schedules by teacher if the user is a teacher
-  const filteredSchedules = schedules?.filter(schedule => {
-    if (isTeacher) {
-      return schedule.teacherId === user?.id;
-    }
-    return true;
-  });
-
-  // Check errors
-  const hasErrors = schedulesError || classesError || subjectsError || usersError;
   
-  // Check loading states
-  const isLoading = isLoadingSchedules || isLoadingClasses || isLoadingSubjects || isLoadingUsers;
-
-  // Handle date select
+  const { data: users = [] } = useQuery({
+    queryKey: ["/api/users"],
+    enabled: isAdmin, // Only fetch users if admin
+  });
+  
+  // Handle date selection
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
   };
-
+  
   // Handle add schedule
   const handleAddSchedule = () => {
     setSelectedSchedule(null);
-    setFormMode('add');
-    setIsFormOpen(true);
+    setFormMode("add");
+    setIsAdminFormOpen(true);
   };
-
+  
   // Handle edit schedule
   const handleEditSchedule = (schedule: Schedule) => {
     setSelectedSchedule(schedule);
-    setFormMode('edit');
-    setIsFormOpen(true);
+    setFormMode("edit");
+    setIsAdminFormOpen(true);
   };
-
-  // Handle form close
-  const handleFormClose = () => {
-    setIsFormOpen(false);
-    setSelectedSchedule(null);
+  
+  // Delete schedule mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (scheduleId: number) => {
+      const res = await apiRequest("DELETE", `/api/schedules/${scheduleId}`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Расписание удалено",
+        description: "Урок был успешно удален из расписания",
+      });
+      
+      // Invalidate schedules query to refresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+    },
+    onError: (error) => {
+      console.error("Error deleting schedule:", error);
+      toast({
+        title: "Ошибка",
+        description: "Произошла ошибка при удалении урока. Пожалуйста, попробуйте еще раз.",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Handle delete schedule
+  const handleDeleteSchedule = (scheduleId: number) => {
+    if (window.confirm("Вы уверены, что хотите удалить этот урок из расписания?")) {
+      deleteMutation.mutate(scheduleId);
+    }
   };
-
+  
+  // Filter teachers for admin form
+  const teachers = isAdmin 
+    ? users.filter(u => u.role === "teacher" || u.activeRole === "teacher")
+    : [];
+    
+  // Get user's classes based on role
+  const userClasses = isAdmin 
+    ? classes 
+    : schedules.filter(schedule => schedule.teacherId === user?.id).map(schedule => schedule.classId);
+  
+  // Render loading state
+  if (isLoadingSchedules) {
+    return (
+      <div className="flex items-center justify-center min-h-[500px]">
+        <div className="animate-pulse flex flex-col items-center">
+          <div className="h-12 w-12 rounded-full bg-muted"></div>
+          <div className="mt-4 h-4 w-32 bg-muted rounded"></div>
+          <div className="mt-2 h-3 w-24 bg-muted rounded"></div>
+        </div>
+      </div>
+    );
+  }
+  
   return (
-    <div className="container py-6 space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="container max-w-7xl mx-auto py-6">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Расписание</h1>
           <p className="text-muted-foreground">
-            Просмотр и управление расписанием занятий
+            Просматривайте и управляйте расписанием занятий
           </p>
         </div>
-
-        {(isAdmin || isTeacher) && (
-          <Button onClick={handleAddSchedule}>
-            <Plus className="mr-2 h-4 w-4" />
-            Добавить урок
-          </Button>
-        )}
-      </div>
-
-      {hasErrors && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Ошибка</AlertTitle>
-          <AlertDescription>
-            Произошла ошибка при загрузке данных. Пожалуйста, попробуйте позже.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {isLoading ? (
-        <div className="space-y-4">
-          <div className="flex justify-between">
-            <Skeleton className="h-10 w-[250px]" />
-            <Skeleton className="h-10 w-[150px]" />
+        
+        <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center rounded-lg bg-muted px-3 py-1 text-sm">
+            <CalendarDays className="mr-2 h-4 w-4 text-primary" />
+            <span>
+              Выбрано: {format(selectedDate, "d MMMM yyyy", { locale: ru })}
+            </span>
           </div>
-          <Skeleton className="h-[350px] w-full" />
+          
+          {isAdmin && (
+            <Button onClick={handleAddSchedule}>
+              <Plus className="mr-2 h-4 w-4" />
+              Добавить урок
+            </Button>
+          )}
         </div>
-      ) : (
-        <div className="space-y-6">
-          <ScheduleCarousel
-            schedules={filteredSchedules}
-            classes={classes}
-            subjects={subjects}
-            users={users}
-            onDateSelect={handleDateSelect}
-            selectedDate={selectedDate}
-          />
-        </div>
-      )}
-
-      {isFormOpen && (
+      </div>
+      
+      <div className="bg-card rounded-lg border shadow-sm p-4 mb-8">
+        <ScheduleCarousel
+          schedules={schedules}
+          classes={classes}
+          subjects={subjects}
+          users={users}
+          selectedDate={selectedDate}
+          onDateSelect={handleDateSelect}
+          onEditSchedule={isAdmin ? handleEditSchedule : undefined}
+          onDeleteSchedule={isAdmin ? handleDeleteSchedule : undefined}
+        />
+      </div>
+      
+      {isAdmin && (
         <AdminScheduleForm
-          isOpen={isFormOpen}
-          onClose={handleFormClose}
+          isOpen={isAdminFormOpen}
+          onClose={() => setIsAdminFormOpen(false)}
           classes={classes}
           subjects={subjects}
           teachers={teachers}
