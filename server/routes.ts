@@ -670,10 +670,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let gradeData = { ...req.body, teacherId: req.user.id };
       
       if (gradeData.date) {
-        // Преобразуем дату урока в объект Date и получаем ISO строку
-        gradeData.createdAt = new Date(gradeData.date).toISOString();
-        // Удаляем временное поле date из данных
-        delete gradeData.date;
+        try {
+          // Преобразуем дату урока в объект Date
+          const dateObj = new Date(gradeData.date);
+          // Проверяем, что дата валидна
+          if (!isNaN(dateObj.getTime())) {
+            gradeData.createdAt = dateObj;
+          }
+          // Удаляем временное поле date из данных
+          delete gradeData.date;
+        } catch (dateError) {
+          console.error('Ошибка при преобразовании даты:', dateError);
+          // Если была ошибка при преобразовании, оставляем поле createdAt как есть
+          // Базовое значение будет установлено на уровне БД (defaultNow)
+        }
       }
       
       const grade = await dataStorage.createGrade(gradeData);

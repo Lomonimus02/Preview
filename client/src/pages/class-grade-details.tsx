@@ -213,8 +213,9 @@ export default function ClassGradeDetailsPage() {
         }
       }
       
+      // Создаём временную оценку для оптимистичного обновления интерфейса
       const tempGrade: Grade = {
-        id: Date.now(), // Временный ID
+        id: Date.now(), // Временный ID для локального отображения
         studentId: newGradeData.studentId!, 
         subjectId: newGradeData.subjectId!,
         classId: newGradeData.classId!,
@@ -222,7 +223,9 @@ export default function ClassGradeDetailsPage() {
         grade: newGradeData.grade!,
         comment: newGradeData.comment || "",
         gradeType: newGradeData.gradeType || "Текущая",
-        createdAt: createdAt.toISOString(), // Используем указанную выше дату (из selectedDate или текущую)
+        // Используем строковое представление даты для отображения в UI
+        // В БД сама дата будет приведена к нужному типу
+        createdAt: createdAt.toISOString(),
       };
       
       // Оптимистично обновляем кеш react-query для обоих запросов
