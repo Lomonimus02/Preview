@@ -33,13 +33,13 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   // Maps user roles to which menu items they can see
   const roleAccess = {
-    [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "user-roles", "student-class-assignments", "parent-student-connections", "analytics", "messages", "notifications", "settings", "support"],
-    [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "user-roles", "schedule", "homework", "grades", "student-class-assignments", "parent-student-connections", "analytics", "messages", "notifications", "settings", "support"],
+    [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "user-roles", "analytics", "messages", "notifications", "settings", "support"],
+    [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "user-roles", "schedule", "homework", "grades", "analytics", "messages", "notifications", "settings", "support"],
     [UserRoleEnum.TEACHER]: ["dashboard", "schedule", "homework", "messages", "documents", "support"],
     [UserRoleEnum.STUDENT]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.PARENT]: ["dashboard", "grades", "messages", "documents", "support"],
-    [UserRoleEnum.PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "student-class-assignments", "parent-student-connections", "analytics", "messages", "documents", "settings", "support"],
-    [UserRoleEnum.VICE_PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "student-class-assignments", "parent-student-connections", "analytics", "messages", "documents", "settings", "support"]
+    [UserRoleEnum.PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"],
+    [UserRoleEnum.VICE_PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"]
   };
 
   // Navigation items
@@ -51,8 +51,6 @@ export function Sidebar({ isOpen }: SidebarProps) {
     { id: "schedule", label: "Расписание", icon: <CalendarIcon className="h-4 w-4 mr-3" />, href: "/schedule" },
     { id: "grades", label: "Оценки", icon: <GraduationCapIcon className="h-4 w-4 mr-3" />, href: "/grades" },
     { id: "homework", label: "Домашние задания", icon: <BookIcon className="h-4 w-4 mr-3" />, href: "/homework" },
-    { id: "student-class-assignments", label: "Ученики - Классы", icon: <UserPlusIcon className="h-4 w-4 mr-3" />, href: "/student-class-assignments" },
-    { id: "parent-student-connections", label: "Родители - Дети", icon: <UsersIcon className="h-4 w-4 mr-3" />, href: "/parent-student-connections" },
     { id: "messages", label: "Сообщения", icon: <MessagesSquareIcon className="h-4 w-4 mr-3" />, href: "/messages" },
     { id: "documents", label: "Документы", icon: <FolderIcon className="h-4 w-4 mr-3" />, href: "/documents" },
     { id: "analytics", label: "Аналитика", icon: <BarChartIcon className="h-4 w-4 mr-3" />, href: "/analytics" },
@@ -69,7 +67,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
 
   const sidebarClass = isOpen 
     ? "fixed inset-0 z-40 md:relative w-64 md:translate-x-0 transform transition duration-200 ease-in-out"
-    : "fixed inset-0 z-40 md:relative w-64 -translate-x-full md:translate-x-0 transform transition duration-200 ease-in-out";
+    : "fixed inset-0 z-40 md:relative w-64 -translate-x-full md:-translate-x-full transform transition duration-200 ease-in-out";
 
   // Role display names in Russian
   const roleNames = {

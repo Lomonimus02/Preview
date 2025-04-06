@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { BellIcon, ChevronDownIcon, Menu } from "lucide-react";
+import { BellIcon, ChevronDownIcon, Menu, MenuIcon } from "lucide-react";
 import { Link } from "wouter";
 import { 
   DropdownMenu, 
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { Notification } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -44,9 +45,14 @@ export function Header({ toggleSidebar }: HeaderProps) {
     <header className="bg-white shadow-sm z-10">
       <div className="flex justify-between items-center px-4 py-3">
         <div className="flex items-center">
-          <button onClick={toggleSidebar} className="md:hidden mr-2 text-gray-700">
-            <Menu className="h-6 w-6" />
-          </button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={toggleSidebar} 
+            className="mr-2 text-gray-700"
+          >
+            <MenuIcon className="h-6 w-6" />
+          </Button>
           <div className="flex items-center">
             <span className="material-icons text-primary-dark mr-2">school</span>
             <h1 className="text-xl font-heading font-bold text-gray-800">Электронный дневник</h1>
