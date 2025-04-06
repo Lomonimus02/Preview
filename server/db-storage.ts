@@ -245,6 +245,19 @@ export class DatabaseStorage implements IStorage {
     const [newGrade] = await db.insert(grades).values(grade).returning();
     return newGrade;
   }
+  
+  async updateGrade(id: number, gradeData: Partial<InsertGrade>): Promise<Grade | undefined> {
+    const [updatedGrade] = await db.update(grades)
+      .set(gradeData)
+      .where(eq(grades.id, id))
+      .returning();
+    
+    return updatedGrade;
+  }
+  
+  async deleteGrade(id: number): Promise<void> {
+    await db.delete(grades).where(eq(grades.id, id));
+  }
 
   // ===== Attendance operations =====
   async getAttendance(id: number): Promise<Attendance | undefined> {

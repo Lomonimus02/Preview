@@ -650,6 +650,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: 'Не удалось создать оценку', error: error.message });
     }
   });
+  
+  // Обновление оценки
+  app.put("/api/grades/:id", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+    try {
+      const gradeId = parseInt(req.params.id);
+      if (isNaN(gradeId)) {
+        return res.status(400).json({ message: "Invalid grade ID" });
+      }
+      
+      // Проверяем, существует ли оценка
+      const existingGrade = await dataStorage.getGrade(gradeId);
+      if (!existingGrade) {
+        return res.status(404).json({ message: "Оценка не найдена" });
+      }
+      
+      // Проверяем, имеет ли учитель право редактировать эту оценку
+      if (existingGrade.teacherId !== req.user.id) {
+        return res.status(403).json({ message: "Вы можете редактировать только выставленные вами оценки" });
+      }
+      
+      // Обновляем оценку
+      const updatedGrade = await dataStorage.updateGrade(gradeId, req.body);
+      
+      // Уведомляем ученика об изменении оценки
+      await dataStorage.createNotification({
+        userId: existingGrade.studentId,
+        title: "Обновление оценки",
+        content: `Ваша оценка была изменена на: ${req.body.grade} (${req.body.gradeType || existingGrade.gradeType})`
+      });
+      
+      // Логируем действие
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "grade_updated",
+        details: `Updated grade for student ${existingGrade.studentId}`,
+        ipAddress: req.ip
+      });
+      
+      res.status(200).json(updatedGrade);
+    } catch (error) {
+      console.error('Ошибка при обновлении оценки:', error);
+      res.status(500).json({ message: 'Не удалось обновить оценку', error: error.message });
+    }
+  });
+  
+  // Удаление оценки
+  app.delete("/api/grades/:id", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+    try {
+      const gradeId = parseInt(req.params.id);
+      if (isNaN(gradeId)) {
+        return res.status(400).json({ message: "Invalid grade ID" });
+      }
+      
+      // Проверяем, существует ли оценка
+      const existingGrade = await dataStorage.getGrade(gradeId);
+      if (!existingGrade) {
+        return res.status(404).json({ message: "Оценка не найдена" });
+      }
+      
+      // Проверяем, имеет ли учитель право удалить эту оценку
+      if (existingGrade.teacherId !== req.user.id) {
+        return res.status(403).json({ message: "Вы можете удалять только выставленные вами оценки" });
+      }
+      
+      // Удаляем оценку
+      await dataStorage.deleteGrade(gradeId);
+      
+      // Уведомляем ученика об удалении оценки
+      await dataStorage.createNotification({
+        userId: existingGrade.studentId,
+        title: "Удаление оценки",
+        content: `Ваша оценка по предмету была удалена`
+      });
+      
+      // Логируем действие
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "grade_deleted",
+        details: `Deleted grade for student ${existingGrade.studentId}`,
+        ipAddress: req.ip
+      });
+      
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('Ошибка при удалении оценки:', error);
+      res.status(500).json({ message: 'Не удалось удалить оценку', error: error.message });
+    }
+  });
 
   // Attendance API
   app.get("/api/attendance", isAuthenticated, async (req, res) => {

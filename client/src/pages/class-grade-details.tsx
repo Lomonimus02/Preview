@@ -187,22 +187,121 @@ export default function ClassGradeDetailsPage() {
     },
   });
   
+  // Mutation to update grade
+  const updateGradeMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number, data: Partial<z.infer<typeof gradeFormSchema>> }) => {
+      const res = await apiRequest("PUT", `/api/grades/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      setIsGradeDialogOpen(false);
+      setEditingGradeId(null);
+      gradeForm.reset({
+        studentId: undefined,
+        grade: undefined,
+        comment: "",
+        gradeType: "Текущая",
+        subjectId: subjectId,
+        classId: classId,
+        teacherId: user?.id,
+      });
+      toast({
+        title: "Оценка обновлена",
+        description: "Оценка успешно обновлена",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось обновить оценку",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Mutation to delete grade
+  const deleteGradeMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/grades/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      toast({
+        title: "Оценка удалена",
+        description: "Оценка успешно удалена",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить оценку",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Track if we're editing an existing grade
+  const [editingGradeId, setEditingGradeId] = useState<number | null>(null);
+  
   // Handle grade form submission
   const onGradeSubmit = (values: z.infer<typeof gradeFormSchema>) => {
-    addGradeMutation.mutate(values);
+    if (editingGradeId) {
+      // Update existing grade
+      updateGradeMutation.mutate({ 
+        id: editingGradeId, 
+        data: values 
+      });
+    } else {
+      // Add new grade
+      addGradeMutation.mutate(values);
+    }
   };
   
   // Open grade dialog for a specific student and date
   const openGradeDialog = (studentId: number, date?: string) => {
     setSelectedStudentId(studentId);
     setSelectedDate(date || null);
+    setEditingGradeId(null);
     
-    gradeForm.setValue("studentId", studentId);
-    gradeForm.setValue("subjectId", subjectId);
-    gradeForm.setValue("classId", classId);
-    gradeForm.setValue("teacherId", user?.id || 0);
+    gradeForm.reset({
+      studentId: studentId,
+      subjectId: subjectId,
+      classId: classId,
+      teacherId: user?.id,
+      grade: undefined,
+      comment: "",
+      gradeType: "Текущая",
+    });
     
     setIsGradeDialogOpen(true);
+  };
+  
+  // Open grade dialog to edit existing grade
+  const openEditGradeDialog = (grade: Grade) => {
+    setSelectedStudentId(grade.studentId);
+    setSelectedDate(null);
+    setEditingGradeId(grade.id);
+    
+    gradeForm.reset({
+      studentId: grade.studentId,
+      subjectId: grade.subjectId,
+      classId: grade.classId, 
+      teacherId: grade.teacherId,
+      grade: grade.grade,
+      comment: grade.comment || "",
+      gradeType: grade.gradeType || "Текущая",
+    });
+    
+    setIsGradeDialogOpen(true);
+  };
+  
+  // Handle grade deletion
+  const handleDeleteGrade = (gradeId: number) => {
+    if (confirm("Вы уверены, что хотите удалить эту оценку?")) {
+      deleteGradeMutation.mutate(gradeId);
+    }
   };
   
   // Get student grades for a specific date
@@ -315,13 +414,44 @@ export default function ClassGradeDetailsPage() {
                           {studentGrades.length > 0 ? (
                             <div className="flex flex-wrap justify-center gap-1">
                               {studentGrades.map((grade) => (
-                                <span 
-                                  key={grade.id} 
-                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
-                                  title={grade.comment || ""}
-                                >
-                                  {grade.grade}
-                                </span>
+                                <div key={grade.id} className="relative group">
+                                  <span 
+                                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
+                                    title={grade.comment || ""}
+                                  >
+                                    {grade.grade}
+                                  </span>
+                                  
+                                  {canEditGrades && (
+                                    <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
+                                        onClick={() => openEditGradeDialog(grade)}
+                                        title="Редактировать оценку"
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M12 20h9"></path>
+                                          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                                        </svg>
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
+                                        onClick={() => handleDeleteGrade(grade.id)}
+                                        title="Удалить оценку"
+                                      >
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M3 6h18"></path>
+                                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                        </svg>
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
                               ))}
                             </div>
                           ) : canEditGrades ? (
@@ -353,15 +483,15 @@ export default function ClassGradeDetailsPage() {
         <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Добавить оценку</DialogTitle>
+              <DialogTitle>{editingGradeId ? "Редактировать оценку" : "Добавить оценку"}</DialogTitle>
               <DialogDescription>
                 {selectedStudentId ? 
-                  `Добавление оценки для ученика: ${
+                  `${editingGradeId ? "Редактирование" : "Добавление"} оценки для ученика: ${
                     students.find(s => s.id === selectedStudentId)?.lastName || ""
                   } ${
                     students.find(s => s.id === selectedStudentId)?.firstName || ""
                   }${selectedDate ? ` (${formatDate(selectedDate)})` : ""}` : 
-                  "Добавление оценки"
+                  `${editingGradeId ? "Редактирование" : "Добавление"} оценки`
                 }
               </DialogDescription>
             </DialogHeader>
@@ -488,8 +618,13 @@ export default function ClassGradeDetailsPage() {
                 )}
                 
                 <DialogFooter>
-                  <Button type="submit" disabled={addGradeMutation.isPending}>
-                    {addGradeMutation.isPending ? 'Сохранение...' : 'Сохранить'}
+                  <Button type="submit" disabled={addGradeMutation.isPending || updateGradeMutation.isPending}>
+                    {addGradeMutation.isPending || updateGradeMutation.isPending 
+                      ? 'Сохранение...' 
+                      : editingGradeId 
+                        ? 'Обновить' 
+                        : 'Сохранить'
+                    }
                   </Button>
                 </DialogFooter>
               </form>
