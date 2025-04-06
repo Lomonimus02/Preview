@@ -144,13 +144,14 @@ export default function ClassGradeDetailsPage() {
   
   // Get unique dates from schedules for this class and subject
   const lessonDates = useMemo(() => {
+    // Фильтруем расписания и получаем даты
     const dates = schedules
       .filter(s => s.scheduleDate && s.subjectId === subjectId) // Filter schedules for this subject only
-      .map(s => s.scheduleDate)
+      .map(s => s.scheduleDate as string) // Уточняем тип, так как мы отфильтровали null значения выше
       .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     
-    // Remove duplicates
-    return [...new Set(dates)];
+    // Remove duplicates using Array.from + Set
+    return Array.from(new Set(dates));
   }, [schedules, subjectId]);
   
   // Группируем расписания учителя по предметам
@@ -197,6 +198,7 @@ export default function ClassGradeDetailsPage() {
       
       // Сохраняем предыдущее состояние
       const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]) || [];
+      const previousGradesWithFilter = queryClient.getQueryData<Grade[]>(["/api/grades", { classId, subjectId }]) || [];
       
       // Создаём временную оценку для оптимистичного обновления
       // Учитываем выбранную дату, если она есть
@@ -204,7 +206,11 @@ export default function ClassGradeDetailsPage() {
       
       // Если у нас есть selectedDate, используем его вместо текущей даты
       if (selectedDate) {
-        createdAt = new Date(selectedDate);
+        // Правильная обработка строки даты - убеждаемся, что у нас всегда строка
+        const dateString = selectedDate || '';
+        if (dateString.trim() !== '') {
+          createdAt = new Date(dateString);
+        }
       }
       
       const tempGrade: Grade = {
@@ -219,16 +225,21 @@ export default function ClassGradeDetailsPage() {
         createdAt: createdAt.toISOString(), // Используем указанную выше дату (из selectedDate или текущую)
       };
       
-      // Оптимистично обновляем кеш react-query
+      // Оптимистично обновляем кеш react-query для обоих запросов
       queryClient.setQueryData<Grade[]>(["/api/grades"], [...previousGrades, tempGrade]);
+      queryClient.setQueryData<Grade[]>(["/api/grades", { classId, subjectId }], [...previousGradesWithFilter, tempGrade]);
       
       // Возвращаем контекст с предыдущим состоянием
-      return { previousGrades };
+      return { previousGrades, previousGradesWithFilter };
     },
     onSuccess: (newGrade) => {
       // После успешного запроса обновляем кеш актуальными данными
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      
+      // Закрываем диалог только после успешного добавления
       setIsGradeDialogOpen(false);
+      
+      // Очищаем форму
       gradeForm.reset({
         studentId: undefined,
         grade: undefined,
@@ -238,15 +249,19 @@ export default function ClassGradeDetailsPage() {
         classId: classId,
         teacherId: user?.id,
       });
+      
       toast({
         title: "Оценка добавлена",
-        description: "Оценка успешно добавлена",
+        description: "Оценка успешно добавлена в журнал",
       });
     },
     onError: (error, newGrade, context) => {
       // При ошибке возвращаем предыдущее состояние
       if (context?.previousGrades) {
         queryClient.setQueryData(["/api/grades"], context.previousGrades);
+      }
+      if (context?.previousGradesWithFilter) {
+        queryClient.setQueryData(["/api/grades", { classId, subjectId }], context.previousGradesWithFilter);
       }
       
       toast({
@@ -273,9 +288,10 @@ export default function ClassGradeDetailsPage() {
       
       // Сохраняем предыдущее состояние
       const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]) || [];
+      const previousGradesWithFilter = queryClient.getQueryData<Grade[]>(["/api/grades", { classId, subjectId }]) || [];
       
-      // Оптимистично обновляем кеш
-      queryClient.setQueryData<Grade[]>(["/api/grades"], (oldData = []) => {
+      // Функция обновления данных оценки
+      const updateGradeData = (oldData: Grade[] = []) => {
         return oldData.map(grade => {
           if (grade.id === id) {
             // Обновляем существующую оценку
@@ -289,14 +305,21 @@ export default function ClassGradeDetailsPage() {
           }
           return grade;
         });
-      });
+      };
       
-      return { previousGrades };
+      // Оптимистично обновляем кеш в обоих запросах
+      queryClient.setQueryData<Grade[]>(["/api/grades"], updateGradeData);
+      queryClient.setQueryData<Grade[]>(["/api/grades", { classId, subjectId }], updateGradeData);
+      
+      return { previousGrades, previousGradesWithFilter };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      
+      // Закрываем диалог и очищаем форму после успешного обновления
       setIsGradeDialogOpen(false);
       setEditingGradeId(null);
+      
       gradeForm.reset({
         studentId: undefined,
         grade: undefined,
@@ -306,15 +329,19 @@ export default function ClassGradeDetailsPage() {
         classId: classId,
         teacherId: user?.id,
       });
+      
       toast({
         title: "Оценка обновлена",
-        description: "Оценка успешно обновлена",
+        description: "Оценка успешно обновлена в журнале",
       });
     },
     onError: (error, variables, context) => {
       // При ошибке возвращаем предыдущее состояние
       if (context?.previousGrades) {
         queryClient.setQueryData(["/api/grades"], context.previousGrades);
+      }
+      if (context?.previousGradesWithFilter) {
+        queryClient.setQueryData(["/api/grades", { classId, subjectId }], context.previousGradesWithFilter);
       }
       
       toast({
@@ -340,25 +367,35 @@ export default function ClassGradeDetailsPage() {
       
       // Сохраняем предыдущее состояние
       const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]) || [];
+      const previousGradesWithFilter = queryClient.getQueryData<Grade[]>(["/api/grades", { classId, subjectId }]) || [];
       
-      // Оптимистично обновляем кеш удаляя оценку
-      queryClient.setQueryData<Grade[]>(["/api/grades"], (oldData = []) => {
+      // Функция фильтрации для удаления оценки
+      const filterGradeData = (oldData: Grade[] = []) => {
         return oldData.filter(grade => grade.id !== id);
-      });
+      };
       
-      return { previousGrades };
+      // Оптимистично обновляем кеш удаляя оценку из обоих запросов
+      queryClient.setQueryData<Grade[]>(["/api/grades"], filterGradeData);
+      queryClient.setQueryData<Grade[]>(["/api/grades", { classId, subjectId }], filterGradeData);
+      
+      return { previousGrades, previousGradesWithFilter };
     },
     onSuccess: () => {
+      // Обновляем кеш после успешного удаления
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      
       toast({
         title: "Оценка удалена",
-        description: "Оценка успешно удалена",
+        description: "Оценка успешно удалена из журнала",
       });
     },
     onError: (error, id, context) => {
       // При ошибке возвращаем предыдущее состояние
       if (context?.previousGrades) {
         queryClient.setQueryData(["/api/grades"], context.previousGrades);
+      }
+      if (context?.previousGradesWithFilter) {
+        queryClient.setQueryData(["/api/grades", { classId, subjectId }], context.previousGradesWithFilter);
       }
       
       toast({
@@ -438,11 +475,17 @@ export default function ClassGradeDetailsPage() {
   // Get student grades for a specific date for the current subject
   const getStudentGradeForDate = (studentId: number, date: string) => {
     // Преобразуем дату в строку формата "YYYY-MM-DD" для более надежного сравнения
-    const formatDateForCompare = (dateString: string) => {
-      if (!dateString) return ''; // Защита от undefined/null
-      const d = new Date(dateString);
+    const formatDateForCompare = (dateInput: string | Date) => {
+      // Если передали null или undefined
+      if (!dateInput) return ''; 
+      
+      // Если передали дату как объект
+      const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+      
       // Проверяем, что дата действительна
       if (isNaN(d.getTime())) return '';
+      
+      // Форматируем дату в строку формата YYYY-MM-DD
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
     
@@ -579,7 +622,7 @@ export default function ClassGradeDetailsPage() {
                             return (
                               <TableCell key={date} className="text-center">
                                 {studentGrades.length > 0 ? (
-                                  <div className="flex flex-wrap justify-center gap-1">
+                                  <div className="flex flex-wrap justify-center gap-1 items-center">
                                     {studentGrades.map((grade) => (
                                       <div key={grade.id} className="relative group">
                                         <span 
@@ -620,6 +663,18 @@ export default function ClassGradeDetailsPage() {
                                         )}
                                       </div>
                                     ))}
+                                    {/* Кнопка "+" для добавления еще одной оценки в тот же день */}
+                                    {canEditGrades && (
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-5 w-5 p-0 rounded-full ml-1"
+                                        onClick={() => openGradeDialog(student.id, date)}
+                                        title="Добавить еще одну оценку"
+                                      >
+                                        +
+                                      </Button>
+                                    )}
                                   </div>
                                 ) : canEditGrades ? (
                                   <Button 
@@ -662,7 +717,7 @@ export default function ClassGradeDetailsPage() {
                     students.find(s => s.id === selectedStudentId)?.lastName || ""
                   } ${
                     students.find(s => s.id === selectedStudentId)?.firstName || ""
-                  }${selectedDate ? ` (${formatDate(selectedDate)})` : ""}` : 
+                  }${selectedDate ? ` (${selectedDate})` : ""}` : 
                   `${editingGradeId ? "Редактирование" : "Добавление"} оценки`
                 }
               </DialogDescription>
