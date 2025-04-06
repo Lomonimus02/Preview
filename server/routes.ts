@@ -1212,6 +1212,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ unreadCount });
   });
 
+  // Маршрут для получения учеников по ID класса для страницы оценок
+  app.get("/api/students-by-class/:classId", isAuthenticated, async (req, res) => {
+    const classId = parseInt(req.params.classId);
+    if (isNaN(classId)) {
+      return res.status(400).json({ message: "Invalid class ID" });
+    }
+    
+    try {
+      // Проверяем, имеет ли пользователь доступ к классу
+      if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+        const classObj = await dataStorage.getClass(classId);
+        if (!classObj || classObj.schoolId !== req.user.schoolId) {
+          return res.status(403).json({ message: "You can only view students in classes of your school" });
+        }
+      } else if (req.user.role === UserRoleEnum.TEACHER) {
+        // Учитель может видеть только учеников тех классов, где преподает
+        const schedules = await dataStorage.getSchedulesByTeacher(req.user.id);
+        const teacherClassIds = [...new Set(schedules.map(s => s.classId))];
+        
+        if (!teacherClassIds.includes(classId)) {
+          return res.status(403).json({ message: "You can only view students in classes you teach" });
+        }
+      } else if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+        return res.status(403).json({ message: "You don't have permission to view class students" });
+      }
+      
+      // Получаем студентов этого класса
+      const students = await dataStorage.getClassStudents(classId);
+      res.json(students);
+    } catch (error) {
+      console.error("Error fetching students by class:", error);
+      return res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+  
   const httpServer = createServer(app);
   return httpServer;
 }
