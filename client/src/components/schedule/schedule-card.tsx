@@ -109,7 +109,7 @@ export function ScheduleCard({
   
   return (
     <Card className={cn(
-      "h-full w-full min-w-[270px] max-w-[350px] mx-auto overflow-hidden border-0 shadow-sm",
+      "h-full w-full min-w-[270px] overflow-hidden border-0 shadow-sm",
       isCurrentDate ? "bg-[#4CAF50] text-white" : "bg-white"
     )}>
       <CardHeader className="py-4 px-4 text-center border-b border-gray-100">

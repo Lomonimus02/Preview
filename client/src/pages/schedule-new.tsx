@@ -24,7 +24,7 @@ export default function ScheduleNew() {
   const isMobile = useMediaQuery("(min-width: 480px)");
   
   // Количество видимых дней
-  const visibleDays = isLargeDesktop ? 4 : isDesktop ? 3 : isTablet ? 2 : 1;
+  const visibleDays = isLargeDesktop ? 5 : isDesktop ? 4 : isTablet ? 3 : isMobile ? 2 : 1;
   
   // Current date
   const today = new Date();
@@ -408,7 +408,7 @@ export default function ScheduleNew() {
           onMouseLeave={handleMouseUp}
         >
           <div 
-            className="flex transition-transform duration-300 ease-in-out gap-4"
+            className="flex transition-transform duration-300 ease-in-out gap-3"
             style={{
               transform: `translateX(-${currentIndex * (100 / visibleDays)}%)`,
               width: `${100 * (weekDays.length / visibleDays)}%`
@@ -421,7 +421,7 @@ export default function ScheduleNew() {
               return (
                 <div 
                   key={weekDay.day} 
-                  className="flex-shrink-0 schedule-slide px-1"
+                  className="flex-shrink-0 schedule-slide px-0.5"
                   style={{ width: `${100 / weekDays.length * visibleDays}%` }}
                 >
                   <ScheduleCard
