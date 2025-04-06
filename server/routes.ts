@@ -623,27 +623,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/grades", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
-    const grade = await dataStorage.createGrade({
-      ...req.body,
-      teacherId: req.user.id
-    });
-    
-    // Notify the student
-    await dataStorage.createNotification({
-      userId: grade.studentId,
-      title: "Новая оценка",
-      content: `У вас новая оценка: ${grade.grade} (${grade.gradeType})`
-    });
-    
-    // Log the action
-    await dataStorage.createSystemLog({
-      userId: req.user.id,
-      action: "grade_created",
-      details: `Created grade ${grade.grade} for student ${grade.studentId}`,
-      ipAddress: req.ip
-    });
-    
-    res.status(201).json(grade);
+    try {
+      const grade = await dataStorage.createGrade({
+        ...req.body,
+        teacherId: req.user.id
+      });
+      
+      // Notify the student
+      await dataStorage.createNotification({
+        userId: grade.studentId,
+        title: "Новая оценка",
+        content: `У вас новая оценка: ${grade.grade} (${grade.gradeType})`
+      });
+      
+      // Log the action
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "grade_created",
+        details: `Created grade ${grade.grade} for student ${grade.studentId}`,
+        ipAddress: req.ip
+      });
+      
+      res.status(201).json(grade);
+    } catch (error) {
+      console.error('Ошибка при создании оценки:', error);
+      res.status(500).json({ message: 'Не удалось создать оценку', error: error.message });
+    }
   });
 
   // Attendance API

@@ -336,15 +336,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    const [newNotification] = await db.insert(notifications).values({
-      ...notification,
-      content: notification.message // Поле в БД называется content
-    }).returning();
+    // В схеме уже используется поле content, так что не нужно переименовывать
+    const [newNotification] = await db.insert(notifications).values(notification).returning();
     
-    return {
-      ...newNotification,
-      message: newNotification.content // Преобразуем для совместимости с интерфейсом
-    } as unknown as Notification;
+    return newNotification;
   }
 
   async markNotificationAsRead(id: number): Promise<Notification | undefined> {
@@ -353,10 +348,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(notifications.id, id))
       .returning();
     
-    return {
-      ...updatedNotification,
-      message: updatedNotification.content // Преобразуем для совместимости с интерфейсом
-    } as unknown as Notification;
+    return updatedNotification;
   }
 
   // ===== Parent-Student operations =====
