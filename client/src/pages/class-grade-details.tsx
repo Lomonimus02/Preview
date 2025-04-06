@@ -197,6 +197,14 @@ export default function ClassGradeDetailsPage() {
       const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]) || [];
       
       // Создаём временную оценку для оптимистичного обновления
+      // Учитываем выбранную дату, если она есть
+      let createdAt = new Date();
+      
+      // Если у нас есть selectedDate, используем его вместо текущей даты
+      if (selectedDate) {
+        createdAt = new Date(selectedDate);
+      }
+      
       const tempGrade: Grade = {
         id: Date.now(), // Временный ID
         studentId: newGradeData.studentId!, 
@@ -206,8 +214,7 @@ export default function ClassGradeDetailsPage() {
         grade: newGradeData.grade!,
         comment: newGradeData.comment || "",
         gradeType: newGradeData.gradeType || "Текущая",
-        createdAt: new Date().toISOString(),
-        // Другие поля оценки с placeholder значениями
+        createdAt: createdAt.toISOString(),
       };
       
       // Оптимистично обновляем кеш react-query
@@ -427,12 +434,22 @@ export default function ClassGradeDetailsPage() {
   
   // Get student grades for a specific date for the current subject
   const getStudentGradeForDate = (studentId: number, date: string) => {
-    const dateObj = new Date(date);
+    // Преобразуем дату в строку формата "YYYY-MM-DD" для более надежного сравнения
+    const formatDateForCompare = (dateString: string) => {
+      if (!dateString) return ''; // Защита от undefined/null
+      const d = new Date(dateString);
+      // Проверяем, что дата действительна
+      if (isNaN(d.getTime())) return '';
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    
+    const formattedDate = formatDateForCompare(date);
+    
     // Фильтруем оценки по студенту, предмету и дате
     return grades.filter(g => 
       g.studentId === studentId && 
       g.subjectId === subjectId && // Добавляем фильтр по предмету
-      g.createdAt && new Date(g.createdAt).toDateString() === dateObj.toDateString()
+      g.createdAt && formatDateForCompare(g.createdAt) === formattedDate
     );
   };
   
