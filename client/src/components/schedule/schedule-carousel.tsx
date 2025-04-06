@@ -24,14 +24,17 @@ export function ScheduleCarousel({
   selectedDate,
   onDateChange,
 }: ScheduleCarouselProps) {
+  // Настройки карусели для плавной прокрутки без резких прыжков
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: false,
     align: "center",
     containScroll: "trimSnaps",
-    dragFree: true,          // Включаем режим свободного перетаскивания
-    duration: 40,            // Увеличиваем длительность анимации для плавности (в мс)
-    inViewThreshold: 0.7,    // Элемент считается видимым при показе 70% его ширины
-    slidesToScroll: 3,       // Количество слайдов для пролистывания кнопками или событиями
+    dragFree: false,         // Отключаем dragFree для более контролируемой прокрутки
+    skipSnaps: false,        // Запрещаем пропуск промежуточных снимков
+    duration: 30,            // Уменьшаем длительность анимации для более быстрого отклика
+    startIndex: 0,           // Устанавливаем начальный индекс
+    inViewThreshold: 0.6,    // Элемент считается видимым при показе 60% его ширины
+    slidesToScroll: 1,       // Устанавливаем прокрутку по одному слайду для предотвращения скачков
   });
   
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -70,17 +73,26 @@ export function ScheduleCarousel({
     return index !== -1 ? index : getWeekDayIndex(selectedDate) - 1;
   }, [selectedDate, weekDays]);
   
-  // Устанавливаем начальный индекс при изменении currentDayIndex
+  // Улучшенная инициализация и прокрутка к текущему дню
   useEffect(() => {
     if (!emblaApi) return;
     
-    // Используем requestAnimationFrame для плавного перехода
-    requestAnimationFrame(() => {
-      emblaApi.scrollTo(currentDayIndex);
-    });
+    // Используем setTimeout для гарантии что контент полностью загружен
+    const timer = setTimeout(() => {
+      // Сначала инициализируем слайдер, чтобы он правильно рассчитал размеры и позиции
+      emblaApi.reInit();
+      
+      // Затем используем requestAnimationFrame для плавного перехода с небольшой задержкой
+      requestAnimationFrame(() => {
+        // Скроллим к нужному индексу без анимации для предотвращения рывков
+        emblaApi.scrollTo(currentDayIndex, false);
+        
+        // После позиционирования обновляем состояние
+        setSelectedIndex(currentDayIndex);
+      });
+    }, 10); // Небольшая задержка для полной загрузки DOM
     
-    // Обновляем выбранный индекс
-    setSelectedIndex(currentDayIndex);
+    return () => clearTimeout(timer);
   }, [emblaApi, currentDayIndex, weekOffset]);
   
   // Предварительно загружаем данные для всех дней недели
@@ -91,38 +103,56 @@ export function ScheduleCarousel({
     }
   }, [emblaApi, weekDays, weekOffset]);
   
-  // Добавляем обработчик колесика мыши для прокрутки карусели
+  // Добавляем улучшенный обработчик колесика мыши для плавной прокрутки карусели
   useEffect(() => {
+    if (!emblaApi) return;
+    
+    // Использование времени для предотвращения слишком частых прокруток
+    let lastWheelEventTime = 0;
+    const wheelEventIntervalMs = 100; // Минимальный интервал между событиями прокрутки
+    
     const handleWheel = (event: WheelEvent) => {
-      if (!emblaApi) return;
-      
       // Предотвращаем стандартную прокрутку страницы
       event.preventDefault();
       
-      // Определяем направление прокрутки
+      // Текущее время
+      const now = Date.now();
+      
+      // Проверяем, прошло ли достаточно времени с последнего события
+      if (now - lastWheelEventTime < wheelEventIntervalMs) {
+        return; // Игнорируем слишком частые события
+      }
+      
+      // Обновляем время последнего события
+      lastWheelEventTime = now;
+      
+      // Определяем направление прокрутки с учетом величины прокрутки
+      // для более плавной работы на трекпадах и сенсорных устройствах
+      const scrollMultiplier = Math.min(Math.abs(event.deltaY) / 100, 1);
+      
       if (event.deltaY < 0) {
         // Прокрутка вверх - двигаемся влево
-        emblaApi.scrollPrev();
+        // Используем scrollTo для более контролируемой прокрутки
+        const currentIndex = emblaApi.selectedScrollSnap();
+        emblaApi.scrollTo(Math.max(0, currentIndex - 1));
       } else {
         // Прокрутка вниз - двигаемся вправо
-        emblaApi.scrollNext();
+        const currentIndex = emblaApi.selectedScrollSnap();
+        const maxIndex = emblaApi.scrollSnapList().length - 1;
+        emblaApi.scrollTo(Math.min(maxIndex, currentIndex + 1));
       }
     };
     
-    // Получаем DOM-элемент карусели через querySelector
-    const containerSelector = () => document.querySelector("[data-embla-container]") as HTMLElement | null;
+    // Получаем ROOT DOM-элемент карусели напрямую через emblaApi
+    const emblaRoot = emblaApi.rootNode();
     
-    const emblaNode = containerSelector();
-    
-    if (emblaNode) {
+    if (emblaRoot) {
       // Добавляем слушатель события колеса мыши
-      emblaNode.addEventListener('wheel', handleWheel, { passive: false });
+      emblaRoot.addEventListener('wheel', handleWheel, { passive: false });
       
       // Функция очистки при размонтировании компонента
       return () => {
-        // Ищем элемент снова, поскольку он может измениться
-        const node = containerSelector();
-        if (node) node.removeEventListener('wheel', handleWheel);
+        emblaRoot.removeEventListener('wheel', handleWheel);
       };
     }
   }, [emblaApi]);
@@ -136,12 +166,21 @@ export function ScheduleCarousel({
     setWeekOffset(prev => prev + 1);
   };
   
-  // Обработчик клика по дню - только обновляет выбранную дату
+  // Обработчик клика по дню с предотвращением резких скачков
   const handleDayClick = (date: Date, index: number) => {
     // Обновляем выбранную дату в родительском компоненте
     // без запроса новых данных (данные уже загружены для всей недели)
     onDateChange(date);
     setSelectedIndex(index);
+    
+    // Плавно скроллим карусель к выбранной карточке без анимации
+    // чтобы предотвратить визуальный скачок
+    if (emblaApi) {
+      // Отложенное выполнение для предотвращения конфликтов с другими обработчиками
+      setTimeout(() => {
+        emblaApi.scrollTo(index, false);
+      }, 10);
+    }
   };
   
   // Форматируем даты для отображения диапазона недели
