@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Schedule as ScheduleType, Subject, Class, User, UserRoleEnum } from "@shared/schema";
-import { Check, Plus, Trash2 } from "lucide-react";
+import { Book, Check, Clock, GraduationCap, MapPin, Plus, Trash2, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
   AlertDialog,
@@ -17,6 +17,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
@@ -31,6 +39,7 @@ interface DayCardProps {
   classes: Class[];
   users: User[];
   onScheduleDeleted?: () => void; // Колбэк при удалении урока
+  onLessonClick?: (schedule: ScheduleType) => void; // Колбэк при клике на урок
 }
 
 export function DayCard({
@@ -41,6 +50,7 @@ export function DayCard({
   classes,
   users,
   onScheduleDeleted,
+  onLessonClick,
 }: DayCardProps) {
   // Состояние для отслеживания наведения курсора
   const [isHovered, setIsHovered] = useState(false);
@@ -196,7 +206,8 @@ export function DayCard({
               sortedSchedules.map((schedule) => (
                 <div 
                   key={schedule.id} 
-                  className="p-2 rounded-md transition-colors bg-muted hover:bg-muted/70"
+                  className="p-2 rounded-md transition-colors bg-muted hover:bg-muted/70 cursor-pointer"
+                  onClick={() => onLessonClick && onLessonClick(schedule)}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div className="font-medium">
@@ -211,7 +222,8 @@ export function DayCard({
                           variant="ghost"
                           size="icon"
                           className="h-6 w-6 text-destructive hover:text-destructive hover:bg-red-100"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation(); // Предотвращаем всплытие события клика
                             setScheduleToDelete(schedule.id);
                             setDeleteDialogOpen(true);
                           }}

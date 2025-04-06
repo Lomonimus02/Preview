@@ -16,7 +16,16 @@ import {
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, PlusIcon, ClockIcon, GraduationCapIcon, UsersIcon, FilterIcon } from "lucide-react";
+import { 
+  CalendarIcon, 
+  PlusIcon, 
+  ClockIcon, 
+  GraduationCapIcon, 
+  UsersIcon, 
+  FilterIcon, 
+  BookOpenIcon,
+  Building2Icon
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -111,10 +120,11 @@ const gradeFormSchema = insertGradeSchema.extend({
 export default function SchedulePage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { isSuperAdmin, isSchoolAdmin, isTeacher, isParent } = useRoleCheck();
+  const { isSuperAdmin, isSchoolAdmin, isTeacher, isParent, isStudent } = useRoleCheck();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [isClassStudentsDialogOpen, setIsClassStudentsDialogOpen] = useState(false);
+  const [isLessonDetailsOpen, setIsLessonDetailsOpen] = useState(false); // Состояние для модального окна деталей урока
   const [currentTab, setCurrentTab] = useState("1"); // 1 to 7 for days of week
   const [selectedSchedule, setSelectedSchedule] = useState<ScheduleType | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
@@ -433,8 +443,94 @@ export default function SchedulePage() {
               users={users}
               selectedDate={selectedDate}
               onDateChange={setSelectedDate}
+              onLessonClick={(schedule) => {
+                setSelectedSchedule(schedule);
+                setIsLessonDetailsOpen(true);
+              }}
             />
           </Card>
+          
+          {/* Модальное окно с деталями урока для учеников и родителей */}
+          <Dialog open={isLessonDetailsOpen} onOpenChange={setIsLessonDetailsOpen}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Информация об уроке</DialogTitle>
+                <DialogDescription>
+                  Детали выбранного урока
+                </DialogDescription>
+              </DialogHeader>
+              
+              {selectedSchedule && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-[20px_1fr] items-start gap-4">
+                    <ClockIcon className="h-5 w-5 text-primary" />
+                    <div>
+                      <h4 className="font-medium leading-none mb-1">Время проведения</h4>
+                      <p className="text-sm text-gray-500">
+                        {selectedSchedule.startTime} - {selectedSchedule.endTime}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-[20px_1fr] items-start gap-4">
+                    <BookOpenIcon className="h-5 w-5 text-primary" />
+                    <div>
+                      <h4 className="font-medium leading-none mb-1">Предмет</h4>
+                      <p className="text-sm text-gray-500">
+                        {getSubjectName(selectedSchedule.subjectId)}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-[20px_1fr] items-start gap-4">
+                    <UsersIcon className="h-5 w-5 text-primary" />
+                    <div>
+                      <h4 className="font-medium leading-none mb-1">Преподаватель</h4>
+                      <p className="text-sm text-gray-500">
+                        {getTeacherName(selectedSchedule.teacherId)}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-[20px_1fr] items-start gap-4">
+                    <Building2Icon className="h-5 w-5 text-primary" />
+                    <div>
+                      <h4 className="font-medium leading-none mb-1">Кабинет</h4>
+                      <p className="text-sm text-gray-500">
+                        {selectedSchedule.room || "Не указан"}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-[20px_1fr] items-start gap-4">
+                    <GraduationCapIcon className="h-5 w-5 text-primary" />
+                    <div>
+                      <h4 className="font-medium leading-none mb-1">Класс</h4>
+                      <p className="text-sm text-gray-500">
+                        {getClassName(selectedSchedule.classId)}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {/* Здесь можно добавить информацию о домашнем задании, если оно есть */}
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="font-medium leading-none mb-2">Домашнее задание</h4>
+                    <p className="text-sm text-gray-500">
+                      {Math.random() > 0.5 ? 
+                        "Прочитать параграф 10, выполнить упражнения 15-20" : 
+                        "Домашнее задание не задано"}
+                    </p>
+                  </div>
+                </div>
+              )}
+                
+              <DialogFooter className="mt-6">
+                <Button onClick={() => setIsLessonDetailsOpen(false)}>
+                  Закрыть
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           
           {/* Панель детализации */}
           {isTeacher() && selectedDate && (

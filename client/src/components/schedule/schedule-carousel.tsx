@@ -14,6 +14,7 @@ interface ScheduleCarouselProps {
   users: User[];
   selectedDate: Date | null;
   onDateChange: (date: Date | null) => void;
+  onLessonClick?: (schedule: ScheduleType) => void;
 }
 
 export function ScheduleCarousel({
@@ -23,6 +24,7 @@ export function ScheduleCarousel({
   users,
   selectedDate,
   onDateChange,
+  onLessonClick,
 }: ScheduleCarouselProps) {
   // Настройки карусели для плавной прокрутки без резких прыжков
   const [emblaRef, emblaApi] = useEmblaCarousel({
@@ -256,6 +258,7 @@ export function ScheduleCarousel({
                   subjects={subjects}
                   classes={classes}
                   users={users}
+                  onLessonClick={onLessonClick}
                 />
               </div>
             );
