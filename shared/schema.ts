@@ -93,6 +93,7 @@ export const homework = pgTable("homework", {
   subjectId: integer("subject_id").notNull(),
   classId: integer("class_id").notNull(),
   teacherId: integer("teacher_id").notNull(),
+  scheduleId: integer("schedule_id"), // Связь с уроком в расписании (опционально)
   dueDate: date("due_date").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

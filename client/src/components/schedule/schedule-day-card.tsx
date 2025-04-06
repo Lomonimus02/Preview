@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { FiClock, FiMapPin, FiUser, FiCheck, FiPlus, FiList, FiEdit3 } from "react-icons/fi";
 import { Schedule, User, Subject, Class, UserRoleEnum, Grade } from "@shared/schema";
+import { HomeworkForm } from "./homework-form";
 
 interface ScheduleItemProps {
   schedule: Schedule;
@@ -28,7 +29,7 @@ interface ScheduleItemProps {
   room: string;
   grades?: Grade[];
   isCompleted?: boolean;
-  onClick: () => void;
+  onClick: (e?: React.MouseEvent, actionType?: string) => void;
 }
 
 export const ScheduleItem: React.FC<ScheduleItemProps> = ({
@@ -56,11 +57,19 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           {schedule.startTime} - {schedule.endTime}
           <span className="ml-3 text-emerald-900">{subject?.name || "Предмет"}</span>
         </div>
-        <div>
+        <div 
+          className="cursor-pointer" 
+          onClick={(e) => {
+            e.stopPropagation(); // Предотвращаем всплытие события
+            if (onClick && typeof onClick === 'function') {
+              onClick(e, "homework");
+            }
+          }}
+        >
           {isCompleted ? (
             <FiCheck className="text-green-500 w-5 h-5" />
           ) : (
-            <FiPlus className="text-orange-500 w-5 h-5" />
+            <FiPlus className="text-orange-500 w-5 h-5" title="Добавить домашнее задание" />
           )}
         </div>
       </div>
@@ -171,9 +180,17 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     return [];
   };
 
-  const handleScheduleClick = (schedule: Schedule) => {
+  // Состояние для диалогового окна добавления домашнего задания
+  const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = useState(false);
+
+  const handleScheduleClick = (schedule: Schedule, actionType?: string) => {
     setSelectedSchedule(schedule);
-    setIsDetailsOpen(true);
+    
+    if (actionType === "homework" && isTeacher()) {
+      setIsHomeworkDialogOpen(true);
+    } else {
+      setIsDetailsOpen(true);
+    }
   };
 
   return (
@@ -215,7 +232,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   room={schedule.room || ""}
                   grades={getScheduleGrades(schedule)}
                   isCompleted={false} // Здесь можно добавить логику для определения завершенных уроков
-                  onClick={() => handleScheduleClick(schedule)}
+                  onClick={(e, actionType) => handleScheduleClick(schedule, actionType)}
                 />
               ))}
               {isAdmin && (
@@ -232,6 +249,30 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
           )}
         </CardContent>
       </Card>
+
+      {/* Диалог для создания домашнего задания */}
+      <Dialog open={isHomeworkDialogOpen} onOpenChange={setIsHomeworkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Добавить домашнее задание</DialogTitle>
+            <DialogDescription>
+              {selectedSchedule && (
+                <>
+                  Предмет: {getSubject(selectedSchedule.subjectId)?.name}, 
+                  Класс: {getClassName(selectedSchedule.classId)}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedSchedule && currentUser && isTeacher() && (
+            <HomeworkForm 
+              schedule={selectedSchedule}
+              onClose={() => setIsHomeworkDialogOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Диалог с детальной информацией об уроке */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
