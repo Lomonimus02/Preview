@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
+import { useLocation } from "wouter";
+import { useRoleCheck } from "@/hooks/use-role-check";
 import { 
   Card, 
   CardContent, 
@@ -16,8 +18,8 @@ import {
   DialogFooter 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FiClock, FiMapPin, FiUser, FiCheck, FiPlus } from "react-icons/fi";
-import { Schedule, User, Subject, Class } from "@shared/schema";
+import { FiClock, FiMapPin, FiUser, FiCheck, FiPlus, FiList, FiEdit3 } from "react-icons/fi";
+import { Schedule, User, Subject, Class, UserRoleEnum } from "@shared/schema";
 
 interface ScheduleItemProps {
   schedule: Schedule;
@@ -99,7 +101,9 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 }) => {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-
+  const [, navigate] = useLocation();
+  const { isTeacher } = useRoleCheck();
+  
   const formattedDate = format(date, "dd.MM", { locale: ru });
   const sortedSchedules = [...schedules].sort((a, b) => {
     const timeA = a.startTime.split(":").map(Number);
@@ -233,8 +237,8 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                 </div>
               </div>
               
-              {isAdmin && (
-                <DialogFooter className="flex justify-between gap-2 sm:justify-between">
+              <DialogFooter className="flex flex-wrap justify-between gap-2 sm:justify-between">
+                {isAdmin && (
                   <Button 
                     variant="destructive" 
                     size="sm"
@@ -247,11 +251,29 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   >
                     Удалить
                   </Button>
-                  <Button size="sm">
+                )}
+                
+                {isTeacher() && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => {
+                      navigate(`/class-grade-details/${selectedSchedule.classId}/${selectedSchedule.subjectId}`);
+                      setIsDetailsOpen(false);
+                    }}
+                  >
+                    <FiList className="mr-2" />
+                    Оценки класса
+                  </Button>
+                )}
+                
+                {isAdmin && (
+                  <Button size="sm" variant="outline">
+                    <FiEdit3 className="mr-2" />
                     Редактировать
                   </Button>
-                </DialogFooter>
-              )}
+                )}
+              </DialogFooter>
             </div>
           )}
         </DialogContent>
