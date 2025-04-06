@@ -122,7 +122,7 @@ export function ScheduleCard({
         </CardTitle>
       </CardHeader>
       
-      <CardContent className="p-3 h-full overflow-y-auto max-h-[500px]">
+      <CardContent className="p-3 h-full overflow-y-auto max-h-[350px]">
         {sortedSchedules.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <p>Нет занятий в этот день</p>

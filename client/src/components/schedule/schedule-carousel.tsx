@@ -30,96 +30,101 @@ export function ScheduleCarousel({
   onEditSchedule,
   onDeleteSchedule,
 }: ScheduleCarouselProps) {
-  // Number of days to display in carousel
-  const isDesktop = useMediaQuery("md");
-  const visibleDays = isDesktop ? 5 : 1;
+  // Количество дней для показа в карусели с учетом размера экрана
+  const isDesktop = useMediaQuery("(min-width: 1200px)");
+  const isTablet = useMediaQuery("(min-width: 768px)");
+  const isMobile = useMediaQuery("(min-width: 480px)");
   
-  // Current date (today)
+  const visibleDays = isDesktop ? 4 : isTablet ? 3 : isMobile ? 2 : 1;
+  
+  // Текущая дата (сегодня)
   const today = new Date();
   
-  // State for dates in carousel
+  // Состояние для дат в карусели
   const [dates, setDates] = useState<Date[]>([]);
   
-  // State for carousel index
+  // Состояние для индекса карусели
   const [currentIndex, setCurrentIndex] = useState(0);
   
-  // State for tracking if we're swiping
+  // Отслеживание состояния свайпа
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
-  const dragThreshold = 50; // Minimum drag distance to trigger swipe
+  const dragThreshold = 50; // Минимальное расстояние для свайпа
   
-  // Ref for the carousel container
+  // Референс для контейнера карусели
   const carouselRef = useRef<HTMLDivElement>(null);
   
-  // Initialize dates for the carousel
+  // Инициализация дат для карусели
   useEffect(() => {
     const initDates = [];
-    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Start from Monday
+    const weekStart = startOfWeek(today, { weekStartsOn: 1 }); // Начинаем с понедельника
     
-    for (let i = 0; i < 7; i++) {
+    // Создаем массив из 14 дней (2 недели) для более плавной навигации
+    for (let i = 0; i < 14; i++) {
       initDates.push(addDays(weekStart, i));
     }
     
     setDates(initDates);
     
-    // Check if selected date is in current week, otherwise navigate to its week
+    // Проверяем, есть ли выбранная дата в текущем наборе дат
     const selectedDateIndex = initDates.findIndex(date => 
       isSameDay(date, selectedDate)
     );
     
     if (selectedDateIndex === -1) {
-      // If not in current week, navigate to the week containing the selected date
+      // Если нет, переходим к неделе, содержащей выбранную дату
       navigateToDate(selectedDate);
     } else {
-      // Set current index to show the selected date
+      // Устанавливаем индекс, чтобы показать выбранную дату по центру
       setCurrentIndex(Math.max(0, selectedDateIndex - Math.floor(visibleDays / 2)));
     }
   }, [selectedDate, visibleDays]);
   
-  // Navigate to specific date
+  // Переход на конкретную дату
   const navigateToDate = (date: Date) => {
     const weekStart = startOfWeek(date, { weekStartsOn: 1 });
     const newDates = [];
     
-    for (let i = 0; i < 7; i++) {
+    // Создаем массив из 14 дней (2 недели) для более плавной навигации
+    for (let i = -7; i < 7; i++) {
       newDates.push(addDays(weekStart, i));
     }
     
     setDates(newDates);
     
-    // Find selected date index in new dates
+    // Находим индекс выбранной даты в новом наборе
     const selectedDateIndex = newDates.findIndex(d => 
       isSameDay(d, date)
     );
     
     if (selectedDateIndex !== -1) {
-      // Set current index to show the selected date
+      // Устанавливаем индекс, чтобы показать выбранную дату по центру
       setCurrentIndex(Math.max(0, selectedDateIndex - Math.floor(visibleDays / 2)));
     } else {
-      setCurrentIndex(0);
+      setCurrentIndex(7); // По умолчанию показываем начало текущей недели (индекс 7 в массиве из 14 дней)
     }
   };
   
-  // Navigate to next or previous set of days
+  // Переход к следующему или предыдущему набору дней (неделе)
   const navigate = (direction: 'prev' | 'next') => {
     if (direction === 'prev') {
       const newDates = dates.map(date => subDays(date, 7));
       setDates(newDates);
-      setCurrentIndex(0);
+      setCurrentIndex(Math.max(0, currentIndex - 2)); // Сдвигаем индекс для более плавного перехода
     } else {
       const newDates = dates.map(date => addDays(date, 7));
       setDates(newDates);
-      setCurrentIndex(0);
+      setCurrentIndex(Math.min(currentIndex + 2, Math.max(0, dates.length - visibleDays))); // Сдвигаем индекс для более плавного перехода
     }
   };
   
-  // Navigate to next or previous day/week
+  // Навигация по карусели вперед и назад
   const navigateCarousel = (direction: 'prev' | 'next') => {
     if (direction === 'prev') {
       if (currentIndex > 0) {
         setCurrentIndex(prevIndex => prevIndex - 1);
       } else {
-        // If at the start of the week, go to previous week
+        // Если в начале массива, переходим к предыдущей неделе
         navigate('prev');
       }
     } else {
@@ -127,59 +132,60 @@ export function ScheduleCarousel({
       if (currentIndex < maxIndex) {
         setCurrentIndex(prevIndex => prevIndex + 1);
       } else {
-        // If at the end of the week, go to next week
+        // Если в конце массива, переходим к следующей неделе
         navigate('next');
       }
     }
   };
   
-  // Handle date selection
+  // Обработка выбора даты
   const handleDateSelect = (date: Date) => {
     onDateSelect(date);
   };
   
-  // Get day name with first letter capitalized
+  // Получение названия дня с заглавной буквы
   const getDayName = (date: Date) => {
     return format(date, 'EEEE', { locale: ru });
   };
   
-  // Get visible dates based on current index
+  // Получение видимых дат на основе текущего индекса
   const getVisibleDates = () => {
-    return dates.slice(currentIndex, currentIndex + visibleDays);
+    // Возвращаем все даты для возможности горизонтальной прокрутки
+    return dates;
   };
   
-  // Filter schedules for a specific date
+  // Фильтрация расписаний для конкретной даты
   const getSchedulesForDate = (date: Date) => {
-    const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay(); // Convert Sunday (0) to 7
+    const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay(); // Воскресенье (0) преобразуем в 7
     
     return schedules.filter(schedule => {
-      // Check if it's a specific date schedule
+      // Проверяем, является ли это расписанием для конкретной даты
       if (schedule.scheduleDate) {
         const scheduleDate = new Date(schedule.scheduleDate);
         return isSameDay(scheduleDate, date);
       }
       
-      // Otherwise check day of week
+      // Иначе проверяем день недели
       return schedule.dayOfWeek === dayOfWeek;
     });
   };
   
-  // Handle mouse wheel scrolling
+  // Обработка колесика мыши для прокрутки
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-        // Horizontal scrolling
-        if (e.deltaX > 10) {
-          navigateCarousel('next');
-        } else if (e.deltaX < -10) {
-          navigateCarousel('prev');
-        }
+      e.preventDefault(); // Предотвращаем стандартную прокрутку страницы
+      
+      // Реагируем как на вертикальную, так и на горизонтальную прокрутку
+      if (e.deltaY > 20 || e.deltaX > 20) {
+        navigateCarousel('next');
+      } else if (e.deltaY < -20 || e.deltaX < -20) {
+        navigateCarousel('prev');
       }
     };
     
     const carousel = carouselRef.current;
     if (carousel) {
-      carousel.addEventListener('wheel', handleWheel);
+      carousel.addEventListener('wheel', handleWheel, { passive: false });
     }
     
     return () => {
@@ -189,7 +195,7 @@ export function ScheduleCarousel({
     };
   }, [currentIndex, dates.length, visibleDays]);
   
-  // Handle touch events for mobile swiping
+  // Обработка событий касания для мобильного свайпа
   const handleTouchStart = (e: React.TouchEvent) => {
     setIsDragging(true);
     setDragStartX(e.touches[0].clientX);
@@ -215,7 +221,7 @@ export function ScheduleCarousel({
     setIsDragging(false);
   };
   
-  // Handle mouse events for desktop dragging
+  // Обработка событий мыши для перетаскивания на десктопе
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
     setDragStartX(e.clientX);
@@ -241,26 +247,33 @@ export function ScheduleCarousel({
     setIsDragging(false);
   };
   
-  // Navigation to current week
+  // Навигация к текущей неделе
   const goToCurrentWeek = () => {
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
     const newDates = [];
     
-    for (let i = 0; i < 7; i++) {
+    // Создаем массив из 14 дней (2 недели)
+    for (let i = -3; i < 11; i++) {
       newDates.push(addDays(weekStart, i));
     }
     
     setDates(newDates);
-    setCurrentIndex(0);
+    // Устанавливаем индекс, чтобы показать сегодняшнюю дату
+    const todayIndex = newDates.findIndex(date => isSameDay(date, new Date()));
+    if (todayIndex !== -1) {
+      setCurrentIndex(Math.max(0, todayIndex - Math.floor(visibleDays / 2)));
+    } else {
+      setCurrentIndex(4); // Позиция понедельника текущей недели
+    }
     
-    // Select today's date
+    // Выбираем сегодняшнюю дату
     onDateSelect(new Date());
   };
   
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => navigate('prev')}>
             <ChevronLeft className="h-4 w-4" />
             Пред. неделя
@@ -282,8 +295,7 @@ export function ScheduleCarousel({
         
         <div className="flex items-center gap-1 text-muted-foreground text-sm">
           <MoveHorizontal className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Прокрутите колесом мыши или</span>
-          <span>свайпните для навигации</span>
+          <span>Прокрутите для навигации</span>
         </div>
       </div>
 
@@ -291,15 +303,14 @@ export function ScheduleCarousel({
         <Button
           variant="ghost"
           size="icon"
-          className="absolute -left-12 top-1/2 transform -translate-y-1/2 h-8 w-8 hidden md:flex"
+          className="absolute -left-10 top-1/2 transform -translate-y-1/2 h-8 w-8 hidden md:flex z-10"
           onClick={() => navigateCarousel('prev')}
-          disabled={currentIndex === 0 && dates[0] && dates[0].getTime() <= startOfWeek(today, { weekStartsOn: 1 }).getTime()}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
 
         <div
-          className="overflow-hidden"
+          className="relative overflow-x-auto pb-4 schedule-carousel"
           ref={carouselRef}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
@@ -308,21 +319,18 @@ export function ScheduleCarousel({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          style={{
+            scrollbarWidth: 'none', // Firefox
+            msOverflowStyle: 'none', // IE
+          }}
         >
-          <motion.div
-            className="flex gap-4 cursor-grab active:cursor-grabbing"
-            initial={false}
-            animate={{ x: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.1}
-            onDragEnd={(_, info) => {
-              if (info.offset.x > dragThreshold) {
-                navigateCarousel('prev');
-              } else if (info.offset.x < -dragThreshold) {
-                navigateCarousel('next');
-              }
+          {/* Стили для скрытия полосы прокрутки добавлены в основные стили компонента */}
+          <div
+            className="flex gap-4 snap-x snap-mandatory"
+            style={{
+              width: `${dates.length * 100}%`,
+              transform: `translateX(-${(currentIndex / dates.length) * 100}%)`,
+              transition: 'transform 0.3s ease-in-out',
             }}
           >
             {getVisibleDates().map((date, index) => {
@@ -333,12 +341,13 @@ export function ScheduleCarousel({
               return (
                 <div
                   key={date.toISOString()}
-                  className={`flex-shrink-0 w-full md:w-[calc(${100 / visibleDays}%-${(4 * (visibleDays - 1)) / visibleDays}px)]`}
+                  className={`snap-start flex-shrink-0`}
+                  style={{ width: `calc(100% / ${visibleDays})` }}
                   onClick={() => handleDateSelect(date)}
                 >
                   <div 
                     className={`
-                      h-full cursor-pointer transition-all
+                      h-full cursor-pointer transition-all mx-1
                       ${isSelected ? 'ring-2 ring-primary rounded-lg ring-offset-2' : ''}
                     `}
                   >
@@ -357,25 +366,24 @@ export function ScheduleCarousel({
                 </div>
               );
             })}
-          </motion.div>
+          </div>
         </div>
 
         <Button
           variant="ghost"
           size="icon"
-          className="absolute -right-12 top-1/2 transform -translate-y-1/2 h-8 w-8 hidden md:flex"
+          className="absolute -right-10 top-1/2 transform -translate-y-1/2 h-8 w-8 hidden md:flex z-10"
           onClick={() => navigateCarousel('next')}
-          disabled={currentIndex === Math.max(0, dates.length - visibleDays)}
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
 
-      <div className="flex justify-center gap-1 mt-2">
-        {dates.map((date, index) => (
+      <div className="flex justify-center flex-wrap gap-1 mt-2">
+        {dates.slice(0, 14).map((date, index) => (
           <button
             key={index}
-            className={`h-1.5 rounded-full transition-all ${
+            className={`h-2 rounded-full transition-all ${
               index >= currentIndex && index < currentIndex + visibleDays
                 ? isSameDay(date, selectedDate)
                   ? "w-6 bg-primary"
