@@ -64,6 +64,8 @@ const gradeFormSchema = z.object({
   gradeType: z.string({
     required_error: "Укажите тип оценки",
   }),
+  // Добавляем поле для даты (необязательное, будет устанавливаться программно)
+  date: z.string().optional(),
 });
 
 export default function ClassGradeDetailsPage() {
@@ -214,7 +216,7 @@ export default function ClassGradeDetailsPage() {
         grade: newGradeData.grade!,
         comment: newGradeData.comment || "",
         gradeType: newGradeData.gradeType || "Текущая",
-        createdAt: createdAt.toISOString(),
+        createdAt: createdAt.toISOString(), // Используем указанную выше дату (из selectedDate или текущую)
       };
       
       // Оптимистично обновляем кеш react-query
@@ -401,6 +403,7 @@ export default function ClassGradeDetailsPage() {
       grade: undefined,
       comment: "",
       gradeType: "Текущая",
+      date: date, // Важно: передаем дату в форму
     });
     
     setIsGradeDialogOpen(true);
