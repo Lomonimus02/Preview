@@ -240,6 +240,20 @@ export default function SchedulePage() {
       // Также запрашиваем обновление с сервера
       queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
       
+      // Принудительно обновляем карусель, чтобы отобразить новый урок
+      // Если выбранная дата совпадает с днем недели нового урока, обновим UI
+      if (selectedDate) {
+        // Получаем день недели из даты (1-7, где 1 - понедельник, 7 - воскресенье)
+        const day = selectedDate.getDay();
+        const dayOfWeekFromDate = day === 0 ? 7 : day; // Преобразуем в формат 1-7 для понедельника-воскресенья
+        
+        if (dayOfWeekFromDate === newSchedule.dayOfWeek) {
+          // Создаем копию даты чтобы вызвать обновление состояния
+          const refreshDate = new Date(selectedDate);
+          setSelectedDate(refreshDate);
+        }
+      }
+      
       // Закрываем диалог и сбрасываем форму
       setIsAddDialogOpen(false);
       form.reset();
@@ -314,6 +328,18 @@ export default function SchedulePage() {
     addGradeMutation.mutate(values);
   };
   
+  // Получаем данные о связях студент-класс
+  const { data: studentClassAssignments = [] } = useQuery({
+    queryKey: ['/api/student-class-assignments'],
+    queryFn: async () => {
+      const res = await fetch('/api/student-class-assignments');
+      if (!res.ok) throw new Error("Не удалось загрузить связи студент-класс");
+      return res.json();
+    },
+    enabled: !!user && isParent(),
+    staleTime: 5 * 60 * 1000 // Кэшируем на 5 минут
+  });
+
   // Функция фильтрации расписания в зависимости от роли и выбранного ребенка
   const getFilteredSchedules = (): ScheduleType[] => {
     // Если пользователь - родитель и выбран ребенок
@@ -322,14 +348,17 @@ export default function SchedulePage() {
       const selectedChild = users.find(u => u.id === selectedChildId);
       
       if (selectedChild?.schoolId) {
-        // Получаем классы выбранного ребенка в его школе
-        const studentClasses = classes.filter(c => c.schoolId === selectedChild.schoolId);
-        
         // Получаем записи ученик-класс для выбранного ребенка
-        const childClassAssignments = studentClassAssignments.filter(sca => sca.studentId === selectedChildId);
+        const childClassAssignments = studentClassAssignments.filter(
+          (sca: {studentId: number, classId: number}) => sca.studentId === selectedChildId
+        );
         
         // Находим ID классов, к которым прикреплен выбранный ребенок
-        const childClassIds = childClassAssignments.map(sca => sca.classId);
+        const childClassIds = childClassAssignments.map(
+          (sca: {studentId: number, classId: number}) => sca.classId
+        );
+        
+        console.log('Классы выбранного ребенка:', childClassIds);
         
         // Фильтруем расписание по классам ребенка
         return schedules.filter(schedule => 

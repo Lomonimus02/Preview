@@ -203,18 +203,30 @@ export function ScheduleCarousel({
     // Проверяем что день в диапазоне 1-7
     const validDay = day >= 1 && day <= 7 ? day : 1;
     
-    return schedules.filter(schedule => {
+    console.log(`Filtering schedules for day ${validDay}, date ${date.toISOString()}`);
+    console.log(`Total schedules before filtering:`, schedules.length);
+    
+    const filteredSchedules = schedules.filter(schedule => {
       // Проверяем совпадение по дню недели
       if (schedule.dayOfWeek !== validDay) return false;
       
       // Если есть конкретная дата в расписании, проверяем её
       if (schedule.scheduleDate) {
         const scheduleDate = new Date(schedule.scheduleDate);
-        return isSameDay(scheduleDate, date);
+        const result = isSameDay(scheduleDate, date);
+        return result;
       }
       
       return true;
     });
+    
+    console.log(`Filtered schedules for day ${validDay}:`, filteredSchedules.length);
+    // Добавляем детальную информацию о каждом уроке в лог
+    filteredSchedules.forEach((schedule, index) => {
+      console.log(`Schedule ${index+1}: subject=${schedule.subjectId}, class=${schedule.classId}, dayOfWeek=${schedule.dayOfWeek}`);
+    });
+    
+    return filteredSchedules;
   };
   
   return (
