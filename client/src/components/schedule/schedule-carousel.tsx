@@ -82,8 +82,20 @@ export function ScheduleCarousel({
   // Устанавливаем начальный индекс при изменении currentDayIndex
   useEffect(() => {
     if (!emblaApi) return;
-    emblaApi.scrollTo(currentDayIndex);
+    
+    // Используем requestAnimationFrame для плавного перехода
+    requestAnimationFrame(() => {
+      emblaApi.scrollTo(currentDayIndex);
+    });
   }, [emblaApi, currentDayIndex, weekOffset]);
+  
+  // Предварительно загружаем данные для всех дней недели
+  useEffect(() => {
+    // Принудительно инициализируем все дни и их содержимое
+    if (emblaApi) {
+      emblaApi.reInit();
+    }
+  }, [emblaApi, weekDays, weekOffset]);
   
   // Обработчики переключения недель
   const goToPrevWeek = () => {
@@ -94,8 +106,14 @@ export function ScheduleCarousel({
     setWeekOffset(prev => prev + 1);
   };
   
-  // Обработчик клика по дню - обновляет выбранную дату
-  const handleDayClick = (date: Date) => {
+  // Обработчик клика по дню - обновляет выбранную дату и активный индекс
+  const handleDayClick = (date: Date, index: number) => {
+    // Устанавливаем индекс текущего дня при клике
+    if (emblaApi) {
+      emblaApi.scrollTo(index);
+    }
+    
+    // Обновляем выбранную дату в родительском компоненте
     onDateChange(date);
   };
   
@@ -160,7 +178,7 @@ export function ScheduleCarousel({
               <div 
                 key={index} 
                 className="min-w-[300px] flex-[0_0_300px] md:min-w-[350px] md:flex-[0_0_350px] h-[580px] cursor-pointer"
-                onClick={() => handleDayClick(date)}
+                onClick={() => handleDayClick(date, index)}
               >
                 <DayCard
                   day={day}

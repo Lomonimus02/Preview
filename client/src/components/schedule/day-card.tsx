@@ -79,14 +79,22 @@ export function DayCard({
   // Определяем анимацию карточки относительно активной карточки
   const getCardAnimation = () => {
     if (activeCardIndex === undefined || cardIndex === undefined) {
-      return {};
+      return {
+        scale: 1,
+        opacity: 1,
+        transition: { duration: 0.2, ease: "easeInOut" }
+      };
     }
 
     const distance = cardIndex - activeCardIndex;
     return {
       scale: isActive ? 1 : 0.95 - Math.abs(distance) * 0.02,
       opacity: isActive ? 1 : 0.9 - Math.abs(distance) * 0.1,
-      transition: { duration: 0.3, ease: "easeInOut" }
+      transition: { 
+        duration: 0.25, 
+        ease: "easeOut",
+        opacity: { duration: 0.15 }
+      }
     };
   };
 
