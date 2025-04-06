@@ -185,16 +185,18 @@ export function DayCard({
           isHovered ? "border-primary border-2" : "border"
         }`}
       >
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-xl">{dayName}</CardTitle>
-            {formattedDate && (
-              <Badge variant="secondary" className="font-normal">
-                {formattedDate}
-              </Badge>
-            )}
+        <CardHeader className="pb-2 day-header">
+          <div className="flex justify-between items-center day-header">
+            <div className="day-header">
+              <CardTitle className="text-xl day-header">{dayName}</CardTitle>
+              {formattedDate && (
+                <Badge variant="secondary" className="font-normal day-header">
+                  <span className="day-header">{formattedDate}</span>
+                </Badge>
+              )}
+            </div>
           </div>
-          <div className="text-sm opacity-80">{lessonsCount} уроков</div>
+          <div className="text-sm opacity-80 day-header">{lessonsCount} уроков</div>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="space-y-2">

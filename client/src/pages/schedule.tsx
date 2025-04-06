@@ -318,15 +318,26 @@ export default function SchedulePage() {
   const getFilteredSchedules = (): ScheduleType[] => {
     // Если пользователь - родитель и выбран ребенок
     if (isParent() && selectedChildId) {
-      // Получаем классы выбранного ребенка
-      const studentClasses = users.find(u => u.id === selectedChildId)?.schoolId
-        ? classes.filter(c => c.schoolId === users.find(u => u.id === selectedChildId)?.schoolId)
-        : [];
+      // Находим данные выбранного ребенка
+      const selectedChild = users.find(u => u.id === selectedChildId);
       
-      // Фильтруем расписание по классам ребенка
-      return schedules.filter(schedule => 
-        studentClasses.some(cls => cls.id === schedule.classId)
-      );
+      if (selectedChild?.schoolId) {
+        // Получаем классы выбранного ребенка в его школе
+        const studentClasses = classes.filter(c => c.schoolId === selectedChild.schoolId);
+        
+        // Получаем записи ученик-класс для выбранного ребенка
+        const childClassAssignments = studentClassAssignments.filter(sca => sca.studentId === selectedChildId);
+        
+        // Находим ID классов, к которым прикреплен выбранный ребенок
+        const childClassIds = childClassAssignments.map(sca => sca.classId);
+        
+        // Фильтруем расписание по классам ребенка
+        return schedules.filter(schedule => 
+          childClassIds.includes(schedule.classId)
+        );
+      }
+      
+      return [];
     }
     
     // Для учителей

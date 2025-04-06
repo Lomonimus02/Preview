@@ -169,19 +169,25 @@ export function ScheduleCarousel({
   };
   
   // Обработчик клика по дню с предотвращением резких скачков
-  const handleDayClick = (date: Date, index: number) => {
-    // Обновляем выбранную дату в родительском компоненте
-    // без запроса новых данных (данные уже загружены для всей недели)
-    onDateChange(date);
-    setSelectedIndex(index);
+  const handleDayClick = (date: Date, index: number, event: React.MouseEvent) => {
+    // Проверяем, что клик был именно по заголовку дня, а не по всей карточке
+    // это предотвращает переключение при взаимодействии с содержимым карточки
+    const target = event.target as HTMLElement;
+    const isHeaderClick = target.closest('.day-header');
     
-    // Плавно скроллим карусель к выбранной карточке без анимации
-    // чтобы предотвратить визуальный скачок
-    if (emblaApi) {
-      // Отложенное выполнение для предотвращения конфликтов с другими обработчиками
-      setTimeout(() => {
-        emblaApi.scrollTo(index, false);
-      }, 10);
+    // Обновляем выбранную дату и скроллим только если клик был по заголовку
+    if (isHeaderClick) {
+      // Обновляем выбранную дату в родительском компоненте
+      onDateChange(date);
+      setSelectedIndex(index);
+      
+      // Плавно скроллим карусель к выбранной карточке без анимации
+      if (emblaApi) {
+        // Отложенное выполнение для предотвращения конфликтов с другими обработчиками
+        setTimeout(() => {
+          emblaApi.scrollTo(index, false);
+        }, 10);
+      }
     }
   };
   
@@ -249,7 +255,7 @@ export function ScheduleCarousel({
               <div 
                 key={index} 
                 className="min-w-[300px] flex-[0_0_300px] md:min-w-[350px] md:flex-[0_0_350px] h-[580px] cursor-pointer"
-                onClick={() => handleDayClick(date, index)}
+                onClick={(event) => handleDayClick(date, index, event)}
               >
                 <DayCard
                   day={day}
