@@ -658,18 +658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Forbidden" });
       }
     } else if (req.user.role === UserRoleEnum.STUDENT) {
-      // Студент видит свои оценки
       grades = await dataStorage.getGradesByStudent(req.user.id);
-    } else if (req.user.role === UserRoleEnum.PARENT) {
-      // Родитель видит оценки всех своих детей
-      const parentStudents = await dataStorage.getParentStudents(req.user.id);
-      if (parentStudents.length > 0) {
-        // Собираем оценки всех детей
-        for (const relation of parentStudents) {
-          const childGrades = await dataStorage.getGradesByStudent(relation.studentId);
-          grades = [...grades, ...childGrades];
-        }
-      }
     }
     
     res.json(grades);
@@ -1219,37 +1208,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     return res.status(400).json({ message: "Either parentId or studentId must be provided" });
-  });
-  
-  // GET parent-children - получение информации о детях для родителя
-  app.get("/api/parent-children", isAuthenticated, async (req, res) => {
-    // Проверяем, что пользователь - родитель
-    if (req.user.role !== UserRoleEnum.PARENT) {
-      return res.status(403).json({ message: "Only parent users can access this endpoint" });
-    }
-    
-    try {
-      // Получаем связи родитель-ученик
-      const parentStudents = await dataStorage.getParentStudents(req.user.id);
-      
-      if (parentStudents.length === 0) {
-        return res.json([]);
-      }
-      
-      // Получаем полную информацию о каждом ребенке
-      const children = [];
-      for (const relation of parentStudents) {
-        const student = await dataStorage.getUser(relation.studentId);
-        if (student) {
-          children.push(student);
-        }
-      }
-      
-      return res.json(children);
-    } catch (error) {
-      console.error("Error fetching parent's children:", error);
-      return res.status(500).json({ message: "Failed to fetch children data" });
-    }
   });
 
   // User roles API
