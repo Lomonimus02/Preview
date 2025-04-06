@@ -143,13 +143,13 @@ export default function ClassGradeDetailsPage() {
   // Get unique dates from schedules for this class and subject
   const lessonDates = useMemo(() => {
     const dates = schedules
-      .filter(s => s.scheduleDate) // Filter out schedules without date
+      .filter(s => s.scheduleDate && s.subjectId === subjectId) // Filter schedules for this subject only
       .map(s => s.scheduleDate)
       .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
     
     // Remove duplicates
     return [...new Set(dates)];
-  }, [schedules]);
+  }, [schedules, subjectId]);
   
   // Группируем расписания учителя по предметам
   const schedulesBySubject = useMemo(() => {
@@ -332,19 +332,25 @@ export default function ClassGradeDetailsPage() {
     }
   };
   
-  // Get student grades for a specific date
+  // Get student grades for a specific date for the current subject
   const getStudentGradeForDate = (studentId: number, date: string) => {
     const dateObj = new Date(date);
-    // Сравниваем только дату (без времени)
+    // Фильтруем оценки по студенту, предмету и дате
     return grades.filter(g => 
       g.studentId === studentId && 
+      g.subjectId === subjectId && // Добавляем фильтр по предмету
       g.createdAt && new Date(g.createdAt).toDateString() === dateObj.toDateString()
     );
   };
   
-  // Calculate average grade for a student
+  // Calculate average grade for a student for the current subject
   const calculateAverageGrade = (studentId: number) => {
-    const studentGrades = grades.filter(g => g.studentId === studentId);
+    // Фильтруем только оценки для текущего предмета
+    const studentGrades = grades.filter(g => 
+      g.studentId === studentId && 
+      g.subjectId === subjectId
+    );
+    
     if (studentGrades.length === 0) return "-";
     
     const sum = studentGrades.reduce((total, g) => total + g.grade, 0);

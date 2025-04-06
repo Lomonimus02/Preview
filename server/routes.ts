@@ -625,13 +625,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      grades = await dataStorage.getGradesByStudent(studentId);
+      // Если указан также subjectId, фильтруем оценки по предмету
+      if (req.query.subjectId) {
+        const subjectId = parseInt(req.query.subjectId as string);
+        const allGrades = await dataStorage.getGradesByStudent(studentId);
+        grades = allGrades.filter(grade => grade.subjectId === subjectId);
+      } else {
+        grades = await dataStorage.getGradesByStudent(studentId);
+      }
     } else if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
       
       // Teachers, school admins, principals, and vice principals can view class grades
       if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
-        grades = await dataStorage.getGradesByClass(classId);
+        // Если указан также subjectId, фильтруем оценки по предмету и классу
+        if (req.query.subjectId) {
+          const subjectId = parseInt(req.query.subjectId as string);
+          const classGrades = await dataStorage.getGradesByClass(classId);
+          grades = classGrades.filter(grade => grade.subjectId === subjectId);
+        } else {
+          grades = await dataStorage.getGradesByClass(classId);
+        }
+      } else {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+    } else if (req.query.subjectId) {
+      // Если указан только subjectId, получаем все оценки по этому предмету
+      const subjectId = parseInt(req.query.subjectId as string);
+      if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+        grades = await dataStorage.getGradesBySubject(subjectId);
       } else {
         return res.status(403).json({ message: "Forbidden" });
       }
