@@ -109,15 +109,15 @@ export function ScheduleCard({
   
   return (
     <Card className={cn(
-      "h-full w-full min-w-[270px] overflow-hidden",
-      isCurrentDate ? "bg-[#4CAF50] text-white" : "bg-white shadow-sm"
+      "h-full w-full min-w-[270px] max-w-[350px] mx-auto overflow-hidden border-0 shadow-sm",
+      isCurrentDate ? "bg-[#4CAF50] text-white" : "bg-white"
     )}>
-      <CardHeader className="py-4 px-4 text-center">
+      <CardHeader className="py-4 px-4 text-center border-b border-gray-100">
         <CardTitle className="flex flex-col items-center justify-center">
           <span className="text-lg font-medium">{dayName}</span>
           <span className={cn(
-            "text-sm", 
-            isCurrentDate ? "text-white/80" : "text-muted-foreground"
+            "text-sm mt-1", 
+            isCurrentDate ? "text-white/90" : "text-muted-foreground"
           )}>
             {format(date, "dd.MM", { locale: ru })}
           </span>
@@ -135,12 +135,12 @@ export function ScheduleCard({
         ) : (
           <div>
             <div className={cn(
-              "px-4 py-2 text-sm border-t border-b",
-              isCurrentDate ? "text-white/80 border-white/20" : "text-muted-foreground border-gray-100"
+              "px-4 py-2 text-sm",
+              isCurrentDate ? "text-white/80 border-b border-white/20" : "text-muted-foreground border-b border-gray-100"
             )}>
               {sortedSchedules.length} уроков
             </div>
-            <div className="space-y-0">
+            <div>
               {sortedSchedules.map((schedule, index) => {
                 // Определяем класс фона для полос (чередование)
                 const isEvenRow = index % 2 === 0;
@@ -148,58 +148,66 @@ export function ScheduleCard({
                   ? isEvenRow ? "bg-[#4CAF50]" : "bg-[#4CAF50]/90"
                   : isEvenRow ? "bg-white" : "bg-[#f9f9f9]";
                 
-                // Определяем иконку кнопки (чек или плюс)
-                const isCompleted = index % 3 === 1; // Условная логика
+                // Определяем состояние задания (с права в карточке будет отметка о выполнении или плюс)
+                // На примере: чередуем статусы для демонстрации
+                const completionStatus = index % 3; // 0 = плюс, 1 = отметка, 2 = нет кнопки
+                
+                // Определяем букву класса для предмета (П, В, С как на изображении)
+                const classSuffix = isCurrentDate ? "C" : date.getDay() % 2 === 0 ? "В" : "П";
                 
                 return (
                   <div 
                     key={schedule.id}
                     className={cn(
                       bgColorClass,
-                      "group py-2 px-3 border-b last:border-b-0 schedule-item hover:bg-opacity-95 transition-colors",
+                      "schedule-item hover:bg-opacity-95 transition-colors border-b last:border-b-0",
                       isCurrentDate ? "border-white/10" : "border-gray-100"
                     )}
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">
-                          {schedule.startTime} - {schedule.endTime}
+                    <div className="px-4 py-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">
+                            {schedule.startTime} - {schedule.endTime}
+                          </div>
+                          <div className={cn(
+                            "text-base font-semibold mt-0.5",
+                            isCurrentDate ? "" : "text-slate-800"
+                          )}>
+                            {getSubjectName(schedule.subjectId)} {classSuffix}
+                          </div>
+                          <div className={cn(
+                            "text-xs mt-1",
+                            isCurrentDate ? "text-white/70" : "text-slate-500"
+                          )}>
+                            Кабинет: {schedule.room} | Учитель {(schedule.teacherId % 9) + 1}
+                          </div>
                         </div>
-                        <div className={cn(
-                          "text-base font-semibold mt-0.5",
-                          isCurrentDate ? "" : "text-slate-800"
-                        )}>
-                          {getSubjectName(schedule.subjectId)} {getClassLetter()}
-                        </div>
-                        <div className={cn(
-                          "text-xs mt-1",
-                          isCurrentDate ? "text-white/70" : "text-slate-500"
-                        )}>
-                          Кабинет: {schedule.room || 100} | {getTeacherName(schedule.teacherId)}
-                        </div>
+                        
+                        {completionStatus !== 2 && (
+                          <Button
+                            variant={isCurrentDate ? "ghost" : "outline"}
+                            size="icon"
+                            className={cn(
+                              "h-6 w-6 rounded-full",
+                              isCurrentDate 
+                                ? completionStatus === 1 ? "bg-white text-green-600" : "bg-white/20 hover:bg-white/30 text-white" 
+                                : completionStatus === 1 ? "bg-[#4CAF50] text-white" : "bg-white border-gray-200"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditSchedule(schedule);
+                            }}
+                          >
+                            {completionStatus === 1 ? (
+                              <Check className="h-3.5 w-3.5" />
+                            ) : (
+                              <Plus className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
+                        )}
                       </div>
-                      
-                      <Button
-                        variant={isCurrentDate ? "ghost" : "outline"}
-                        size="icon"
-                        className={cn(
-                          "h-6 w-6 rounded-full",
-                          isCurrentDate 
-                            ? isCompleted ? "bg-white text-green-600" : "bg-white/20 hover:bg-white/30 text-white" 
-                            : isCompleted ? "bg-[#4CAF50] text-white" : "bg-white border-gray-200"
-                        )}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditSchedule(schedule);
-                        }}
-                      >
-                        {isCompleted ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : (
-                          <Plus className="h-3.5 w-3.5" />
-                        )}
-                      </Button>
                     </div>
                     
                     <Dialog open={dialogOpen && selectedSchedule?.id === schedule.id} onOpenChange={setDialogOpen}>

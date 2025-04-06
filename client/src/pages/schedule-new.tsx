@@ -236,11 +236,60 @@ export default function ScheduleNew() {
     ? classes 
     : schedules.filter(schedule => schedule.teacherId === user?.id).map(schedule => schedule.classId);
   
+  // Генерируем мок-данные для дней, где нет расписания
+  const generateDemoSchedulesForDay = (dayOfWeek: number): Schedule[] => {
+    // Базовые предметы из изображения с их временем
+    const subjectTemplates = [
+      { name: "Математика", startTime: "08:30", endTime: "09:15", room: "100", teacherId: 1 },
+      { name: "Русский язык", startTime: "09:25", endTime: "10:10", room: "101", teacherId: 2 },
+      { name: "Физика", startTime: "10:20", endTime: "11:05", room: "102", teacherId: 3 },
+      { name: "Химия", startTime: "11:15", endTime: "12:00", room: "103", teacherId: 4 },
+      { name: "Биология", startTime: "12:10", endTime: "12:55", room: "104", teacherId: 5 },
+      { name: "История", startTime: "13:05", endTime: "13:50", room: "105", teacherId: 6 },
+      { name: "География", startTime: "14:00", endTime: "14:45", room: "106", teacherId: 7 },
+      { name: "Английский язык", startTime: "14:55", endTime: "15:40", room: "107", teacherId: 8 },
+      { name: "Литература", startTime: "15:50", endTime: "16:35", room: "108", teacherId: 9 }
+    ];
+    
+    // Получаем идентификаторы предметов из базы данных или используем запасные значения
+    const getSubjectIdByName = (name: string): number => {
+      const subject = subjects.find(s => s.name === name);
+      return subject ? subject.id : 1;
+    };
+    
+    // Получаем класс (используем первый доступный, если есть)
+    const classId = classes.length > 0 ? classes[0].id : 1;
+    
+    // Генерируем расписание для указанного дня недели
+    // Адаптируем количество уроков: будем использовать от 7 до 9 уроков в зависимости от дня
+    const lessonsCount = 9 - ((dayOfWeek % 3) % 2); // 9, 8 или 7 уроков
+    
+    // Создаем уроки для дня
+    return subjectTemplates.slice(0, lessonsCount).map((template, index) => {
+      // Добавляем уникальные суффиксы для разных дней
+      const daySuffix = String.fromCharCode(65 + ((dayOfWeek - 1) % 3));
+      
+      return {
+        id: 1000 + dayOfWeek * 100 + index, // Генерируем уникальные ID для мок-данных
+        classId: classId,
+        subjectId: getSubjectIdByName(template.name),
+        teacherId: template.teacherId,
+        dayOfWeek: dayOfWeek,
+        startTime: template.startTime,
+        endTime: template.endTime,
+        room: template.room,
+        notes: "", // Пустые заметки
+        scheduleDate: null // Нет конкретной даты, только день недели
+      };
+    });
+  };
+  
   // Фильтрация расписаний для конкретной даты
   const getSchedulesForDate = (date: Date) => {
     const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay(); // Воскресенье (0) преобразуем в 7
     
-    return schedules.filter(schedule => {
+    // Сначала ищем реальные расписания для этой даты
+    const realSchedules = schedules.filter(schedule => {
       // Проверяем, является ли это расписанием для конкретной даты
       if (schedule.scheduleDate) {
         const scheduleDate = new Date(schedule.scheduleDate);
@@ -250,6 +299,13 @@ export default function ScheduleNew() {
       // Иначе проверяем день недели
       return schedule.dayOfWeek === dayOfWeek;
     });
+    
+    // Если нет реальных данных, генерируем демо-данные для примера
+    if (realSchedules.length === 0) {
+      return generateDemoSchedulesForDay(dayOfWeek);
+    }
+    
+    return realSchedules;
   };
   
   // Получение всех дней недели для отображения
