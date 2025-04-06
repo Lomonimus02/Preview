@@ -142,27 +142,16 @@ export default function ClassGradeDetailsPage() {
     enabled: !!classId && !!subjectId && !!user,
   });
   
-  // Get lesson schedules for this class and subject
-  const lessonSchedules = useMemo(() => {
-    // Фильтруем расписания и сортируем их по дате
-    return schedules
+  // Get unique dates from schedules for this class and subject
+  const lessonDates = useMemo(() => {
+    // Фильтруем расписания и получаем даты
+    const dates = schedules
       .filter(s => s.scheduleDate && s.subjectId === subjectId) // Filter schedules for this subject only
-      .sort((a, b) => {
-        // Сортировка сначала по дате, затем по времени начала
-        const dateA = new Date(a.scheduleDate as string).getTime();
-        const dateB = new Date(b.scheduleDate as string).getTime();
-        
-        if (dateA !== dateB) {
-          return dateA - dateB; // Сортировка по дате
-        } else {
-          // Если даты одинаковые, сортируем по времени начала
-          const [hoursA, minutesA] = a.startTime.split(':').map(Number);
-          const [hoursB, minutesB] = b.startTime.split(':').map(Number);
-          const timeA = hoursA * 60 + minutesA;
-          const timeB = hoursB * 60 + minutesB;
-          return timeA - timeB;
-        }
-      });
+      .map(s => s.scheduleDate as string) // Уточняем тип, так как мы отфильтровали null значения выше
+      .sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    
+    // Remove duplicates using Array.from + Set
+    return Array.from(new Set(dates));
   }, [schedules, subjectId]);
   
   // Группируем расписания учителя по предметам
