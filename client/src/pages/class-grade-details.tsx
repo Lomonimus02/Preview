@@ -120,6 +120,16 @@ export default function ClassGradeDetailsPage() {
     enabled: !!classId && !!subjectId && !!user,
   });
   
+  // Получаем расписание для текущего учителя (все предметы)
+  const { data: teacherSchedules = [], isLoading: isTeacherSchedulesLoading } = useQuery<Schedule[]>({
+    queryKey: ["/api/schedules", { teacherId: user?.id }],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/schedules?teacherId=${user?.id}`);
+      return res.json();
+    },
+    enabled: !!user?.id,
+  });
+  
   // Fetch grades for this class and subject
   const { data: grades = [], isLoading: isGradesLoading } = useQuery<Grade[]>({
     queryKey: ["/api/grades", { classId, subjectId }],
@@ -130,7 +140,7 @@ export default function ClassGradeDetailsPage() {
     enabled: !!classId && !!subjectId && !!user,
   });
   
-  // Get unique dates from schedules
+  // Get unique dates from schedules for this class and subject
   const lessonDates = useMemo(() => {
     const dates = schedules
       .filter(s => s.scheduleDate) // Filter out schedules without date
@@ -140,6 +150,24 @@ export default function ClassGradeDetailsPage() {
     // Remove duplicates
     return [...new Set(dates)];
   }, [schedules]);
+  
+  // Группируем расписания учителя по предметам
+  const schedulesBySubject = useMemo(() => {
+    return teacherSchedules.reduce((acc, schedule) => {
+      if (!schedule.subjectId || !schedule.scheduleDate) return acc;
+      
+      if (!acc[schedule.subjectId]) {
+        acc[schedule.subjectId] = [];
+      }
+      
+      // Добавляем, если такой даты еще нет
+      if (!acc[schedule.subjectId].includes(schedule.scheduleDate)) {
+        acc[schedule.subjectId].push(schedule.scheduleDate);
+      }
+      
+      return acc;
+    }, {} as Record<number, string[]>);
+  }, [teacherSchedules]);
   
   // Grade form
   const gradeForm = useForm<z.infer<typeof gradeFormSchema>>({
@@ -333,8 +361,26 @@ export default function ClassGradeDetailsPage() {
     }
   };
   
+  // Получаем все предметы, по которым есть расписание у учителя
+  const teacherSubjects = useMemo(() => {
+    return Object.keys(schedulesBySubject).map(Number);
+  }, [schedulesBySubject]);
+  
+  // Fetch all subjects taught by this teacher
+  const { data: subjectsData = [] } = useQuery({
+    queryKey: ["/api/subjects"],
+    enabled: !!user?.id,
+  });
+
+  const subjectNameById = useMemo(() => {
+    return subjectsData.reduce((acc, subject) => {
+      acc[subject.id] = subject.name;
+      return acc;
+    }, {} as Record<number, string>);
+  }, [subjectsData]);
+  
   const isLoading = isClassLoading || isSubjectLoading || isStudentsLoading || 
-                    isSchedulesLoading || isGradesLoading;
+                    isSchedulesLoading || isGradesLoading || isTeacherSchedulesLoading;
   
   if (isLoading) {
     return (
@@ -364,10 +410,10 @@ export default function ClassGradeDetailsPage() {
               Вернуться к расписанию
             </Button>
             <h1 className="text-2xl font-bold">
-              {classData?.name} - {subjectData?.name}
+              {classData?.name} - Журнал оценок
             </h1>
             <p className="text-gray-500">
-              Таблица оценок учеников по предмету
+              Таблицы оценок учеников по предметам
             </p>
           </div>
           
@@ -386,96 +432,266 @@ export default function ClassGradeDetailsPage() {
             </CardHeader>
           </Card>
         ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[180px] bg-muted/50">Ученик</TableHead>
-                  {lessonDates.map((date) => (
-                    <TableHead key={date} className="text-center">
-                      {formatDate(date)}
-                    </TableHead>
-                  ))}
-                  <TableHead className="text-center sticky right-0 bg-muted/50">
-                    Средний балл
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {students.map((student) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-medium bg-muted/20">
-                      {student.lastName} {student.firstName}
-                    </TableCell>
-                    {lessonDates.map((date) => {
-                      const studentGrades = getStudentGradeForDate(student.id, date);
-                      return (
-                        <TableCell key={date} className="text-center">
-                          {studentGrades.length > 0 ? (
-                            <div className="flex flex-wrap justify-center gap-1">
-                              {studentGrades.map((grade) => (
-                                <div key={grade.id} className="relative group">
-                                  <span 
-                                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
-                                    title={grade.comment || ""}
+          // Создаем таблицу для каждого предмета
+          <div className="space-y-8">
+            {/* Текущий предмет (из URL) */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center">
+                  <BookOpenIcon className="h-5 w-5 mr-2" />
+                  {subjectData?.name}
+                </CardTitle>
+                <CardDescription>
+                  Оценки учеников по предмету "{subjectData?.name}" в классе {classData?.name}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[180px] bg-muted/50">Ученик</TableHead>
+                        {lessonDates.map((date) => (
+                          <TableHead key={date} className="text-center">
+                            {formatDate(date)}
+                          </TableHead>
+                        ))}
+                        <TableHead className="text-center sticky right-0 bg-muted/50">
+                          Средний балл
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {students.map((student) => (
+                        <TableRow key={student.id}>
+                          <TableCell className="font-medium bg-muted/20">
+                            {student.lastName} {student.firstName}
+                          </TableCell>
+                          {lessonDates.map((date) => {
+                            const studentGrades = getStudentGradeForDate(student.id, date);
+                            return (
+                              <TableCell key={date} className="text-center">
+                                {studentGrades.length > 0 ? (
+                                  <div className="flex flex-wrap justify-center gap-1">
+                                    {studentGrades.map((grade) => (
+                                      <div key={grade.id} className="relative group">
+                                        <span 
+                                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
+                                          title={grade.comment || ""}
+                                        >
+                                          {grade.grade}
+                                        </span>
+                                        
+                                        {canEditGrades && (
+                                          <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
+                                            <Button
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
+                                              onClick={() => openEditGradeDialog(grade)}
+                                              title="Редактировать оценку"
+                                            >
+                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M12 20h9"></path>
+                                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                                              </svg>
+                                            </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
+                                              onClick={() => handleDeleteGrade(grade.id)}
+                                              title="Удалить оценку"
+                                            >
+                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M3 6h18"></path>
+                                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                              </svg>
+                                            </Button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : canEditGrades ? (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-7 w-7 p-0 rounded-full"
+                                    onClick={() => openGradeDialog(student.id, date)}
                                   >
-                                    {grade.grade}
-                                  </span>
-                                  
-                                  {canEditGrades && (
-                                    <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
-                                      <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
-                                        onClick={() => openEditGradeDialog(grade)}
-                                        title="Редактировать оценку"
-                                      >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                          <path d="M12 20h9"></path>
-                                          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                                        </svg>
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
-                                        onClick={() => handleDeleteGrade(grade.id)}
-                                        title="Удалить оценку"
-                                      >
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                          <path d="M3 6h18"></path>
-                                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                                        </svg>
-                                      </Button>
-                                    </div>
-                                  )}
-                                </div>
+                                    +
+                                  </Button>
+                                ) : (
+                                  "-"
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell className="text-center font-medium sticky right-0 bg-muted/30">
+                            {calculateAverageGrade(student.id)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Другие предметы, которые преподает учитель */}
+            {teacherSubjects
+              .filter(subId => subId !== subjectId) // Исключаем текущий предмет
+              .map(subjectId => {
+                // Получаем даты уроков для этого предмета
+                const subjectDates = schedulesBySubject[subjectId]?.sort((a, b) => 
+                  new Date(a).getTime() - new Date(b).getTime()
+                ) || [];
+                
+                // Если для предмета есть расписание, показываем отдельную таблицу
+                if (subjectDates.length > 0) {
+                  return (
+                    <Card key={subjectId}>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center">
+                          <BookOpenIcon className="h-5 w-5 mr-2" />
+                          {subjectNameById[subjectId] || `Предмет ${subjectId}`}
+                        </CardTitle>
+                        <CardDescription>
+                          Оценки учеников по предмету "{subjectNameById[subjectId] || `Предмет ${subjectId}`}" в классе {classData?.name}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[180px] bg-muted/50">Ученик</TableHead>
+                                {subjectDates.map((date) => (
+                                  <TableHead key={date} className="text-center">
+                                    {formatDate(date)}
+                                  </TableHead>
+                                ))}
+                                <TableHead className="text-center sticky right-0 bg-muted/50">
+                                  Средний балл
+                                </TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {students.map((student) => (
+                                <TableRow key={student.id}>
+                                  <TableCell className="font-medium bg-muted/20">
+                                    {student.lastName} {student.firstName}
+                                  </TableCell>
+                                  {subjectDates.map((date) => {
+                                    // Тут нужна функция получения оценок по конкретному предмету
+                                    const studentGradesForThisSubject = grades
+                                      .filter(g => 
+                                        g.studentId === student.id && 
+                                        g.subjectId === subjectId &&
+                                        g.createdAt && new Date(g.createdAt).toDateString() === new Date(date).toDateString()
+                                      );
+                                    return (
+                                      <TableCell key={date} className="text-center">
+                                        {studentGradesForThisSubject.length > 0 ? (
+                                          <div className="flex flex-wrap justify-center gap-1">
+                                            {studentGradesForThisSubject.map((grade) => (
+                                              <div key={grade.id} className="relative group">
+                                                <span 
+                                                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
+                                                  title={grade.comment || ""}
+                                                >
+                                                  {grade.grade}
+                                                </span>
+                                                
+                                                {canEditGrades && (
+                                                  <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
+                                                    <Button
+                                                      variant="outline"
+                                                      size="icon"
+                                                      className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
+                                                      onClick={() => openEditGradeDialog(grade)}
+                                                      title="Редактировать оценку"
+                                                    >
+                                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M12 20h9"></path>
+                                                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                                                      </svg>
+                                                    </Button>
+                                                    <Button
+                                                      variant="outline"
+                                                      size="icon"
+                                                      className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
+                                                      onClick={() => handleDeleteGrade(grade.id)}
+                                                      title="Удалить оценку"
+                                                    >
+                                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M3 6h18"></path>
+                                                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                                      </svg>
+                                                    </Button>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : canEditGrades ? (
+                                          <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            className="h-7 w-7 p-0 rounded-full"
+                                            onClick={() => {
+                                              // При добавлении оценки для другого предмета нужно установить этот предмет
+                                              setSelectedStudentId(student.id);
+                                              setSelectedDate(date || null);
+                                              setEditingGradeId(null);
+                                              
+                                              gradeForm.reset({
+                                                studentId: student.id,
+                                                subjectId: subjectId,
+                                                classId: classId,
+                                                teacherId: user?.id,
+                                                grade: undefined,
+                                                comment: "",
+                                                gradeType: "Текущая",
+                                              });
+                                              
+                                              setIsGradeDialogOpen(true);
+                                            }}
+                                          >
+                                            +
+                                          </Button>
+                                        ) : (
+                                          "-"
+                                        )}
+                                      </TableCell>
+                                    );
+                                  })}
+                                  <TableCell className="text-center font-medium sticky right-0 bg-muted/30">
+                                    {(() => {
+                                      // Рассчитываем средний балл для этого предмета
+                                      const studentGradesForThisSubject = grades.filter(
+                                        g => g.studentId === student.id && g.subjectId === subjectId
+                                      );
+                                      if (studentGradesForThisSubject.length === 0) return "-";
+                                      
+                                      const sum = studentGradesForThisSubject.reduce((total, g) => total + g.grade, 0);
+                                      return (sum / studentGradesForThisSubject.length).toFixed(1);
+                                    })()}
+                                  </TableCell>
+                                </TableRow>
                               ))}
-                            </div>
-                          ) : canEditGrades ? (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-7 w-7 p-0 rounded-full"
-                              onClick={() => openGradeDialog(student.id, date)}
-                            >
-                              +
-                            </Button>
-                          ) : (
-                            "-"
-                          )}
-                        </TableCell>
-                      );
-                    })}
-                    <TableCell className="text-center font-medium sticky right-0 bg-muted/30">
-                      {calculateAverageGrade(student.id)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                }
+                return null;
+              })}
           </div>
         )}
         
