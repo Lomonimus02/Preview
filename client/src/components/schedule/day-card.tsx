@@ -15,8 +15,7 @@ interface DayCardProps {
   classes: Class[];
   users: User[];
   isActive?: boolean;
-  isHovered?: boolean;
-  activeCardIndex?: number | null;
+  activeCardIndex?: number;
   cardIndex?: number;
 }
 
@@ -28,7 +27,6 @@ export function DayCard({
   classes,
   users,
   isActive = false,
-  isHovered = false,
   activeCardIndex,
   cardIndex,
 }: DayCardProps) {
@@ -75,42 +73,25 @@ export function DayCard({
   // Рассчитываем, сколько всего уроков
   const lessonsCount = sortedSchedules.length;
 
-  // Определяем цвет и стиль карточки
+  // Определяем цвет карточки
   const cardClass = isActive 
     ? "bg-primary text-primary-foreground border-primary" 
-    : isHovered
-    ? "bg-card border-2 border-primary/50 shadow-md"
     : "bg-card";
 
   // Определяем анимацию карточки относительно активной карточки
   const getCardAnimation = () => {
-    if (activeCardIndex === undefined || activeCardIndex === null || cardIndex === undefined) {
+    if (activeCardIndex === undefined || cardIndex === undefined) {
       return {
-        scale: isHovered ? 1.02 : 1,
+        scale: 1,
         opacity: 1,
         transition: { duration: 0.2, ease: "easeInOut" }
       };
     }
 
     const distance = cardIndex - activeCardIndex;
-    
-    // Если карточка активна или на ней курсор, используем особые стили
-    if (isActive || isHovered) {
-      return {
-        scale: isActive ? 1 : isHovered ? 1.02 : 1,
-        opacity: 1,
-        transition: { 
-          duration: 0.25, 
-          ease: "easeOut",
-          scale: { duration: 0.2 }
-        }
-      };
-    }
-    
-    // Для обычных карточек
     return {
-      scale: 0.95 - Math.abs(distance) * 0.02,
-      opacity: 0.9 - Math.abs(distance) * 0.1,
+      scale: isActive ? 1 : 0.95 - Math.abs(distance) * 0.02,
+      opacity: isActive ? 1 : 0.9 - Math.abs(distance) * 0.1,
       transition: { 
         duration: 0.25, 
         ease: "easeOut",
