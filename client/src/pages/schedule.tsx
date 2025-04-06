@@ -216,13 +216,25 @@ export default function SchedulePage() {
   // Add schedule mutation
   const addScheduleMutation = useMutation({
     mutationFn: async (data: z.infer<typeof scheduleFormSchema>) => {
+      console.log('Добавление урока в расписание:', data); // Логирование данных
       const res = await apiRequest("POST", "/api/schedules", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (newSchedule) => {
+      // Немедленно обновляем кэш React Query, добавляя новый урок
+      queryClient.setQueryData<ScheduleType[]>(['/api/schedules'], (oldData) => {
+        const currentData = oldData || [];
+        return [...currentData, newSchedule];
+      });
+      
+      // Также запрашиваем обновление с сервера
       queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+      
+      // Закрываем диалог и сбрасываем форму
       setIsAddDialogOpen(false);
       form.reset();
+      
+      // Показываем уведомление
       toast({
         title: "Расписание добавлено",
         description: "Новый урок успешно добавлен в расписание",
@@ -553,33 +565,8 @@ export default function SchedulePage() {
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="dayOfWeek"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>День недели</FormLabel>
-                    <Select
-                      onValueChange={(value) => field.onChange(parseInt(value))}
-                      defaultValue={field.value?.toString()}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите день недели" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-                          <SelectItem key={day} value={day.toString()}>
-                            {getDayName(day)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Поле dayOfWeek скрыто, так как оно определяется автоматически из выбранной даты */}
+              <input type="hidden" {...form.register("dayOfWeek")} />
               
               <div className="grid grid-cols-2 gap-4">
                 <FormField
