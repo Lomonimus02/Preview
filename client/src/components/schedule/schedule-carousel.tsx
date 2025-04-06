@@ -12,7 +12,7 @@ import {
 import { ru } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { ScheduleDayCard } from "./schedule-day-card";
-import { Schedule, User, Subject, Class } from "@shared/schema";
+import { Schedule, User, Subject, Class, Grade, UserRoleEnum } from "@shared/schema";
 import { FiChevronLeft, FiChevronRight, FiCalendar } from "react-icons/fi";
 
 interface ScheduleCarouselProps {
@@ -20,6 +20,8 @@ interface ScheduleCarouselProps {
   subjects: Subject[];
   teachers: User[];
   classes: Class[];
+  grades?: Grade[];
+  currentUser?: User | null;
   isAdmin?: boolean;
   onAddSchedule: (date: Date) => void;
   onDeleteSchedule?: (scheduleId: number) => void;
@@ -30,6 +32,8 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   subjects,
   teachers,
   classes,
+  grades = [],
+  currentUser = null,
   isAdmin = false,
   onAddSchedule,
   onDeleteSchedule
@@ -137,6 +141,8 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
                 subjects={subjects}
                 teachers={teachers}
                 classes={classes}
+                grades={grades}
+                currentUser={currentUser}
                 isAdmin={isAdmin}
                 onAddSchedule={onAddSchedule}
                 onDeleteSchedule={onDeleteSchedule}

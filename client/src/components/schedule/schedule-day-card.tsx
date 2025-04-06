@@ -19,13 +19,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FiClock, FiMapPin, FiUser, FiCheck, FiPlus, FiList, FiEdit3 } from "react-icons/fi";
-import { Schedule, User, Subject, Class, UserRoleEnum } from "@shared/schema";
+import { Schedule, User, Subject, Class, UserRoleEnum, Grade } from "@shared/schema";
 
 interface ScheduleItemProps {
   schedule: Schedule;
   subject: Subject | undefined;
   teacherName: string;
   room: string;
+  grades?: Grade[];
   isCompleted?: boolean;
   onClick: () => void;
 }
@@ -35,6 +36,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
   subject,
   teacherName,
   room,
+  grades = [],
   isCompleted = false,
   onClick,
 }) => {
@@ -67,10 +69,28 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           <FiMapPin className="text-gray-400" size={14} />
           <span>Кабинет: {room || "—"}</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 mb-1">
           <FiUser className="text-gray-400" size={14} />
           <span>{teacherName}</span>
         </div>
+        
+        {/* Отображаем оценки, если они есть */}
+        {grades.length > 0 && (
+          <div className="mt-2">
+            <div className="text-xs text-gray-500 mb-1">Оценки:</div>
+            <div className="flex flex-wrap gap-1">
+              {grades.map((grade) => (
+                <div 
+                  key={grade.id}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground"
+                  title={grade.comment || ""}
+                >
+                  {grade.grade}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -83,6 +103,8 @@ interface ScheduleDayCardProps {
   subjects: Subject[];
   teachers: User[];
   classes: Class[];
+  grades?: Grade[];
+  currentUser?: User | null;
   isAdmin?: boolean;
   onAddSchedule?: (date: Date) => void;
   onDeleteSchedule?: (scheduleId: number) => void;
@@ -95,6 +117,8 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   subjects,
   teachers,
   classes,
+  grades = [],
+  currentUser = null,
   isAdmin = false,
   onAddSchedule,
   onDeleteSchedule,
@@ -125,6 +149,26 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   const getClassName = (classId: number) => {
     const classObj = classes.find(c => c.id === classId);
     return classObj ? classObj.name : "—";
+  };
+
+  // Функция для получения оценок по конкретному расписанию
+  const getScheduleGrades = (schedule: Schedule) => {
+    if (!grades?.length || !currentUser) return [];
+    
+    // Если текущий пользователь - учитель, оценки должны относиться к его предмету и классу 
+    if (currentUser.role === UserRoleEnum.TEACHER) {
+      return [];
+    }
+    
+    // Если текущий пользователь - ученик, показываем только его оценки
+    if (currentUser.role === UserRoleEnum.STUDENT) {
+      return grades.filter(grade => 
+        grade.studentId === currentUser.id && 
+        grade.subjectId === schedule.subjectId
+      );
+    }
+    
+    return [];
   };
 
   const handleScheduleClick = (schedule: Schedule) => {
@@ -169,6 +213,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   subject={getSubject(schedule.subjectId)}
                   teacherName={getTeacherName(schedule.teacherId)}
                   room={schedule.room || ""}
+                  grades={getScheduleGrades(schedule)}
                   isCompleted={false} // Здесь можно добавить логику для определения завершенных уроков
                   onClick={() => handleScheduleClick(schedule)}
                 />

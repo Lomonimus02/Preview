@@ -120,7 +120,8 @@ export default function SchedulePage() {
   // Fetch grades
   const { data: grades = [] } = useQuery<Grade[]>({
     queryKey: ["/api/grades"],
-    enabled: !!user && isTeacher()
+    // Теперь запрашиваем оценки для всех пользователей, а не только для учителя
+    enabled: !!user
   });
   
   const teachers = users.filter(u => u.role === UserRoleEnum.TEACHER);
@@ -291,6 +292,8 @@ export default function SchedulePage() {
             subjects={subjects}
             teachers={teachers}
             classes={classes}
+            grades={grades}
+            currentUser={user}
             isAdmin={canEditSchedule}
             onAddSchedule={handleAddSchedule}
             onDeleteSchedule={(scheduleId) => deleteScheduleMutation.mutate(scheduleId)}
