@@ -188,10 +188,8 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   const getScheduleHomework = (schedule: Schedule) => {
     if (!homework?.length) return undefined;
     
-    return homework.find(hw => 
-      hw.classId === schedule.classId && 
-      hw.subjectId === schedule.subjectId
-    );
+    // Ищем задание именно для этого урока (scheduleId)
+    return homework.find(hw => hw.scheduleId === schedule.id);
   };
 
   // Состояние для диалогового окна добавления домашнего задания

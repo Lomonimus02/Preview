@@ -47,9 +47,9 @@ export const HomeworkForm: React.FC<HomeworkFormProps> = ({ schedule, existingHo
     enabled: !existingHomework, // не запрашиваем, если уже передано
   });
   
-  // Используем переданное домашнее задание или ищем в списке
+  // Используем переданное домашнее задание или ищем в списке для конкретного расписания (урока)
   const currentHomework = existingHomework || (homework && homework.find(hw => 
-    hw.classId === schedule.classId && hw.subjectId === schedule.subjectId
+    hw.scheduleId === schedule.id
   ));
   
   const form = useForm({
