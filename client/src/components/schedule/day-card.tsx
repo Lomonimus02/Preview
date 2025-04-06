@@ -4,8 +4,24 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
-import { Schedule as ScheduleType, Subject, Class, User } from "@shared/schema";
-import { Check, Plus } from "lucide-react";
+import { Schedule as ScheduleType, Subject, Class, User, UserRoleEnum } from "@shared/schema";
+import { Check, Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { useRoleCheck } from "@/hooks/use-role-check";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 interface DayCardProps {
   day: number;
@@ -14,6 +30,7 @@ interface DayCardProps {
   subjects: Subject[];
   classes: Class[];
   users: User[];
+  onScheduleDeleted?: () => void; // Колбэк при удалении урока
 }
 
 export function DayCard({
@@ -23,9 +40,49 @@ export function DayCard({
   subjects,
   classes,
   users,
+  onScheduleDeleted,
 }: DayCardProps) {
   // Состояние для отслеживания наведения курсора
   const [isHovered, setIsHovered] = useState(false);
+  
+  // Состояние для диалога подтверждения удаления
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState<number | null>(null);
+  
+  // Проверка прав на удаление
+  const { user } = useAuth();
+  const roleCheck = useRoleCheck();
+  const isAdmin = roleCheck.isAdmin();
+  
+  // Мутация для удаления урока
+  const queryClient = useQueryClient();
+  const deleteMutation = useMutation({
+    mutationFn: async (scheduleId: number) => {
+      const res = await apiRequest("DELETE", `/api/schedules/${scheduleId}`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Урок удален",
+        description: "Урок был успешно удален из расписания",
+      });
+      
+      // Обновляем кэш запросов расписания
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+      
+      // Вызываем колбэк, если он определен
+      if (onScheduleDeleted) {
+        onScheduleDeleted();
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка при удалении урока",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
   
   // Получаем название дня недели
   const dayName = useMemo(() => {
@@ -70,20 +127,49 @@ export function DayCard({
   // Рассчитываем, сколько всего уроков
   const lessonsCount = sortedSchedules.length;
 
+  // Обработчик удаления урока
+  const handleDeleteSchedule = () => {
+    if (scheduleToDelete) {
+      deleteMutation.mutate(scheduleToDelete);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   return (
-    <motion.div
-      className="h-full w-full"
-      whileHover={{ 
-        scale: 1.03,
-        transition: { 
-          type: "spring", 
-          stiffness: 500, 
-          damping: 17 
-        } 
-      }}
-      onHoverStart={() => setIsHovered(true)}
-      onHoverEnd={() => setIsHovered(false)}
-    >
+    <>
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить урок?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Это действие нельзя отменить. Урок будет удален из расписания.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteSchedule}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <motion.div
+        className="h-full w-full"
+        whileHover={{ 
+          scale: 1.03,
+          transition: { 
+            type: "spring", 
+            stiffness: 500, 
+            damping: 17 
+          } 
+        }}
+        onHoverStart={() => setIsHovered(true)}
+        onHoverEnd={() => setIsHovered(false)}
+      >
       <Card 
         className={`h-full overflow-hidden transition-all duration-200 ${
           isHovered ? "border-primary border-2" : "border"
@@ -116,8 +202,23 @@ export function DayCard({
                     <div className="font-medium">
                       {schedule.startTime} - {schedule.endTime}
                     </div>
-                    <div className="text-xs opacity-80">
-                      Кабинет: {schedule.room || "—"}
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs opacity-80">
+                        Кабинет: {schedule.room || "—"}
+                      </div>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-destructive hover:text-destructive hover:bg-red-100"
+                          onClick={() => {
+                            setScheduleToDelete(schedule.id);
+                            setDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                   <div className="font-semibold">
@@ -147,5 +248,6 @@ export function DayCard({
         </CardContent>
       </Card>
     </motion.div>
+    </>
   );
 }
