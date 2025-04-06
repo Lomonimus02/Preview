@@ -4,11 +4,10 @@ import { Express } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { storage } from "./storage";
 import { dbStorage } from "./db-storage";
 
-// Выбираем хранилище для использования (БД или in-memory)
-const dataStorage = process.env.USE_DATABASE === "true" ? dbStorage : storage;
+// Используем хранилище БД для всех операций
+const dataStorage = dbStorage;
 import { User, UserRoleEnum } from "@shared/schema";
 
 // Use type augmentation for Express session

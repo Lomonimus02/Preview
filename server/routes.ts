@@ -1,10 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
 import { dbStorage } from "./db-storage";
 
-// Выбираем хранилище для использования (БД или in-memory)
-const dataStorage = process.env.USE_DATABASE === "true" ? dbStorage : storage;
+// Используем хранилище БД для всех операций
+const dataStorage = dbStorage;
 import { setupAuth } from "./auth";
 import { z } from "zod";
 import { UserRoleEnum } from "@shared/schema";

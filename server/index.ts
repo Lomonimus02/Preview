@@ -47,10 +47,13 @@ app.use((req, res, next) => {
     console.log('Testing database connection...');
     await testConnection();
     console.log('Database connection successful.');
+    
+    // Устанавливаем PostgreSQL как основное хранилище данных
+    process.env.USE_DATABASE = "true";
   } catch (error) {
     console.error('Database connection error:', error);
-    // При ошибке продолжаем работу приложения с in-memory хранилищем
-    console.log('Falling back to in-memory storage');
+    console.log('Error connecting to database:', error);
+    process.exit(1); // Завершаем приложение при ошибке подключения к БД
   }
   
   const server = await registerRoutes(app);
