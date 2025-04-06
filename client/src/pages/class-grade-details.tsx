@@ -86,7 +86,7 @@ export default function ClassGradeDetailsPage() {
   const { data: classData, isLoading: isClassLoading } = useQuery<ClassType>({
     queryKey: ["/api/classes", classId],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/classes/${classId}`);
+      const res = await apiRequest(`/api/classes/${classId}`, "GET");
       return res.json();
     },
     enabled: !!classId && !!user,
@@ -96,7 +96,7 @@ export default function ClassGradeDetailsPage() {
   const { data: subjectData, isLoading: isSubjectLoading } = useQuery<Subject>({
     queryKey: ["/api/subjects", subjectId],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/subjects/${subjectId}`);
+      const res = await apiRequest(`/api/subjects/${subjectId}`, "GET");
       return res.json();
     },
     enabled: !!subjectId && !!user,
@@ -106,7 +106,7 @@ export default function ClassGradeDetailsPage() {
   const { data: students = [], isLoading: isStudentsLoading } = useQuery<User[]>({
     queryKey: ["/api/students-by-class", classId],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/students-by-class/${classId}`);
+      const res = await apiRequest(`/api/students-by-class/${classId}`, "GET");
       return res.json();
     },
     enabled: !!classId && !!user,
@@ -116,7 +116,7 @@ export default function ClassGradeDetailsPage() {
   const { data: schedules = [], isLoading: isSchedulesLoading } = useQuery<Schedule[]>({
     queryKey: ["/api/schedules", { classId, subjectId }],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/schedules?classId=${classId}&subjectId=${subjectId}`);
+      const res = await apiRequest(`/api/schedules?classId=${classId}&subjectId=${subjectId}`, "GET");
       return res.json();
     },
     enabled: !!classId && !!subjectId && !!user,
@@ -126,7 +126,7 @@ export default function ClassGradeDetailsPage() {
   const { data: teacherSchedules = [], isLoading: isTeacherSchedulesLoading } = useQuery<Schedule[]>({
     queryKey: ["/api/schedules", { teacherId: user?.id }],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/schedules?teacherId=${user?.id}`);
+      const res = await apiRequest(`/api/schedules?teacherId=${user?.id}`, "GET");
       return res.json();
     },
     enabled: !!user?.id,
@@ -136,7 +136,7 @@ export default function ClassGradeDetailsPage() {
   const { data: grades = [], isLoading: isGradesLoading } = useQuery<Grade[]>({
     queryKey: ["/api/grades", { classId, subjectId }],
     queryFn: async () => {
-      const res = await apiRequest("GET", `/api/grades?classId=${classId}&subjectId=${subjectId}`);
+      const res = await apiRequest(`/api/grades?classId=${classId}&subjectId=${subjectId}`, "GET");
       return res.json();
     },
     enabled: !!classId && !!subjectId && !!user,
@@ -189,7 +189,7 @@ export default function ClassGradeDetailsPage() {
   // Mutation to add grade
   const addGradeMutation = useMutation({
     mutationFn: async (data: z.infer<typeof gradeFormSchema>) => {
-      const res = await apiRequest("POST", "/api/grades", data);
+      const res = await apiRequest("/api/grades", "POST", data);
       return res.json();
     },
     onMutate: async (newGradeData) => {
@@ -282,7 +282,7 @@ export default function ClassGradeDetailsPage() {
   // Mutation to update grade
   const updateGradeMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: Partial<z.infer<typeof gradeFormSchema>> }) => {
-      const res = await apiRequest("PUT", `/api/grades/${id}`, data);
+      const res = await apiRequest(`/api/grades/${id}`, "PUT", data);
       return res.json();
     },
     onMutate: async ({ id, data }) => {
@@ -361,7 +361,7 @@ export default function ClassGradeDetailsPage() {
   // Mutation to delete grade
   const deleteGradeMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/grades/${id}`);
+      const res = await apiRequest(`/api/grades/${id}`, "DELETE");
       return res.json();
     },
     onMutate: async (id) => {
