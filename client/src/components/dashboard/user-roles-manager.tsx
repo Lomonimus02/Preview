@@ -85,7 +85,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
   // Add role mutation
   const addRoleMutation = useMutation({
     mutationFn: async (data: { userId: number; role: UserRoleEnum; schoolId: number | null; classId: number | null }) => {
-      const res = await apiRequest('POST', '/api/user-roles', data);
+      const res = await apiRequest('/api/user-roles', 'POST', data);
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || 'Не удалось добавить роль');
@@ -115,7 +115,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
   // Remove role mutation
   const removeRoleMutation = useMutation({
     mutationFn: async (roleId: number) => {
-      const res = await apiRequest('DELETE', `/api/user-roles/${roleId}`);
+      const res = await apiRequest(`/api/user-roles/${roleId}`, 'DELETE');
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || 'Не удалось удалить роль');

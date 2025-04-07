@@ -1646,7 +1646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!isStudentInClass) {
           return res.status(403).json({ message: "Student does not belong to your class" });
         }
-      } else if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+      } else if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL, UserRoleEnum.CLASS_TEACHER].includes(req.user.role)) {
         // Только администраторы и классные руководители могут просматривать расписание учеников
         return res.status(403).json({ message: "You don't have permission to view student schedules" });
       }
@@ -1741,7 +1741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!isStudentInClass) {
           return res.status(403).json({ message: "You can only view schedules of students in your assigned class" });
         }
-      } else if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+      } else if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL, UserRoleEnum.CLASS_TEACHER].includes(req.user.role)) {
         // Проверяем, является ли текущий пользователь родителем этого ученика
         if (req.user.role === UserRoleEnum.PARENT) {
           const parentStudents = await dataStorage.getParentStudents(req.user.id);
