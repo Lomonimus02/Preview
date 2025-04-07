@@ -1438,7 +1438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // User roles API
-  app.get("/api/user-roles/:userId", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+  app.get("/api/user-roles/:userId", isAuthenticated, async (req, res) => {
     const userId = parseInt(req.params.userId);
     const user = await dataStorage.getUser(userId);
     
@@ -1446,9 +1446,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: "User not found" });
     }
     
+    // Пользователь может всегда видеть свои собственные роли
+    if (req.user.id === userId) {
+      const userRoles = await dataStorage.getUserRoles(userId);
+      return res.json(userRoles);
+    }
+    
+    // Для просмотра ролей других пользователей нужны административные права
+    if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+      return res.status(403).json({ message: "Forbidden. You don't have the required permissions to view other users' roles." });
+    }
+    
     // Проверка прав: школьный администратор может видеть роли только пользователей своей школы
     if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && user.schoolId !== req.user.schoolId) {
-      return res.status(403).json({ message: "Forbidden" });
+      return res.status(403).json({ message: "Forbidden. You can only view roles of users in your school." });
     }
     
     const userRoles = await dataStorage.getUserRoles(userId);
