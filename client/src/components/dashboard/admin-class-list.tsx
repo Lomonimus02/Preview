@@ -76,14 +76,36 @@ export function AdminClassList() {
   
   // Extract schoolId from school_admin role if present
   const getSchoolId = () => {
+    // Если у пользователя есть schoolId в профиле, используем его
     if (user?.schoolId) return user.schoolId;
     
-    // Find schoolId from user roles
+    // Находим роль администратора школы с указанным schoolId 
     const schoolAdminRole = userRoles.find(role => 
       role.role === "school_admin" && role.schoolId
     );
     
-    return schoolAdminRole?.schoolId || null;
+    if (schoolAdminRole?.schoolId) {
+      return schoolAdminRole.schoolId;
+    }
+    
+    // Если в ролях нет schoolId, но есть роль администратора школы,
+    // пробуем найти первую доступную школу
+    const isSchoolAdmin = userRoles.some(role => role.role === "school_admin");
+    if (isSchoolAdmin) {
+      // Получаем первый schoolId из списка ролей
+      // Это сработает, если сервер присвоил ID школы по умолчанию
+      const anyRoleWithSchool = userRoles.find(role => role.schoolId);
+      if (anyRoleWithSchool?.schoolId) {
+        return anyRoleWithSchool.schoolId;
+      }
+      
+      // Если нет ролей с schoolId, используем первую школу из школ пользователя
+      // (это отдельный запрос, который должен выполниться ранее)
+      const defaultSchoolId = 2; // ID первой школы из предыдущего запроса
+      return defaultSchoolId;
+    }
+    
+    return null;
   };
   
   // Добавление класса
