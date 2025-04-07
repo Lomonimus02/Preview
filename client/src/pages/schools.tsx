@@ -8,6 +8,16 @@ import { useToast } from "@/hooks/use-toast";
 import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -51,6 +61,7 @@ export default function Schools() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   // Only Super admin can access this page
   if (user?.role !== UserRoleEnum.SUPER_ADMIN) {
@@ -159,6 +170,30 @@ export default function Schools() {
     },
   });
   
+  // Delete school mutation
+  const deleteSchoolMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest(`/api/schools/${id}`, "DELETE");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schools"] });
+      setIsDeleteDialogOpen(false);
+      setSelectedSchool(null);
+      toast({
+        title: "Школа удалена",
+        description: "Школа успешно удалена из системы",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить школу",
+        variant: "destructive",
+      });
+    },
+  });
+  
   const onSubmitAdd = (values: z.infer<typeof schoolFormSchema>) => {
     addSchoolMutation.mutate(values);
   };
@@ -176,6 +211,17 @@ export default function Schools() {
     setSelectedSchool(school);
     setFormForEdit(school);
     setIsEditDialogOpen(true);
+  };
+  
+  const handleDelete = (school: School) => {
+    setSelectedSchool(school);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const confirmDelete = () => {
+    if (selectedSchool) {
+      deleteSchoolMutation.mutate(selectedSchool.id);
+    }
   };
   
   return (
@@ -241,9 +287,14 @@ export default function Schools() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleEdit(school)}>
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-end">
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(school)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(school)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -379,6 +430,28 @@ export default function Schools() {
           </Form>
         </DialogContent>
       </Dialog>
+      
+      {/* Delete School Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удалить школу</AlertDialogTitle>
+            <AlertDialogDescription>
+              Вы уверены, что хотите удалить школу "{selectedSchool?.name}"? Это действие невозможно отменить.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDelete}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleteSchoolMutation.isPending}
+            >
+              {deleteSchoolMutation.isPending ? 'Удаление...' : 'Удалить'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }

@@ -56,33 +56,37 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
   const switchRoleMutation = useMutation({
     mutationFn: async (role: UserRoleEnum) => {
       if (!user || !user.id) throw new Error("Пользователь не авторизован");
-      // Используем правильный порядок аргументов: url, method, data
+      
+      // Используем правильный порядок аргументов для apiRequest: url, method, data
       const res = await apiRequest(`/api/users/${user.id}/active-role`, "PUT", { activeRole: role });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Не удалось сменить роль");
+      }
       return await res.json();
     },
     onSuccess: (updatedUser) => {
-      // Обновляем данные пользователя и роли в кэше
+      // Обновляем данные пользователя в кэше
       queryClient.setQueryData(["/api/user"], updatedUser);
+      
+      // Инвалидируем другие запросы, которые могут зависеть от роли пользователя
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-roles"] });
       
-      // Инвалидируем все запросы, чтобы данные обновились с учетом новой роли
-      setTimeout(() => {
-        queryClient.invalidateQueries();
-      }, 100);
-      
+      // Закрываем попап
       setOpen(false);
+      
+      // Показываем уведомление об успешной смене роли
       toast({
         title: "Роль изменена",
         description: `Вы переключились на роль: ${getRoleName(updatedUser.activeRole)}`,
       });
       
-      // Перенаправляем на главную с небольшой задержкой
-      setTimeout(() => {
-        window.location.href = "/";
-      }, 500);
+      // Перенаправляем на главную страницу для обновления интерфейса
+      window.location.href = "/";
     },
     onError: (error: Error) => {
+      console.error("Ошибка при смене роли:", error);
       toast({
         title: "Ошибка при смене роли",
         description: error.message,

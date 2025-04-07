@@ -165,6 +165,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(updatedSchool);
   });
 
+  app.delete("/api/schools/:id", hasRole([UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const deletedSchool = await dataStorage.deleteSchool(id);
+    
+    if (!deletedSchool) {
+      return res.status(404).json({ message: "School not found" });
+    }
+    
+    // Log the action
+    await dataStorage.createSystemLog({
+      userId: req.user.id,
+      action: "school_deleted",
+      details: `Deleted school: ${deletedSchool.name}`,
+      ipAddress: req.ip
+    });
+    
+    res.json({ message: "School deleted successfully", school: deletedSchool });
+  });
+
   // Users API
   app.get("/api/users", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
     const activeRole = req.user.activeRole || req.user.role;

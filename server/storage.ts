@@ -46,6 +46,7 @@ export interface IStorage {
   getSchools(): Promise<School[]>;
   createSchool(school: InsertSchool): Promise<School>;
   updateSchool(id: number, school: Partial<InsertSchool>): Promise<School | undefined>;
+  deleteSchool(id: number): Promise<School | undefined>;
   
   // Class operations
   getClass(id: number): Promise<Class | undefined>;
@@ -321,6 +322,14 @@ export class MemStorage implements IStorage {
     const updatedSchool: School = { ...existingSchool, ...school };
     this.schools.set(id, updatedSchool);
     return updatedSchool;
+  }
+  
+  async deleteSchool(id: number): Promise<School | undefined> {
+    const school = this.schools.get(id);
+    if (!school) return undefined;
+    
+    this.schools.delete(id);
+    return school;
   }
   
   // Class operations
