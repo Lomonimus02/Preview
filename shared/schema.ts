@@ -10,7 +10,8 @@ export enum UserRoleEnum {
   STUDENT = "student",
   PARENT = "parent",
   PRINCIPAL = "principal",
-  VICE_PRINCIPAL = "vice_principal"
+  VICE_PRINCIPAL = "vice_principal",
+  CLASS_TEACHER = "class_teacher"
 }
 
 // Users table
@@ -181,6 +182,7 @@ export const userRoles = pgTable("user_roles", {
   userId: integer("user_id").notNull(),
   role: text("role").$type<UserRoleEnum>().notNull(),
   schoolId: integer("school_id"), // школа, связанная с этой ролью (например, для учителя, работающего в нескольких школах)
+  classId: integer("class_id"), // класс, связанный с этой ролью (для классного руководителя)
 });
 
 // System logs

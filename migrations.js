@@ -1,4 +1,4 @@
-import { db } from './server/db.js';
+import { db } from './server/db.ts';
 import { sql } from 'drizzle-orm';
 
 async function addScheduleDateColumn() {
@@ -57,11 +57,40 @@ async function addGradeScheduleIdColumn() {
   }
 }
 
+async function addUserRolesClassIdColumn() {
+  try {
+    console.log('Проверяем наличие колонки class_id в таблице user_roles...');
+    const checkColumnExistsQuery = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'user_roles' AND column_name = 'class_id'
+    `;
+    
+    const result = await db.execute(sql.raw(checkColumnExistsQuery));
+    
+    if (result.length === 0) {
+      console.log('Колонка class_id не найдена, добавляем...');
+      const addColumnQuery = `
+        ALTER TABLE user_roles 
+        ADD COLUMN class_id INTEGER
+      `;
+      await db.execute(sql.raw(addColumnQuery));
+      console.log('Колонка class_id успешно добавлена');
+    } else {
+      console.log('Колонка class_id уже существует');
+    }
+  } catch (error) {
+    console.error('Ошибка при добавлении колонки class_id:', error);
+    throw error;
+  }
+}
+
 async function runMigrations() {
   try {
     console.log('Запуск миграций...');
     await addScheduleDateColumn();
     await addGradeScheduleIdColumn();
+    await addUserRolesClassIdColumn();
     console.log('Миграции успешно выполнены');
   } catch (error) {
     console.error('Ошибка при выполнении миграций:', error);

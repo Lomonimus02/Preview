@@ -379,6 +379,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } else if (req.user.role === UserRoleEnum.TEACHER) {
       schedules = await dataStorage.getSchedulesByTeacher(req.user.id);
+    } else if (req.user.role === UserRoleEnum.CLASS_TEACHER) {
+      // Классный руководитель видит расписание для своего класса
+      // Получаем роли пользователя, чтобы найти роль классного руководителя и определить его класс
+      const userRoles = await dataStorage.getUserRoles(req.user.id);
+      const classTeacherRole = userRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER && r.classId);
+      
+      if (classTeacherRole && classTeacherRole.classId) {
+        // Получаем расписание для класса
+        const classSchedules = await dataStorage.getSchedulesByClass(classTeacherRole.classId);
+        schedules.push(...classSchedules);
+      }
     } else if (req.user.role === UserRoleEnum.STUDENT) {
       // Get all classes for the student
       const classes = await dataStorage.getStudentClasses(req.user.id);
@@ -1388,7 +1399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.post("/api/user-roles", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
-    const { userId, role, schoolId } = req.body;
+    const { userId, role, schoolId, classId } = req.body;
     
     const user = await dataStorage.getUser(userId);
     if (!user) {
@@ -1400,19 +1411,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Forbidden" });
     }
     
+    // Для роли классного руководителя проверяем, что указан класс
+    if (role === UserRoleEnum.CLASS_TEACHER && !classId) {
+      return res.status(400).json({ message: "Class ID is required for class teacher role" });
+    }
+    
     // Проверяем, не существует ли уже такая роль у пользователя
     const existingRoles = await dataStorage.getUserRoles(userId);
-    if (existingRoles.some(r => r.role === role && r.schoolId === schoolId)) {
+    if (existingRoles.some(r => r.role === role && r.schoolId === schoolId && (role !== UserRoleEnum.CLASS_TEACHER || r.classId === classId))) {
       return res.status(400).json({ message: "User already has this role" });
     }
     
-    const userRole = await dataStorage.addUserRole({ userId, role, schoolId });
+    // Для роли CLASS_TEACHER проверяем, что класс существует и принадлежит указанной школе
+    if (role === UserRoleEnum.CLASS_TEACHER && classId) {
+      const classData = await dataStorage.getClass(classId);
+      if (!classData) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      if (classData.schoolId !== schoolId) {
+        return res.status(400).json({ message: "Class does not belong to the selected school" });
+      }
+    }
+    
+    const userRole = await dataStorage.addUserRole({ userId, role, schoolId, classId });
     
     // Log the action
     await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "user_role_added",
-      details: `Added role ${role} to user ${userId}`,
+      details: `Added role ${role} to user ${userId}${classId ? ` for class ${classId}` : ''}`,
       ipAddress: req.ip
     });
     
@@ -1466,6 +1494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.user.id,
         role: req.user.role,
         schoolId: req.user.schoolId,
+        classId: req.user.classId || null, // Добавляем classId если он есть
         isDefault: true
       });
     }
@@ -1522,6 +1551,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const unreadCount = notifications.filter(n => !n.isRead).length;
     res.json({ unreadCount });
   });
+  
+  // Endpoint для получения расписания для ученика (для классного руководителя)
+  app.get("/api/students/:studentId/schedules", isAuthenticated, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      
+      if (isNaN(studentId)) {
+        return res.status(400).json({ message: "Invalid student ID" });
+      }
+      
+      // Проверяем права доступа
+      if (req.user.role === UserRoleEnum.CLASS_TEACHER) {
+        // Классный руководитель может видеть расписания только учеников своего класса
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const classTeacherRole = userRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER && r.classId);
+        
+        if (!classTeacherRole || !classTeacherRole.classId) {
+          return res.status(403).json({ message: "You don't have an assigned class" });
+        }
+        
+        // Проверяем, что студент принадлежит к классу руководителя
+        const classStudents = await dataStorage.getClassStudents(classTeacherRole.classId);
+        const isStudentInClass = classStudents.some(s => s.id === studentId);
+        
+        if (!isStudentInClass) {
+          return res.status(403).json({ message: "Student does not belong to your class" });
+        }
+      } else if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+        // Только администраторы и классные руководители могут просматривать расписание учеников
+        return res.status(403).json({ message: "You don't have permission to view student schedules" });
+      }
+      
+      // Получаем классы, к которым принадлежит студент
+      const studentClasses = await dataStorage.getStudentClasses(studentId);
+      if (!studentClasses.length) {
+        return res.json([]);
+      }
+      
+      let schedules = [];
+      
+      // Получаем расписание для каждого класса студента
+      for (const classData of studentClasses) {
+        const classSchedules = await dataStorage.getSchedulesByClass(classData.id);
+        schedules = [...schedules, ...classSchedules];
+      }
+      
+      res.json(schedules);
+    } catch (error) {
+      console.error("Error fetching student schedules:", error);
+      res.status(500).json({ message: "Failed to fetch student schedules" });
+    }
+  });
 
   // Маршрут для получения учеников по ID класса для страницы оценок
   app.get("/api/students-by-class/:classId", isAuthenticated, async (req, res) => {
@@ -1544,6 +1625,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (!teacherClassIds.includes(classId)) {
           return res.status(403).json({ message: "You can only view students in classes you teach" });
+        }
+      } else if (req.user.role === UserRoleEnum.CLASS_TEACHER) {
+        // Классный руководитель может видеть студентов только своего класса
+        // Получаем роли пользователя, чтобы найти роль классного руководителя
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const classTeacherRole = userRoles.find(r => 
+          r.role === UserRoleEnum.CLASS_TEACHER && r.classId === classId
+        );
+        
+        if (!classTeacherRole) {
+          return res.status(403).json({ message: "You can only view students in your assigned class" });
         }
       } else if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
         return res.status(403).json({ message: "You don't have permission to view class students" });

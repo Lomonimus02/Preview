@@ -41,6 +41,12 @@ export function useRoleCheck() {
     return activeRole === UserRoleEnum.TEACHER;
   };
   
+  // Функция для проверки, является ли пользователь классным руководителем
+  const isClassTeacher = () => {
+    if (!activeRole) return false;
+    return activeRole === UserRoleEnum.CLASS_TEACHER;
+  };
+  
   // Функция для проверки, является ли пользователь учеником
   const isStudent = () => {
     if (!activeRole) return false;
@@ -62,6 +68,7 @@ export function useRoleCheck() {
     isSuperAdmin,
     isSchoolAdmin,
     isTeacher,
+    isClassTeacher, // Добавлена новая функция проверки
     isStudent,
     isParent,
     currentRole

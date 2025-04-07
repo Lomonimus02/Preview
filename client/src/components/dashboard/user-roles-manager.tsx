@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -17,6 +17,7 @@ type UserRole = {
   userId: number;
   role: UserRoleEnum;
   schoolId: number | null;
+  classId: number | null;
 };
 
 type School = {
@@ -25,6 +26,14 @@ type School = {
   address: string;
   city: string;
   status: string;
+};
+
+type Class = {
+  id: number;
+  name: string;
+  gradeLevel: number;
+  academicYear: string;
+  schoolId: number;
 };
 
 interface UserRolesManagerProps {
@@ -37,6 +46,8 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newRole, setNewRole] = useState<UserRoleEnum | ''>('');
   const [selectedSchoolId, setSelectedSchoolId] = useState<number | null>(null);
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
+  const [classes, setClasses] = useState<Class[]>([]);
 
   // Fetch user roles
   const { data: userRoles = [], isLoading: isLoadingRoles } = useQuery<UserRole[]>({
@@ -48,9 +59,40 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
     queryKey: ['/api/schools'],
   });
 
+  // Fetch classes for the selected school
+  useEffect(() => {
+    if (selectedSchoolId && (newRole === UserRoleEnum.CLASS_TEACHER)) {
+      const fetchClasses = async () => {
+        try {
+          const res = await fetch(`/api/schools/${selectedSchoolId}/classes`);
+          if (res.ok) {
+            const data = await res.json();
+            setClasses(data);
+          } else {
+            toast({
+              title: 'Ошибка',
+              description: 'Не удалось загрузить классы',
+              variant: 'destructive',
+            });
+          }
+        } catch (error) {
+          toast({
+            title: 'Ошибка',
+            description: 'Не удалось загрузить классы',
+            variant: 'destructive',
+          });
+        }
+      };
+      fetchClasses();
+    } else {
+      setClasses([]);
+      setSelectedClassId(null);
+    }
+  }, [selectedSchoolId, newRole, toast]);
+
   // Add role mutation
   const addRoleMutation = useMutation({
-    mutationFn: async (data: { userId: number; role: UserRoleEnum; schoolId: number | null }) => {
+    mutationFn: async (data: { userId: number; role: UserRoleEnum; schoolId: number | null; classId: number | null }) => {
       const res = await apiRequest('POST', '/api/user-roles', data);
       if (!res.ok) {
         const errorData = await res.json();
@@ -67,6 +109,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
       setIsAddDialogOpen(false);
       setNewRole('');
       setSelectedSchoolId(null);
+      setSelectedClassId(null);
     },
     onError: (error: Error) => {
       toast({
@@ -120,6 +163,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
       UserRoleEnum.TEACHER,
       UserRoleEnum.PRINCIPAL,
       UserRoleEnum.VICE_PRINCIPAL,
+      UserRoleEnum.CLASS_TEACHER,
     ].includes(newRole as UserRoleEnum);
 
     if (isSchoolRole && !selectedSchoolId) {
@@ -131,10 +175,21 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
       return;
     }
 
+    // Check if class is required for this role (CLASS_TEACHER)
+    if (newRole === UserRoleEnum.CLASS_TEACHER && !selectedClassId) {
+      toast({
+        title: 'Ошибка',
+        description: 'Для классного руководителя необходимо выбрать класс',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     addRoleMutation.mutate({
       userId,
       role: newRole as UserRoleEnum,
       schoolId: isSchoolRole ? selectedSchoolId : null,
+      classId: newRole === UserRoleEnum.CLASS_TEACHER ? selectedClassId : null,
     });
   };
 
@@ -155,6 +210,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
       [UserRoleEnum.PARENT]: 'Родитель',
       [UserRoleEnum.PRINCIPAL]: 'Директор',
       [UserRoleEnum.VICE_PRINCIPAL]: 'Завуч',
+      [UserRoleEnum.CLASS_TEACHER]: 'Классный руководитель',
     };
     return roleLabels[role] || role;
   };
@@ -169,6 +225,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
       [UserRoleEnum.PARENT]: 'secondary',
       [UserRoleEnum.PRINCIPAL]: 'default',
       [UserRoleEnum.VICE_PRINCIPAL]: 'default',
+      [UserRoleEnum.CLASS_TEACHER]: 'default',
     };
     return roleBadgeVariants[role] || 'default';
   };
@@ -180,6 +237,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
       UserRoleEnum.TEACHER,
       UserRoleEnum.PRINCIPAL,
       UserRoleEnum.VICE_PRINCIPAL,
+      UserRoleEnum.CLASS_TEACHER,
     ].includes(role);
   };
 
@@ -214,6 +272,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
                     // Reset school selection if role doesn't require it
                     if (!doesRoleRequireSchool(value as UserRoleEnum)) {
                       setSelectedSchoolId(null);
+                      setSelectedClassId(null);
                     }
                   }}
                 >
@@ -228,6 +287,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
                     <SelectItem value={UserRoleEnum.PARENT}>Родитель</SelectItem>
                     <SelectItem value={UserRoleEnum.PRINCIPAL}>Директор</SelectItem>
                     <SelectItem value={UserRoleEnum.VICE_PRINCIPAL}>Завуч</SelectItem>
+                    <SelectItem value={UserRoleEnum.CLASS_TEACHER}>Классный руководитель</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -249,6 +309,34 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
                           {school.name}
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Show class selection for CLASS_TEACHER role */}
+              {newRole === UserRoleEnum.CLASS_TEACHER && selectedSchoolId && (
+                <div className="grid gap-2">
+                  <Label htmlFor="class">Класс</Label>
+                  <Select
+                    value={selectedClassId?.toString() || ''}
+                    onValueChange={(value) => setSelectedClassId(parseInt(value))}
+                  >
+                    <SelectTrigger id="class">
+                      <SelectValue placeholder="Выберите класс" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes.length === 0 ? (
+                        <SelectItem value="" disabled>
+                          Нет доступных классов
+                        </SelectItem>
+                      ) : (
+                        classes.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id.toString()}>
+                            {cls.name} ({cls.academicYear})
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -281,6 +369,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
               <TableRow>
                 <TableHead>Роль</TableHead>
                 <TableHead>Школа</TableHead>
+                <TableHead>Класс</TableHead>
                 <TableHead className="w-[100px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -297,6 +386,13 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
                       schools.find((s) => s.id === role.schoolId)?.name || `Школа ID: ${role.schoolId}`
                     ) : (
                       <span className="text-muted-foreground">Нет привязки к школе</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {role.classId ? (
+                      `Класс ID: ${role.classId}`
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
                   <TableCell>
