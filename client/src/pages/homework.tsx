@@ -455,12 +455,13 @@ export default function HomeworkPage() {
                                 homeworkForm.reset({
                                   title: hw.title,
                                   description: hw.description,
-                                  subjectId: hw.subjectId,
                                   classId: hw.classId,
-                                  scheduleId: hw.scheduleId || undefined,
+                                  subjectId: hw.subjectId,
+                                  scheduleId: hw.scheduleId,
                                 });
                                 setIsEditDialogOpen(true);
                               }}
+                              className="flex items-center"
                             >
                               <Edit className="mr-2 h-4 w-4" />
                               Редактировать
@@ -470,7 +471,7 @@ export default function HomeworkPage() {
                                 setHomeworkToDelete(hw);
                                 setIsDeleteDialogOpen(true);
                               }}
-                              className="text-red-600"
+                              className="flex items-center text-red-500"
                             >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Удалить
@@ -478,51 +479,58 @@ export default function HomeworkPage() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
-                      <Badge variant={isPastDue ? "secondary" : "default"}>
-                        {isPastDue ? "Завершено" : "Активно"}
-                      </Badge>
                     </div>
                   </div>
-                  <CardDescription className="flex items-center mt-2">
-                    <CalendarIcon className="h-4 w-4 mr-1" />
-                    Срок: {new Date(hw.dueDate).toLocaleDateString('ru-RU')}
+                  <CardDescription className="flex justify-between">
+                    <span>{getClassName(hw.classId)} • {getSubjectName(hw.subjectId)}</span>
+                    {isSubmitted && (
+                      <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+                        <CheckCircle className="mr-1 h-3 w-3" /> Выполнено
+                      </Badge>
+                    )}
                   </CardDescription>
                 </CardHeader>
+                
                 <CardContent>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    <Badge variant="outline" className="bg-primary-50 border-0">
-                      {getSubjectName(hw.subjectId)}
-                    </Badge>
-                    <Badge variant="outline" className="bg-primary-50 border-0">
-                      {getClassName(hw.classId)}
-                    </Badge>
+                  <p className="text-sm text-gray-600 mb-4">{hw.description}</p>
+                  
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Clock className="mr-1 h-4 w-4" />
+                    <span>Срок до: {format(new Date(hw.dueDate), "d MMMM yyyy", { locale: ru })}</span>
                   </div>
-                  <p className="text-gray-700">{hw.description}</p>
                 </CardContent>
-                <CardFooter className="flex justify-between">
-                  {canSubmitHomework && !isPastDue && (
+                
+                <CardFooter>
+                  {canSubmitHomework && !isSubmitted && !isPastDue && (
                     <Button 
                       onClick={() => handleSubmitHomework(hw)}
-                      disabled={isSubmitted}
-                      variant={isSubmitted ? "secondary" : "default"}
                       className="w-full"
                     >
-                      {isSubmitted ? (
-                        <>
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Выполнено
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-4 w-4 mr-2" />
-                          Отправить ответ
-                        </>
-                      )}
+                      <Upload className="mr-2 h-4 w-4" /> Отправить ответ
                     </Button>
                   )}
-                  {canCreateHomework && (
-                    <Button variant="outline" className="w-full">
-                      Просмотреть ответы
+                  
+                  {isSubmitted && (
+                    <Button variant="outline" className="w-full" disabled>
+                      <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Ответ отправлен
+                    </Button>
+                  )}
+                  
+                  {isPastDue && !isSubmitted && canSubmitHomework && (
+                    <Button variant="outline" className="w-full text-red-500" disabled>
+                      <svg
+                        className="mr-2 h-4 w-4"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Срок сдачи истек
                     </Button>
                   )}
                 </CardFooter>
@@ -534,11 +542,11 @@ export default function HomeworkPage() {
 
       {/* Create Homework Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
             <DialogTitle>Создать домашнее задание</DialogTitle>
             <DialogDescription>
-              Заполните информацию о новом домашнем задании
+              Заполните форму для создания нового задания для класса
             </DialogDescription>
           </DialogHeader>
           
@@ -549,9 +557,9 @@ export default function HomeworkPage() {
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Название</FormLabel>
+                    <FormLabel>Название задания</FormLabel>
                     <FormControl>
-                      <Input placeholder="Название задания" {...field} />
+                      <Input placeholder="Введите название задания" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -563,11 +571,11 @@ export default function HomeworkPage() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Описание</FormLabel>
+                    <FormLabel>Описание задания</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Описание задания" 
-                        className="resize-none" 
+                        placeholder="Введите подробное описание задания" 
+                        className="min-h-[120px]"
                         {...field} 
                       />
                     </FormControl>
@@ -579,41 +587,13 @@ export default function HomeworkPage() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={homeworkForm.control}
-                  name="subjectId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Предмет</FormLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(parseInt(value))}
-                        defaultValue={field.value?.toString()}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите предмет" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {subjects.map((subject) => (
-                            <SelectItem key={subject.id} value={subject.id.toString()}>
-                              {subject.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={homeworkForm.control}
                   name="classId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Класс</FormLabel>
                       <Select
+                        value={field.value?.toString()}
                         onValueChange={(value) => field.onChange(parseInt(value))}
-                        defaultValue={field.value?.toString()}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -632,8 +612,36 @@ export default function HomeworkPage() {
                     </FormItem>
                   )}
                 />
+                
+                <FormField
+                  control={homeworkForm.control}
+                  name="subjectId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Предмет</FormLabel>
+                      <Select
+                        value={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите предмет" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {subjects.map((subject) => (
+                            <SelectItem key={subject.id} value={subject.id.toString()}>
+                              {subject.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              
+
               <FormField
                 control={homeworkForm.control}
                 name="scheduleId"
@@ -641,9 +649,8 @@ export default function HomeworkPage() {
                   <FormItem>
                     <FormLabel>Урок</FormLabel>
                     <Select
+                      value={field.value?.toString()}
                       onValueChange={(value) => field.onChange(parseInt(value))}
-                      defaultValue={field.value?.toString()}
-                      disabled={selectedSchedules.length === 0}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -651,16 +658,13 @@ export default function HomeworkPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {selectedSchedules.map((schedule) => {
-                          const dateStr = schedule.scheduleDate ? format(new Date(schedule.scheduleDate), 'dd.MM.yyyy', { locale: ru }) : '';
-                          return (
-                            <SelectItem key={schedule.id} value={schedule.id.toString()}>
-                              {dateStr}, {schedule.startTime}-{schedule.endTime}, {schedule.room || ""}
-                            </SelectItem>
-                          );
-                        })}
+                        {selectedSchedules.map((schedule) => (
+                          <SelectItem key={schedule.id} value={schedule.id.toString()}>
+                            {format(new Date(schedule.date), "d MMMM yyyy", { locale: ru })} {schedule.startTime}
+                          </SelectItem>
+                        ))}
                         {selectedSchedules.length === 0 && (
-                          <SelectItem value="" disabled>Сначала выберите класс и предмет</SelectItem>
+                          <SelectItem value="placeholder" disabled>Сначала выберите класс и предмет</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -671,86 +675,26 @@ export default function HomeworkPage() {
               
               <DialogFooter>
                 <Button type="submit" disabled={createHomeworkMutation.isPending}>
-                  {createHomeworkMutation.isPending ? 'Сохранение...' : 'Создать задание'}
+                  {createHomeworkMutation.isPending ? 'Создание...' : 'Создать задание'}
                 </Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
-
-      {/* Submit Homework Dialog */}
-      <Dialog open={isSubmitDialogOpen} onOpenChange={setIsSubmitDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Отправить ответ</DialogTitle>
-            <DialogDescription>
-              {selectedHomework?.title}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Form {...submissionForm}>
-            <form onSubmit={submissionForm.handleSubmit(onSubmitSubmission)} className="space-y-4">
-              <FormField
-                control={submissionForm.control}
-                name="submissionText"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Ответ</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Введите ваш ответ" 
-                        className="resize-none min-h-[150px]" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={submissionForm.control}
-                name="fileUrl"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Прикрепить файл (опционально)</FormLabel>
-                    <FormControl>
-                      <div className="flex items-center">
-                        <Input placeholder="URL файла" {...field} />
-                        <Button type="button" variant="outline" className="ml-2">
-                          <FileUpIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <DialogFooter>
-                <Button type="submit" disabled={submitHomeworkMutation.isPending}>
-                  {submitHomeworkMutation.isPending ? 'Отправка...' : 'Отправить ответ'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
+      
       {/* Edit Homework Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
             <DialogTitle>Редактировать домашнее задание</DialogTitle>
             <DialogDescription>
-              Внесите изменения в задание
+              Измените информацию о домашнем задании
             </DialogDescription>
           </DialogHeader>
           
           <Form {...homeworkForm}>
-            <form 
-              onSubmit={homeworkForm.handleSubmit((values) => {
+            <form onSubmit={homeworkForm.handleSubmit((values) => {
                 if (homeworkToEdit) {
                   updateHomeworkMutation.mutate({ id: homeworkToEdit.id, data: values });
                 }
@@ -762,9 +706,9 @@ export default function HomeworkPage() {
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Название</FormLabel>
+                    <FormLabel>Название задания</FormLabel>
                     <FormControl>
-                      <Input placeholder="Название задания" {...field} />
+                      <Input placeholder="Введите название задания" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -776,11 +720,11 @@ export default function HomeworkPage() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Описание</FormLabel>
+                    <FormLabel>Описание задания</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Описание задания" 
-                        className="resize-none" 
+                        placeholder="Введите подробное описание задания" 
+                        className="min-h-[120px]"
                         {...field} 
                       />
                     </FormControl>
@@ -792,41 +736,13 @@ export default function HomeworkPage() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={homeworkForm.control}
-                  name="subjectId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Предмет</FormLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(parseInt(value))}
-                        defaultValue={field.value?.toString()}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите предмет" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {subjects.map((subject) => (
-                            <SelectItem key={subject.id} value={subject.id.toString()}>
-                              {subject.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={homeworkForm.control}
                   name="classId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Класс</FormLabel>
                       <Select
+                        value={field.value?.toString()}
                         onValueChange={(value) => field.onChange(parseInt(value))}
-                        defaultValue={field.value?.toString()}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -845,8 +761,36 @@ export default function HomeworkPage() {
                     </FormItem>
                   )}
                 />
+                
+                <FormField
+                  control={homeworkForm.control}
+                  name="subjectId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Предмет</FormLabel>
+                      <Select
+                        value={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите предмет" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {subjects.map((subject) => (
+                            <SelectItem key={subject.id} value={subject.id.toString()}>
+                              {subject.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              
+
               <FormField
                 control={homeworkForm.control}
                 name="scheduleId"
@@ -854,9 +798,8 @@ export default function HomeworkPage() {
                   <FormItem>
                     <FormLabel>Урок</FormLabel>
                     <Select
+                      value={field.value?.toString()}
                       onValueChange={(value) => field.onChange(parseInt(value))}
-                      defaultValue={field.value?.toString()}
-                      disabled={selectedSchedules.length === 0}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -864,16 +807,13 @@ export default function HomeworkPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {selectedSchedules.map((schedule) => {
-                          const dateStr = schedule.scheduleDate ? format(new Date(schedule.scheduleDate), 'dd.MM.yyyy', { locale: ru }) : '';
-                          return (
-                            <SelectItem key={schedule.id} value={schedule.id.toString()}>
-                              {dateStr}, {schedule.startTime}-{schedule.endTime}, {schedule.room || ""}
-                            </SelectItem>
-                          );
-                        })}
+                        {selectedSchedules.map((schedule) => (
+                          <SelectItem key={schedule.id} value={schedule.id.toString()}>
+                            {format(new Date(schedule.date), "d MMMM yyyy", { locale: ru })} {schedule.startTime}
+                          </SelectItem>
+                        ))}
                         {selectedSchedules.length === 0 && (
-                          <SelectItem value="" disabled>Сначала выберите класс и предмет</SelectItem>
+                          <SelectItem value="placeholder" disabled>Сначала выберите класс и предмет</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
@@ -883,9 +823,6 @@ export default function HomeworkPage() {
               />
               
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} type="button">
-                  Отмена
-                </Button>
                 <Button type="submit" disabled={updateHomeworkMutation.isPending}>
                   {updateHomeworkMutation.isPending ? 'Сохранение...' : 'Сохранить изменения'}
                 </Button>
@@ -894,19 +831,19 @@ export default function HomeworkPage() {
           </Form>
         </DialogContent>
       </Dialog>
-
-      {/* Delete Confirmation Dialog */}
+      
+      {/* Delete Homework Confirmation */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+            <AlertDialogTitle>Подтверждение удаления</AlertDialogTitle>
             <AlertDialogDescription>
-              Это действие не может быть отменено. Домашнее задание "{homeworkToDelete?.title}" будет удалено навсегда.
+              Вы уверены, что хотите удалить это домашнее задание? Это действие нельзя отменить.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction 
+            <Button
               onClick={() => {
                 if (homeworkToDelete) {
                   deleteHomeworkMutation.mutate(homeworkToDelete.id);
@@ -939,12 +876,79 @@ export default function HomeworkPage() {
                   Удаление...
                 </span>
               ) : (
-                "Да, удалить"
+                'Удалить задание'
               )}
-            </AlertDialogAction>
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Submit Homework Dialog */}
+      <Dialog open={isSubmitDialogOpen} onOpenChange={setIsSubmitDialogOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Отправить ответ на задание</DialogTitle>
+            <DialogDescription>
+              {selectedHomework && (
+                <span className="text-primary font-medium">
+                  {selectedHomework.title}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...submissionForm}>
+            <form onSubmit={submissionForm.handleSubmit(onSubmitSubmission)} className="space-y-4">
+              <FormField
+                control={submissionForm.control}
+                name="submissionText"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Текст ответа</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Введите ваш ответ на задание" 
+                        className="min-h-[150px]"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={submissionForm.control}
+                name="fileUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Прикрепить файл (необязательно)</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center space-x-2">
+                        <Input 
+                          type="text"
+                          placeholder="Ссылка на файл или документ" 
+                          {...field} 
+                        />
+                        <Button type="button" variant="outline" size="icon">
+                          <FileUpIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="submit" disabled={submitHomeworkMutation.isPending}>
+                  {submitHomeworkMutation.isPending ? 'Отправка...' : 'Отправить ответ'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }
