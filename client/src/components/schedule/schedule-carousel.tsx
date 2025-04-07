@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { 
   startOfWeek, 
@@ -13,7 +13,7 @@ import { ru } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { ScheduleDayCard } from "./schedule-day-card";
 import { Schedule, User, Subject, Class, Grade, UserRoleEnum, Homework } from "@shared/schema";
-import { FiChevronLeft, FiChevronRight, FiCalendar } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiCalendar, FiArrowLeft, FiArrowRight } from "react-icons/fi";
 
 interface ScheduleCarouselProps {
   schedules: Schedule[];
@@ -45,11 +45,16 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
     return startOfWeek(new Date(), { weekStartsOn: 1 });
   });
   
-  const [emblaRef, emblaApi] = useEmblaCarousel({ 
+  // Опции для Embla Carousel
+  const options = {
     loop: false,
     align: "start",
-    dragFree: true
-  });
+    dragFree: true,
+    containScroll: "trimSnaps"
+  };
+  
+  const [emblaRef, emblaApi] = useEmblaCarousel(options);
+  const scrollListenerRef = useRef<((event: WheelEvent) => void) | null>(null);
 
   // Создаем массив дат для текущей недели
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
@@ -64,6 +69,75 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
     const newWeekStart = addWeeks(currentWeekStart, 1);
     setCurrentWeekStart(newWeekStart);
   }, [currentWeekStart]);
+  
+  // Обработчики прокрутки карточек внутри недели
+  const scrollPrev = useCallback(() => {
+    if (emblaApi) emblaApi.scrollPrev();
+  }, [emblaApi]);
+  
+  const scrollNext = useCallback(() => {
+    if (emblaApi) emblaApi.scrollNext();
+  }, [emblaApi]);
+  
+  // Состояние для отслеживания возможности прокрутки
+  const [canScrollPrev, setCanScrollPrev] = useState(false);
+  const [canScrollNext, setCanScrollNext] = useState(true);
+  
+  // Обновляем состояние кнопок навигации при прокрутке
+  useEffect(() => {
+    if (!emblaApi) return;
+    
+    const onSelect = () => {
+      setCanScrollPrev(emblaApi.canScrollPrev());
+      setCanScrollNext(emblaApi.canScrollNext());
+    };
+    
+    // Инициализация состояния кнопок
+    onSelect();
+    
+    // Подписка на события прокрутки
+    emblaApi.on('select', onSelect);
+    emblaApi.on('reInit', onSelect);
+    
+    return () => {
+      emblaApi.off('select', onSelect);
+      emblaApi.off('reInit', onSelect);
+    };
+  }, [emblaApi]);
+
+  // Добавляем прокрутку колесиком мыши
+  useEffect(() => {
+    if (!emblaApi) return;
+    
+    const handleWheel = (event: WheelEvent) => {
+      // Предотвращаем стандартное поведение прокрутки страницы
+      event.preventDefault();
+      
+      // Определяем направление прокрутки
+      if (event.deltaY < 0) {
+        emblaApi.scrollPrev();
+      } else {
+        emblaApi.scrollNext();
+      }
+    };
+    
+    // Удаляем предыдущий обработчик, если он был
+    if (scrollListenerRef.current) {
+      emblaRef.current?.removeEventListener('wheel', scrollListenerRef.current);
+    }
+    
+    // Сохраняем ссылку на текущий обработчик
+    scrollListenerRef.current = handleWheel;
+    
+    // Добавляем новый обработчик
+    emblaRef.current?.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      if (scrollListenerRef.current) {
+        emblaRef.current?.removeEventListener('wheel', scrollListenerRef.current);
+      }
+    };
+  }, [emblaApi, emblaRef]);
 
   // Скролл к текущему дню, когда меняется неделя
   useEffect(() => {
@@ -108,7 +182,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   const weekRangeText = `${format(currentWeekStart, "d MMM", { locale: ru })} - ${format(currentWeekEnd, "d MMM yyyy", { locale: ru })}`;
 
   return (
-    <div className="mb-8">
+    <div className="mb-8 relative">
       <div className="flex justify-between items-center mb-4">
         <Button 
           variant="outline" 
@@ -129,6 +203,29 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
           className="gap-1"
         >
           Следующая неделя <FiChevronRight />
+        </Button>
+      </div>
+      
+      {/* Кнопки навигации внутри недели */}
+      <div className="flex justify-between absolute w-full top-1/2 transform -translate-y-1/2 px-2 z-10 pointer-events-none">
+        <Button 
+          variant="outline" 
+          size="icon"
+          className="rounded-full shadow-md bg-background/90 pointer-events-auto"
+          onClick={scrollPrev}
+          disabled={!canScrollPrev}
+        >
+          <FiArrowLeft className="h-5 w-5" />
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          size="icon"
+          className="rounded-full shadow-md bg-background/90 pointer-events-auto"
+          onClick={scrollNext}
+          disabled={!canScrollNext}
+        >
+          <FiArrowRight className="h-5 w-5" />
         </Button>
       </div>
       
@@ -153,6 +250,11 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
             </div>
           ))}
         </div>
+      </div>
+      
+      {/* Добавляем небольшую подсказку о прокрутке колесиком мыши */}
+      <div className="text-center mt-2 text-sm text-muted-foreground">
+        <span>Используйте колесико мыши или стрелки для навигации по дням недели</span>
       </div>
     </div>
   );
