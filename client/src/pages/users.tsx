@@ -1015,7 +1015,7 @@ export default function UsersPage() {
       
       {/* Add User Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md max-w-[95vw] w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Добавить пользователя</DialogTitle>
             <DialogDescription>
@@ -1025,7 +1025,7 @@ export default function UsersPage() {
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmitAdd)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
                   name="firstName"
@@ -1097,7 +1097,7 @@ export default function UsersPage() {
                 )}
               />
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
                   name="password"
@@ -1351,7 +1351,7 @@ export default function UsersPage() {
       
       {/* Edit User Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md max-w-[95vw] w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Редактировать пользователя</DialogTitle>
             <DialogDescription>
@@ -1361,7 +1361,7 @@ export default function UsersPage() {
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmitEdit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
                   name="firstName"
@@ -1433,7 +1433,7 @@ export default function UsersPage() {
                 )}
               />
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
                   name="password"
