@@ -702,8 +702,7 @@ export default function HomeworkPage() {
                 if (homeworkToEdit) {
                   updateHomeworkMutation.mutate({ id: homeworkToEdit.id, data: values });
                 }
-              })} 
-              className="space-y-4"
+              })} className="space-y-4"
             >
               <FormField
                 control={homeworkForm.control}

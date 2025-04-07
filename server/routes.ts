@@ -553,14 +553,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Рассчитываем срок сдачи (7 дней после даты урока)
-    const lessonDate = new Date(schedule.scheduleDate);
-    const dueDate = new Date(lessonDate);
-    dueDate.setDate(dueDate.getDate() + 7); // Срок сдачи через неделю после урока
+    let dueDate;
+    if (schedule.scheduleDate) {
+      const lessonDate = new Date(schedule.scheduleDate);
+      dueDate = new Date(lessonDate);
+      dueDate.setDate(dueDate.getDate() + 7); // Срок сдачи через неделю после урока
+    } else {
+      // Если дата урока не указана, используем текущую дату + 7 дней
+      dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 7);
+    }
+    
+    // Преобразуем дату в строку формата YYYY-MM-DD для хранения в БД
+    const formattedDueDate = dueDate.toISOString().split('T')[0];
     
     const homework = await dataStorage.createHomework({
       ...req.body,
       teacherId: req.user.id,
-      dueDate
+      dueDate: formattedDueDate
     });
     
     // Create notifications for all students in the class
@@ -599,8 +609,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "You can only update your own homework assignments" });
     }
     
+    // Если в запросе присутствует дата, обработаем её
+    let updateData = { ...req.body };
+    
+    // Если нужно обработать dueDate, переведём в строку
+    if (updateData.dueDate && updateData.dueDate instanceof Date) {
+      updateData.dueDate = updateData.dueDate.toISOString().split('T')[0];
+    }
+    
     // Update the homework
-    const updatedHomework = await dataStorage.updateHomework(homeworkId, req.body);
+    const updatedHomework = await dataStorage.updateHomework(homeworkId, updateData);
     
     // Log the action
     await dataStorage.createSystemLog({
