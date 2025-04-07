@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRoleEnum, Homework, insertHomeworkSchema, Class, Subject, HomeworkSubmission } from "@shared/schema";
+import { UserRoleEnum, Homework, insertHomeworkSchema, Class, Subject, HomeworkSubmission, Schedule } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Filter, Search, Upload, Clock, CalendarIcon, FileUpIcon, CheckCircle } from "lucide-react";
+import { Plus, Filter, Search, Upload, Clock, CalendarIcon, FileUpIcon, CheckCircle, Edit, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,6 +23,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -42,11 +43,29 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 
-// Schema for homework creation
+// Schema for homework creation (обновленная схема без dueDate, но с scheduleId)
 const homeworkFormSchema = insertHomeworkSchema.extend({
   title: z.string().min(1, "Название обязательно"),
   description: z.string().min(1, "Описание обязательно"),
@@ -56,7 +75,9 @@ const homeworkFormSchema = insertHomeworkSchema.extend({
   classId: z.number({
     required_error: "Выберите класс",
   }),
-  dueDate: z.string().min(1, "Выберите срок сдачи"),
+  scheduleId: z.number({
+    required_error: "Выберите урок",
+  }),
 });
 
 // Schema for homework submission
@@ -106,6 +127,19 @@ export default function HomeworkPage() {
     enabled: !!user && canSubmitHomework
   });
 
+  // Добавляем состояния для редактирования и удаления
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [homeworkToEdit, setHomeworkToEdit] = useState<Homework | null>(null);
+  const [homeworkToDelete, setHomeworkToDelete] = useState<Homework | null>(null);
+  const [selectedSchedules, setSelectedSchedules] = useState<Schedule[]>([]);
+
+  // Запрос на получение расписаний
+  const { data: schedules = [] } = useQuery<Schedule[]>({
+    queryKey: ["/api/schedules"],
+    enabled: !!user && canCreateHomework
+  });
+
   // Form for creating homework
   const homeworkForm = useForm<z.infer<typeof homeworkFormSchema>>({
     resolver: zodResolver(homeworkFormSchema),
@@ -114,9 +148,26 @@ export default function HomeworkPage() {
       description: "",
       subjectId: undefined,
       classId: undefined,
-      dueDate: "",
+      scheduleId: undefined,
     },
   });
+  
+  // Получить уроки для выбранного класса и предмета
+  const classId = homeworkForm.watch("classId");
+  const subjectId = homeworkForm.watch("subjectId");
+  
+  useEffect(() => {
+    if (classId && subjectId) {
+      const filteredSchedules = schedules.filter(
+        (schedule) => 
+          schedule.classId === classId && 
+          schedule.subjectId === subjectId
+      );
+      setSelectedSchedules(filteredSchedules);
+    } else {
+      setSelectedSchedules([]);
+    }
+  }, [classId, subjectId, schedules]);
 
   // Form for submitting homework
   const submissionForm = useForm<z.infer<typeof submissionFormSchema>>({
@@ -147,6 +198,55 @@ export default function HomeworkPage() {
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось создать домашнее задание",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Update homework mutation
+  const updateHomeworkMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number, data: z.infer<typeof homeworkFormSchema> }) => {
+      const res = await apiRequest("PATCH", `/api/homework/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/homework"] });
+      setIsEditDialogOpen(false);
+      setHomeworkToEdit(null);
+      homeworkForm.reset();
+      toast({
+        title: "Домашнее задание обновлено",
+        description: "Изменения успешно сохранены",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось обновить домашнее задание",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Delete homework mutation
+  const deleteHomeworkMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/homework/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/homework"] });
+      setIsDeleteDialogOpen(false);
+      setHomeworkToDelete(null);
+      toast({
+        title: "Домашнее задание удалено",
+        description: "Задание успешно удалено из системы",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить домашнее задание",
         variant: "destructive",
       });
     },
@@ -327,9 +427,61 @@ export default function HomeworkPage() {
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-xl">{hw.title}</CardTitle>
-                    <Badge variant={isPastDue ? "secondary" : "default"}>
-                      {isPastDue ? "Завершено" : "Активно"}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {canCreateHomework && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="h-4 w-4"
+                              >
+                                <circle cx="12" cy="12" r="1" />
+                                <circle cx="12" cy="5" r="1" />
+                                <circle cx="12" cy="19" r="1" />
+                              </svg>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setHomeworkToEdit(hw);
+                                homeworkForm.reset({
+                                  title: hw.title,
+                                  description: hw.description,
+                                  subjectId: hw.subjectId,
+                                  classId: hw.classId,
+                                  scheduleId: hw.scheduleId || undefined,
+                                });
+                                setIsEditDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="mr-2 h-4 w-4" />
+                              Редактировать
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setHomeworkToDelete(hw);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Удалить
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                      <Badge variant={isPastDue ? "secondary" : "default"}>
+                        {isPastDue ? "Завершено" : "Активно"}
+                      </Badge>
+                    </div>
                   </div>
                   <CardDescription className="flex items-center mt-2">
                     <CalendarIcon className="h-4 w-4 mr-1" />
@@ -484,16 +636,34 @@ export default function HomeworkPage() {
               
               <FormField
                 control={homeworkForm.control}
-                name="dueDate"
+                name="scheduleId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Срок выполнения</FormLabel>
-                    <FormControl>
-                      <div className="flex items-center">
-                        <CalendarIcon className="h-4 w-4 mr-2 text-gray-400" />
-                        <Input type="date" {...field} />
-                      </div>
-                    </FormControl>
+                    <FormLabel>Урок</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      defaultValue={field.value?.toString()}
+                      disabled={selectedSchedules.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите урок" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {selectedSchedules.map((schedule) => {
+                          const dateStr = schedule.scheduleDate ? format(new Date(schedule.scheduleDate), 'dd.MM.yyyy', { locale: ru }) : '';
+                          return (
+                            <SelectItem key={schedule.id} value={schedule.id.toString()}>
+                              {dateStr}, {schedule.startTime}-{schedule.endTime}, {schedule.room || ""}
+                            </SelectItem>
+                          );
+                        })}
+                        {selectedSchedules.length === 0 && (
+                          <SelectItem value="" disabled>Сначала выберите класс и предмет</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -567,6 +737,214 @@ export default function HomeworkPage() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Homework Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Редактировать домашнее задание</DialogTitle>
+            <DialogDescription>
+              Внесите изменения в задание
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...homeworkForm}>
+            <form 
+              onSubmit={homeworkForm.handleSubmit((values) => {
+                if (homeworkToEdit) {
+                  updateHomeworkMutation.mutate({ id: homeworkToEdit.id, data: values });
+                }
+              })} 
+              className="space-y-4"
+            >
+              <FormField
+                control={homeworkForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Название</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Название задания" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={homeworkForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Описание</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Описание задания" 
+                        className="resize-none" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={homeworkForm.control}
+                  name="subjectId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Предмет</FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                        defaultValue={field.value?.toString()}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите предмет" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {subjects.map((subject) => (
+                            <SelectItem key={subject.id} value={subject.id.toString()}>
+                              {subject.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={homeworkForm.control}
+                  name="classId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Класс</FormLabel>
+                      <Select
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                        defaultValue={field.value?.toString()}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите класс" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {classes.map((cls) => (
+                            <SelectItem key={cls.id} value={cls.id.toString()}>
+                              {cls.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={homeworkForm.control}
+                name="scheduleId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Урок</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      defaultValue={field.value?.toString()}
+                      disabled={selectedSchedules.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите урок" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {selectedSchedules.map((schedule) => {
+                          const dateStr = schedule.scheduleDate ? format(new Date(schedule.scheduleDate), 'dd.MM.yyyy', { locale: ru }) : '';
+                          return (
+                            <SelectItem key={schedule.id} value={schedule.id.toString()}>
+                              {dateStr}, {schedule.startTime}-{schedule.endTime}, {schedule.room || ""}
+                            </SelectItem>
+                          );
+                        })}
+                        {selectedSchedules.length === 0 && (
+                          <SelectItem value="" disabled>Сначала выберите класс и предмет</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} type="button">
+                  Отмена
+                </Button>
+                <Button type="submit" disabled={updateHomeworkMutation.isPending}>
+                  {updateHomeworkMutation.isPending ? 'Сохранение...' : 'Сохранить изменения'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Это действие не может быть отменено. Домашнее задание "{homeworkToDelete?.title}" будет удалено навсегда.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (homeworkToDelete) {
+                  deleteHomeworkMutation.mutate(homeworkToDelete.id);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleteHomeworkMutation.isPending ? (
+                <span className="flex items-center">
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Удаление...
+                </span>
+              ) : (
+                "Да, удалить"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
