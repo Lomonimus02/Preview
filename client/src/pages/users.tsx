@@ -225,7 +225,7 @@ export default function UsersPage() {
   const addUserMutation = useMutation({
     mutationFn: async (data: UserFormData) => {
       const { confirmPassword, ...userData } = data;
-      const res = await apiRequest("POST", "/api/register", userData);
+      const res = await apiRequest("POST", "/api/users", userData);
       return res.json();
     },
     onSuccess: () => {
