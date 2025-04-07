@@ -1669,7 +1669,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "User does not have this role" });
     }
     
-    const user = await dataStorage.updateUser(userId, { activeRole });
+    // Найдем выбранную роль, чтобы получить schoolId и classId
+    const selectedRole = userRoles.find(r => r.role === activeRole);
+    
+    // Обновим пользователя с новой активной ролью и соответствующими данными
+    const updateData: any = { activeRole };
+    
+    // Если выбрана дополнительная роль, то обновляем schoolId и classId
+    if (selectedRole) {
+      updateData.schoolId = selectedRole.schoolId;
+      
+      // Если есть classId (например, для классного руководителя), тоже обновляем
+      if (selectedRole.classId) {
+        updateData.classId = selectedRole.classId;
+      }
+    }
+    
+    const user = await dataStorage.updateUser(userId, updateData);
+    
+    // Обновим данные пользователя в сессии
+    req.user.activeRole = activeRole;
+    if (updateData.schoolId !== undefined) req.user.schoolId = updateData.schoolId;
+    if (updateData.classId !== undefined) req.user.classId = updateData.classId;
     
     // Log the action
     await dataStorage.createSystemLog({
