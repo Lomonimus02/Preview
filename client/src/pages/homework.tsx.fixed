@@ -664,7 +664,7 @@ export default function HomeworkPage() {
                       <SelectContent>
                         {selectedSchedules.map((schedule) => (
                           <SelectItem key={schedule.id} value={schedule.id.toString()}>
-{schedule.scheduleDate ? format(new Date(schedule.scheduleDate), "d MMMM yyyy", { locale: ru }) : ""}                             {schedule.startTime}
+                            {schedule.scheduleDate ? format(new Date(schedule.scheduleDate), "d MMMM yyyy", { locale: ru }) : ""} {schedule.startTime}
                           </SelectItem>
                         ))}
                         {selectedSchedules.length === 0 && (
@@ -840,49 +840,23 @@ export default function HomeworkPage() {
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Подтверждение удаления</AlertDialogTitle>
+            <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
             <AlertDialogDescription>
-              Вы уверены, что хотите удалить это домашнее задание? Это действие нельзя отменить.
+              Это действие нельзя отменить. Домашнее задание будет удалено из системы вместе со всеми ответами студентов.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <Button
+            <AlertDialogAction
               onClick={() => {
                 if (homeworkToDelete) {
                   deleteHomeworkMutation.mutate(homeworkToDelete.id);
                 }
               }}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-red-500 hover:bg-red-600"
             >
-              {deleteHomeworkMutation.isPending ? (
-                <span className="flex items-center">
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Удаление...
-                </span>
-              ) : (
-                'Удалить задание'
-              )}
-            </Button>
+              Удалить
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -893,11 +867,7 @@ export default function HomeworkPage() {
           <DialogHeader>
             <DialogTitle>Отправить ответ на задание</DialogTitle>
             <DialogDescription>
-              {selectedHomework && (
-                <span className="text-primary font-medium">
-                  {selectedHomework.title}
-                </span>
-              )}
+              {selectedHomework?.title}
             </DialogDescription>
           </DialogHeader>
           
@@ -926,20 +896,17 @@ export default function HomeworkPage() {
                 name="fileUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Прикрепить файл (необязательно)</FormLabel>
+                    <FormLabel>Ссылка на файл (необязательно)</FormLabel>
                     <FormControl>
-                      <div className="flex items-center space-x-2">
-                        <Input 
-                          type="text"
-                          placeholder="Ссылка на файл или документ" 
-                          {...field} 
-                        />
-                        <Button type="button" variant="outline" size="icon">
-                          <FileUpIcon className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Input 
+                        placeholder="Вставьте ссылку на загруженный файл" 
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
+                    <p className="text-xs text-gray-500 mt-1">
+                      * Вы можете загрузить файл на любой файловый хостинг и вставить ссылку сюда
+                    </p>
                   </FormItem>
                 )}
               />
