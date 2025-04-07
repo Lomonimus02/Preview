@@ -113,7 +113,7 @@ export default function Schools() {
   // Add school mutation
   const addSchoolMutation = useMutation({
     mutationFn: async (data: z.infer<typeof schoolFormSchema>) => {
-      const res = await apiRequest("POST", "/api/schools", data);
+      const res = await apiRequest("/api/schools", "POST", data);
       return res.json();
     },
     onSuccess: () => {
@@ -137,7 +137,7 @@ export default function Schools() {
   // Edit school mutation
   const editSchoolMutation = useMutation({
     mutationFn: async (data: { id: number; school: Partial<z.infer<typeof schoolFormSchema>> }) => {
-      const res = await apiRequest("PUT", `/api/schools/${data.id}`, data.school);
+      const res = await apiRequest(`/api/schools/${data.id}`, "PUT", data.school);
       return res.json();
     },
     onSuccess: () => {
