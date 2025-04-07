@@ -70,7 +70,7 @@ export default function ClassTeacherGradesPage() {
   const { data: students = [], isLoading: studentsLoading } = useQuery<User[]>({
     queryKey: ["/api/students-by-class", classId],
     queryFn: async () => {
-      const res = await fetch(`/api/students-by-class/${classId}`);
+      const res = await apiRequest(`/api/students-by-class/${classId}`, "GET");
       if (!res.ok) throw new Error("Не удалось загрузить список учеников");
       return res.json();
     },
