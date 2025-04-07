@@ -167,6 +167,22 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return deletedSchedule;
   }
+  
+  async updateSchedule(id: number, schedule: Partial<InsertSchedule>): Promise<Schedule | undefined> {
+    const [updatedSchedule] = await db.update(schedules)
+      .set(schedule)
+      .where(eq(schedules.id, id))
+      .returning();
+    return updatedSchedule;
+  }
+  
+  async updateScheduleStatus(id: number, status: string): Promise<Schedule | undefined> {
+    const [updatedSchedule] = await db.update(schedules)
+      .set({ status })
+      .where(eq(schedules.id, id))
+      .returning();
+    return updatedSchedule;
+  }
 
   // ===== Homework operations =====
   async getHomework(id: number): Promise<Homework | undefined> {
