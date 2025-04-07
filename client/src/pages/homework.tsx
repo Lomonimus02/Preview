@@ -184,7 +184,7 @@ export default function HomeworkPage() {
   // Create homework mutation
   const createHomeworkMutation = useMutation({
     mutationFn: async (data: z.infer<typeof homeworkFormSchema>) => {
-      const res = await apiRequest("POST", "/api/homework", data);
+      const res = await apiRequest("/api/homework", "POST", data);
       return res.json();
     },
     onSuccess: () => {
@@ -208,7 +208,7 @@ export default function HomeworkPage() {
   // Update homework mutation
   const updateHomeworkMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: z.infer<typeof homeworkFormSchema> }) => {
-      const res = await apiRequest("PATCH", `/api/homework/${id}`, data);
+      const res = await apiRequest(`/api/homework/${id}`, "PATCH", data);
       return res.json();
     },
     onSuccess: () => {
@@ -233,7 +233,7 @@ export default function HomeworkPage() {
   // Delete homework mutation
   const deleteHomeworkMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/homework/${id}`, {});
+      const res = await apiRequest(`/api/homework/${id}`, "DELETE");
       return res.json();
     },
     onSuccess: () => {
@@ -257,7 +257,7 @@ export default function HomeworkPage() {
   // Submit homework mutation
   const submitHomeworkMutation = useMutation({
     mutationFn: async (data: z.infer<typeof submissionFormSchema>) => {
-      const res = await apiRequest("POST", "/api/homework-submissions", data);
+      const res = await apiRequest("/api/homework-submissions", "POST", data);
       return res.json();
     },
     onSuccess: () => {
