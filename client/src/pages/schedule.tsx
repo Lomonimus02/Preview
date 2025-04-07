@@ -86,6 +86,7 @@ export default function SchedulePage() {
   const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [selectedAddDate, setSelectedAddDate] = useState<Date | null>(null);
+  const [scheduleToEdit, setScheduleToEdit] = useState<ScheduleType | null>(null);
   
   // Check access permissions
   const canEditSchedule = isSuperAdmin() || isSchoolAdmin();
@@ -170,6 +171,7 @@ export default function SchedulePage() {
       queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
       setIsAddDialogOpen(false);
       setSelectedAddDate(null);
+      setScheduleToEdit(null);
       toast({
         title: "Расписание добавлено",
         description: "Новый урок успешно добавлен в расписание",
@@ -179,6 +181,33 @@ export default function SchedulePage() {
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось добавить урок в расписание",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Update schedule mutation
+  const updateScheduleMutation = useMutation({
+    mutationFn: async (data: ScheduleFormData & { id: number }) => {
+      console.log("Обновление урока в расписании:", data);
+      const { id, ...scheduleData } = data;
+      const res = await apiRequest(`/api/schedules/${id}`, "PATCH", scheduleData);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+      setIsAddDialogOpen(false);
+      setSelectedAddDate(null);
+      setScheduleToEdit(null);
+      toast({
+        title: "Расписание обновлено",
+        description: "Урок был успешно обновлен в расписании",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось обновить урок в расписании",
         variant: "destructive",
       });
     },
@@ -266,16 +295,26 @@ export default function SchedulePage() {
     return teacher ? `${teacher.lastName} ${teacher.firstName}` : `Учитель ${id}`;
   };
 
-  // Обработка открытия формы добавления урока
-  const handleAddSchedule = useCallback((date: Date) => {
+  // Обработка открытия формы добавления/редактирования урока
+  const handleAddSchedule = useCallback((date: Date, scheduleToEdit?: ScheduleType) => {
     setSelectedAddDate(date);
+    setScheduleToEdit(scheduleToEdit || null);
     setIsAddDialogOpen(true);
   }, []);
 
-  // Обработка отправки формы добавления урока
+  // Обработка отправки формы добавления/редактирования урока
   const handleSubmitSchedule = useCallback((data: any) => {
-    addScheduleMutation.mutate(data);
-  }, [addScheduleMutation]);
+    if (scheduleToEdit) {
+      // Если редактируем существующий урок
+      updateScheduleMutation.mutate({
+        ...data,
+        id: scheduleToEdit.id
+      });
+    } else {
+      // Если добавляем новый урок
+      addScheduleMutation.mutate(data);
+    }
+  }, [addScheduleMutation, updateScheduleMutation, scheduleToEdit]);
 
   return (
     <MainLayout>
@@ -320,6 +359,7 @@ export default function SchedulePage() {
           subjects={subjects}
           teachers={teachers}
           isSubmitting={addScheduleMutation.isPending}
+          scheduleToEdit={scheduleToEdit}
         />
         
         {/* Class Students Dialog */}

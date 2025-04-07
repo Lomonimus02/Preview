@@ -94,11 +94,14 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
     return schedules.filter(schedule => {
       // Фильтрация по дате, если установлена конкретная дата
       if (schedule.scheduleDate) {
+        // Используем сравнение дат без времени (только год, месяц, день)
         const scheduleDate = new Date(schedule.scheduleDate);
-        return isSameDay(scheduleDate, date);
+        return format(scheduleDate, "yyyy-MM-dd") === format(date, "yyyy-MM-dd");
       }
       
       // Фильтрация по дню недели
+      // JS: 0 - воскресенье, 1 - понедельник, ..., 6 - суббота
+      // API: 1 - понедельник, 2 - вторник, ..., 7 - воскресенье
       const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
       return schedule.dayOfWeek === dayOfWeek;
     });

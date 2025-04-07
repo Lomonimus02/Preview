@@ -118,7 +118,7 @@ interface ScheduleDayCardProps {
   homework?: Homework[];
   currentUser?: User | null;
   isAdmin?: boolean;
-  onAddSchedule?: (date: Date) => void;
+  onAddSchedule?: (date: Date, scheduleToEdit?: Schedule) => void;
   onDeleteSchedule?: (scheduleId: number) => void;
 }
 
@@ -407,7 +407,16 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                 )}
                 
                 {isAdmin && (
-                  <Button size="sm" variant="outline">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => {
+                      setIsDetailsOpen(false);
+                      if (onAddSchedule && selectedSchedule) {
+                        onAddSchedule(date, selectedSchedule);
+                      }
+                    }}
+                  >
                     <FiEdit3 className="mr-2" />
                     Редактировать
                   </Button>

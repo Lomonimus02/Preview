@@ -704,6 +704,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(deletedSchedule);
   });
   
+  // Обновление урока расписания
+  app.patch("/api/schedules/:id", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    const scheduleId = parseInt(req.params.id);
+    
+    // Проверяем, существует ли расписание
+    const schedule = await dataStorage.getSchedule(scheduleId);
+    if (!schedule) {
+      return res.status(404).json({ message: "Schedule not found" });
+    }
+    
+    // Проверяем права доступа для школьного администратора (школа должна совпадать)
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+      const scheduleClass = await dataStorage.getClass(schedule.classId);
+      if (!scheduleClass || scheduleClass.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "You can only update schedules from your school" });
+      }
+    }
+    
+    // Если дата передана как строка или объект Date, преобразуем ее в правильный формат для PostgreSQL
+    if (req.body.scheduleDate) {
+      try {
+        const dateObj = new Date(req.body.scheduleDate);
+        req.body.scheduleDate = dateObj.toISOString().split('T')[0];
+      } catch (error) {
+        console.error('Error processing schedule date:', error);
+      }
+    }
+    
+    const updatedSchedule = await dataStorage.updateSchedule(scheduleId, req.body);
+    
+    // Log the action
+    await dataStorage.createSystemLog({
+      userId: req.user.id,
+      action: "schedule_updated",
+      details: `Updated schedule entry ID ${scheduleId}`,
+      ipAddress: req.ip
+    });
+    
+    res.json(updatedSchedule);
+  });
+
   // Обновление статуса урока (проведен/не проведен)
   app.patch("/api/schedules/:id/status", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
     const scheduleId = parseInt(req.params.id);

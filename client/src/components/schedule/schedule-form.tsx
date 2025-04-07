@@ -71,6 +71,7 @@ interface ScheduleFormProps {
   subjects: Subject[];
   teachers: User[];
   isSubmitting: boolean;
+  scheduleToEdit?: Schedule | null;
 }
 
 export const ScheduleForm: React.FC<ScheduleFormProps> = ({
@@ -81,19 +82,20 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
   classes,
   subjects,
   teachers,
-  isSubmitting
+  isSubmitting,
+  scheduleToEdit
 }) => {
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
     defaultValues: {
-      classId: undefined,
-      subjectId: undefined,
-      teacherId: undefined,
-      dayOfWeek: defaultDate ? (defaultDate.getDay() === 0 ? 7 : defaultDate.getDay()) : undefined,
-      scheduleDate: defaultDate || undefined,
-      startTime: "",
-      endTime: "",
-      room: "",
+      classId: scheduleToEdit?.classId || undefined,
+      subjectId: scheduleToEdit?.subjectId || undefined,
+      teacherId: scheduleToEdit?.teacherId || undefined,
+      dayOfWeek: scheduleToEdit ? scheduleToEdit.dayOfWeek : (defaultDate ? (defaultDate.getDay() === 0 ? 7 : defaultDate.getDay()) : undefined),
+      scheduleDate: scheduleToEdit ? (scheduleToEdit.scheduleDate ? new Date(scheduleToEdit.scheduleDate) : defaultDate) : (defaultDate || undefined),
+      startTime: scheduleToEdit?.startTime || "",
+      endTime: scheduleToEdit?.endTime || "",
+      room: scheduleToEdit?.room || "",
     },
   });
 
@@ -125,9 +127,12 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Добавить урок в расписание</DialogTitle>
+          <DialogTitle>{scheduleToEdit ? "Редактировать урок" : "Добавить урок в расписание"}</DialogTitle>
           <DialogDescription>
-            Заполните информацию о новом уроке
+            {scheduleToEdit 
+              ? "Обновите информацию об уроке" 
+              : "Заполните информацию о новом уроке"
+            }
           </DialogDescription>
         </DialogHeader>
         
