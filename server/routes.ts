@@ -187,13 +187,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Users API
   app.get("/api/users", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
     const activeRole = req.user.activeRole || req.user.role;
+    console.log("Получение списка пользователей:");
+    console.log("Роль пользователя:", activeRole);
+    console.log("ID школы пользователя:", req.user.schoolId);
     
     if (activeRole === UserRoleEnum.SUPER_ADMIN) {
+      console.log("Получение всех пользователей для SUPER_ADMIN");
       const users = await dataStorage.getUsers();
       return res.json(users);
     } else if (activeRole === UserRoleEnum.SCHOOL_ADMIN && req.user.schoolId) {
+      console.log("Получение пользователей школы для SCHOOL_ADMIN, ID школы:", req.user.schoolId);
       const users = await dataStorage.getUsersBySchool(req.user.schoolId);
+      console.log("Найдено пользователей:", users.length);
       return res.json(users);
+    } else {
+      console.log("Не удовлетворены условия для получения пользователей");
+      console.log("Роль:", activeRole);
+      console.log("ID школы:", req.user.schoolId);
     }
     
     res.json([]);

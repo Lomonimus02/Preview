@@ -173,7 +173,27 @@ export function AdminSubjectList() {
           </DialogHeader>
           
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              console.log("Форма предмета отправлена");
+              const isValid = form.formState.isValid;
+              console.log("Форма валидна:", isValid);
+              console.log("Ошибки формы:", form.formState.errors);
+              
+              if (isValid) {
+                const values = form.getValues();
+                console.log("Значения формы:", values);
+                
+                // Убедимся, что у нас есть schoolId
+                if (!values.schoolId && user?.schoolId) {
+                  values.schoolId = user.schoolId;
+                }
+                
+                addSubjectMutation.mutate(values);
+              } else {
+                form.handleSubmit(onSubmit)(e);
+              }
+            }} className="space-y-4">
               <FormField
                 control={form.control}
                 name="name"
