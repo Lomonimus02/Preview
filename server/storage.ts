@@ -27,6 +27,10 @@ export interface IStorage {
   // Session store
   sessionStore: session.Store;
   
+  // Password methods
+  hashPassword(password: string): Promise<string>;
+  comparePasswords(supplied: string, stored: string): Promise<boolean>;
+  
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -209,6 +213,17 @@ export class MemStorage implements IStorage {
       schoolId: null,
       phone: null
     });
+  }
+  
+  // Password methods
+  async hashPassword(password: string): Promise<string> {
+    // In memory storage doesn't hash passwords, just return the plain text
+    return password;
+  }
+  
+  async comparePasswords(supplied: string, stored: string): Promise<boolean> {
+    // In memory storage doesn't hash passwords, just compare plain text
+    return supplied === stored;
   }
   
   // User operations

@@ -1,6 +1,8 @@
 import { IStorage } from './storage';
 import { db } from './db';
 import { eq, and, or, inArray, sql } from 'drizzle-orm';
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
 import {
   User, InsertUser,
   School, InsertSchool,
@@ -44,6 +46,29 @@ export class DatabaseStorage implements IStorage {
       tableName: 'session', // Имя таблицы для хранения сессий
       createTableIfMissing: true
     });
+  }
+  
+  // Метод для хеширования паролей
+  async hashPassword(password: string): Promise<string> {
+    const scryptAsync = promisify(scrypt);
+    const salt = randomBytes(16).toString("hex");
+    const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+    return `${buf.toString("hex")}.${salt}`;
+  }
+  
+  // Метод для сравнения паролей
+  async comparePasswords(supplied: string, stored: string): Promise<boolean> {
+    const scryptAsync = promisify(scrypt);
+    // Check if the stored password is already hashed (has a salt)
+    if (stored.includes(".")) {
+      const [hashed, salt] = stored.split(".");
+      const hashedBuf = Buffer.from(hashed, "hex");
+      const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+      return timingSafeEqual(hashedBuf, suppliedBuf);
+    } else {
+      // For plaintext passwords (like initial admin user), do a direct comparison
+      return supplied === stored;
+    }
   }
 
   // ===== User operations =====

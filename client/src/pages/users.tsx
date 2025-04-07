@@ -225,7 +225,7 @@ export default function UsersPage() {
   const addUserMutation = useMutation({
     mutationFn: async (data: UserFormData) => {
       const { confirmPassword, ...userData } = data;
-      const res = await apiRequest("POST", "/api/users", userData);
+      const res = await apiRequest("/api/users", "POST", userData);
       return res.json();
     },
     onSuccess: () => {
@@ -250,7 +250,7 @@ export default function UsersPage() {
   const editUserMutation = useMutation({
     mutationFn: async (data: { id: number; user: Partial<UserFormData> }) => {
       const { confirmPassword, ...userData } = data.user;
-      const res = await apiRequest("PUT", `/api/users/${data.id}`, userData);
+      const res = await apiRequest(`/api/users/${data.id}`, "PUT", userData);
       return res.json();
     },
     onSuccess: () => {
@@ -439,7 +439,7 @@ export default function UsersPage() {
   // Add student to class mutation
   const addStudentToClassMutation = useMutation({
     mutationFn: async (data: { studentId: number, classId: number }) => {
-      const res = await apiRequest("POST", "/api/student-classes", data);
+      const res = await apiRequest("/api/student-classes", "POST", data);
       return res.json();
     },
     onSuccess: () => {
@@ -468,7 +468,7 @@ export default function UsersPage() {
   // Add parent-student connection mutation
   const addParentStudentMutation = useMutation({
     mutationFn: async (data: { parentId: number, studentId: number }) => {
-      const res = await apiRequest("POST", "/api/parent-students", data);
+      const res = await apiRequest("/api/parent-students", "POST", data);
       return res.json();
     },
     onSuccess: () => {

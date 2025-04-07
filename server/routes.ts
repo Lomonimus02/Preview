@@ -180,6 +180,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json([]);
   });
 
+  // Add user API endpoint
+  app.post("/api/users", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res, next) => {
+    try {
+      // Check if the user is authorized to create this type of user
+      const currentUser = req.user;
+      const newUserRole = req.body.role;
+      
+      // Validate permissions based on user roles
+      if (currentUser.role !== UserRoleEnum.SUPER_ADMIN && 
+          (newUserRole === UserRoleEnum.SUPER_ADMIN || 
+           newUserRole === UserRoleEnum.SCHOOL_ADMIN && currentUser.role !== UserRoleEnum.SCHOOL_ADMIN)) {
+        return res.status(403).send("У вас нет прав для создания пользователя с данной ролью");
+      }
+      
+      // School admin can only create users for their school
+      if (currentUser.role === UserRoleEnum.SCHOOL_ADMIN && 
+          req.body.schoolId !== currentUser.schoolId) {
+        return res.status(403).send("Вы можете создавать пользователей только для своей школы");
+      }
+      
+      // Check if username already exists
+      const existingUser = await dataStorage.getUserByUsername(req.body.username);
+      if (existingUser) {
+        return res.status(400).send("Пользователь с таким логином уже существует");
+      }
+
+      // Create the user
+      const hashedPassword = await dataStorage.hashPassword(req.body.password);
+      const user = await dataStorage.createUser({
+        ...req.body,
+        password: hashedPassword,
+      });
+
+      // Process related data (class assignments, parent-student connections, etc.)
+      if (newUserRole === UserRoleEnum.CLASS_TEACHER && req.body.classIds && req.body.classIds.length > 0) {
+        // Add class teacher role
+        await dataStorage.addUserRole({
+          userId: user.id,
+          role: UserRoleEnum.CLASS_TEACHER,
+          classId: req.body.classIds[0]
+        });
+      }
+
+      // Log the new user creation
+      await dataStorage.createSystemLog({
+        userId: currentUser.id,
+        action: "user_created",
+        details: `Created user ${user.username} with role ${user.role}`,
+        ipAddress: req.ip
+      });
+
+      res.status(201).json(user);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/users/:id", isAuthenticated, async (req, res) => {
     const id = parseInt(req.params.id);
     const user = await dataStorage.getUser(id);
