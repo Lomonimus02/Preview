@@ -88,14 +88,16 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   
   // Обработчики прокрутки карточек внутри недели
   const scrollPrev = useCallback(() => {
+    console.log("Scrolling to previous card");
     if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+      setCurrentIndex(prevIndex => prevIndex - 1);
     }
   }, [currentIndex]);
   
   const scrollNext = useCallback(() => {
+    console.log("Scrolling to next card");
     if (currentIndex < weekDates.length - cardsVisible) {
-      setCurrentIndex(currentIndex + 1);
+      setCurrentIndex(prevIndex => prevIndex + 1);
     }
   }, [currentIndex, weekDates.length, cardsVisible]);
   
@@ -133,6 +135,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
     if (!containerElement) return;
     
     const handleWheel = (event: WheelEvent) => {
+      // Предотвращаем стандартное поведение прокрутки страницы
       event.preventDefault();
       
       // Определяем направление прокрутки
@@ -143,10 +146,11 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
       }
     };
     
-    containerElement.addEventListener('wheel', handleWheel, { passive: false });
+    // Используем capture phase для гарантированного перехвата события
+    containerElement.addEventListener('wheel', handleWheel, { passive: false, capture: true });
     
     return () => {
-      containerElement.removeEventListener('wheel', handleWheel);
+      containerElement.removeEventListener('wheel', handleWheel, { capture: true });
     };
   }, [scrollPrev, scrollNext]);
 
@@ -166,9 +170,6 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
 
   const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
   const weekRangeText = `${format(currentWeekStart, "d MMM", { locale: ru })} - ${format(currentWeekEnd, "d MMM yyyy", { locale: ru })}`;
-
-  // Вычисляем видимые дни
-  const visibleDates = weekDates.slice(currentIndex, currentIndex + cardsVisible);
 
   return (
     <div className="mb-8 relative">
@@ -195,12 +196,12 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         </Button>
       </div>
       
-      {/* Кнопки навигации внутри недели */}
+      {/* Кнопки навигации внутри недели - делаем их крупнее и заметнее */}
       <div className="flex justify-between absolute w-full top-1/2 transform -translate-y-1/2 px-2 z-10 pointer-events-none">
         <Button 
-          variant="outline" 
+          variant="secondary" 
           size="icon"
-          className="rounded-full shadow-md bg-background/90 pointer-events-auto"
+          className="rounded-full shadow-md bg-background/80 pointer-events-auto w-10 h-10"
           onClick={scrollPrev}
           disabled={!canScrollPrev}
         >
@@ -208,9 +209,9 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         </Button>
         
         <Button 
-          variant="outline" 
+          variant="secondary" 
           size="icon"
-          className="rounded-full shadow-md bg-background/90 pointer-events-auto"
+          className="rounded-full shadow-md bg-background/80 pointer-events-auto w-10 h-10"
           onClick={scrollNext}
           disabled={!canScrollNext}
         >
@@ -218,19 +219,28 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         </Button>
       </div>
       
+      {/* Контейнер с прокруткой */}
       <div 
-        className="overflow-hidden relative" 
+        className="overflow-hidden relative border rounded-lg p-1 bg-card" 
         ref={containerRef}
         style={{ touchAction: 'none' }} // Предотвращаем стандартное поведение тач-устройств
       >
+        {/* Обертка для всех карточек с днями */}
         <div 
-          className="flex gap-4 transition-transform duration-300 ease-in-out" 
-          style={{ transform: `translateX(-${currentIndex * (100 / cardsVisible)}%)` }}
+          className="flex transition-transform duration-300 ease-in-out" 
+          style={{ 
+            transform: `translateX(-${currentIndex * (100 / cardsVisible)}%)`,
+            width: `${weekDates.length * (100 / cardsVisible)}%` // Устанавливаем явную ширину
+          }}
         >
           {weekDates.map((date) => (
             <div 
-              className="flex-shrink-0" 
-              style={{ width: `calc(${100 / cardsVisible}% - ${(cardsVisible - 1) * 16 / cardsVisible}px)` }}
+              className="px-2" 
+              style={{ 
+                width: `${100 / weekDates.length}%`, // Равномерно распределяем карточки
+                flexShrink: 0, // Запрещаем сжатие
+                flexGrow: 0 // Запрещаем расширение
+              }}
               key={format(date, "yyyy-MM-dd")}
             >
               <ScheduleDayCard
@@ -252,12 +262,12 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         </div>
       </div>
       
-      {/* Индикатор текущей позиции */}
-      <div className="flex justify-center gap-1 mt-4">
+      {/* Индикатор текущей позиции - делаем более заметным */}
+      <div className="flex justify-center gap-2 mt-4">
         {weekDates.map((date, index) => (
           <button
             key={format(date, "yyyy-MM-dd")}
-            className={`w-2 h-2 rounded-full transition-all ${
+            className={`w-3 h-3 rounded-full transition-all ${
               index >= currentIndex && index < currentIndex + cardsVisible
                 ? 'bg-primary'
                 : 'bg-muted-foreground/30'
@@ -268,8 +278,8 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         ))}
       </div>
       
-      {/* Добавляем подсказку о прокрутке колесиком мыши */}
-      <div className="text-center mt-2 text-sm text-muted-foreground">
+      {/* Подсказка для пользователя */}
+      <div className="text-center mt-3 text-sm text-muted-foreground">
         <span>Используйте колесико мыши или стрелки для навигации по дням недели</span>
       </div>
     </div>
