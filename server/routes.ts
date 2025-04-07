@@ -773,16 +773,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Создаем дату из scheduleDate, startTime и endTime
       if (schedule.scheduleDate) {
-        const [hours, minutes] = schedule.endTime.split(':').map(Number);
-        const lessonEndDate = new Date(schedule.scheduleDate);
-        lessonEndDate.setHours(hours, minutes, 0);
+        const scheduleDate = new Date(schedule.scheduleDate);
+        const currentDate = new Date();
         
-        // Если текущее время раньше окончания урока, нельзя отметить как проведенный
-        if (now < lessonEndDate) {
-          return res.status(400).json({ 
-            message: "Cannot mark lesson as conducted before it ends",
-            endTime: lessonEndDate
-          });
+        // Сравнение только даты (без учета времени)
+        const isCurrentDay = scheduleDate.getFullYear() === currentDate.getFullYear() &&
+                             scheduleDate.getMonth() === currentDate.getMonth() &&
+                             scheduleDate.getDate() === currentDate.getDate();
+        
+        // Проверка времени только для уроков текущего дня
+        if (isCurrentDay) {
+          const [hours, minutes] = schedule.endTime.split(':').map(Number);
+          const lessonEndDate = new Date(schedule.scheduleDate);
+          lessonEndDate.setHours(hours, minutes, 0);
+          
+          // Если текущее время раньше окончания урока, нельзя отметить как проведенный
+          if (now < lessonEndDate) {
+            return res.status(400).json({ 
+              message: "Cannot mark lesson as conducted before it ends",
+              endTime: lessonEndDate
+            });
+          }
         }
       }
     }
