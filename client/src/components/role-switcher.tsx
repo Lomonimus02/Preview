@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { useRoleCheck } from "@/hooks/use-role-check";
 
 // Расширенная модель роли пользователя
 interface UserRole {
@@ -17,6 +16,7 @@ interface UserRole {
   userId: number;
   role: UserRoleEnum;
   schoolId: number | null;
+  classId?: number | null;
   isDefault?: boolean;
   isActive?: boolean;
 }
@@ -52,13 +52,13 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
     enabled: !!user, // Запрос выполняется только если пользователь авторизован
   });
   
-  // Мутация для смены роли
+  // Мутация для смены роли через endpoint /api/switch-role
   const switchRoleMutation = useMutation({
     mutationFn: async (role: UserRoleEnum) => {
       if (!user || !user.id) throw new Error("Пользователь не авторизован");
       
-      // Используем правильный порядок аргументов для apiRequest: url, method, data
-      const res = await apiRequest(`/api/users/${user.id}/active-role`, "PUT", { activeRole: role });
+      // Используем endpoint /api/switch-role
+      const res = await apiRequest("/api/switch-role", "POST", { role });
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.message || "Не удалось сменить роль");
