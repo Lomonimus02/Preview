@@ -173,11 +173,11 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
       return [];
     }
     
-    // Если текущий пользователь - ученик, показываем только его оценки
+    // Если текущий пользователь - ученик, показываем только его оценки по конкретному уроку (scheduleId)
     if (currentUser.role === UserRoleEnum.STUDENT) {
       return grades.filter(grade => 
         grade.studentId === currentUser.id && 
-        grade.subjectId === schedule.subjectId
+        grade.scheduleId === schedule.id // Привязываем оценки к конкретному уроку по scheduleId
       );
     }
     

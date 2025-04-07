@@ -205,6 +205,7 @@ export default function ClassGradeDetailsPage() {
       subjectId: subjectId,
       classId: classId,
       teacherId: user?.id,
+      scheduleId: null, // Добавляем scheduleId с изначальным значением null
     },
   });
   
@@ -283,6 +284,7 @@ export default function ClassGradeDetailsPage() {
         subjectId: subjectId,
         classId: classId,
         teacherId: user?.id,
+        scheduleId: null, // Добавляем scheduleId с изначальным значением null
       });
       
       toast({
@@ -363,6 +365,7 @@ export default function ClassGradeDetailsPage() {
         subjectId: subjectId,
         classId: classId,
         teacherId: user?.id,
+        scheduleId: null, // Добавляем scheduleId с изначальным значением null
       });
       
       toast({

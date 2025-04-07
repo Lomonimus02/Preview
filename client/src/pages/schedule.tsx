@@ -72,6 +72,7 @@ const gradeFormSchema = insertGradeSchema.extend({
   gradeType: z.string({
     required_error: "Укажите тип оценки",
   }),
+  scheduleId: z.number().nullable().optional(), // Добавляем scheduleId для привязки оценки к конкретному уроку
 });
 
 export default function SchedulePage() {
@@ -217,6 +218,7 @@ export default function SchedulePage() {
       subjectId: selectedSchedule?.subjectId,
       classId: selectedSchedule?.classId,
       teacherId: user?.id,
+      scheduleId: selectedSchedule?.id, // Добавляем scheduleId для привязки оценки к конкретному уроку
     },
   });
   
@@ -382,6 +384,8 @@ export default function SchedulePage() {
                               gradeForm.setValue("subjectId", selectedSchedule?.subjectId || 0);
                               gradeForm.setValue("classId", selectedSchedule?.classId || 0);
                               gradeForm.setValue("teacherId", user?.id || 0);
+                              // Добавляем scheduleId, чтобы привязать оценку к конкретному уроку
+                              gradeForm.setValue("scheduleId", selectedSchedule?.id || 0);
                               
                               setIsGradeDialogOpen(true);
                             }}
