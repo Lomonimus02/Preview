@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, PencilIcon, ClipboardCheck, School } from "lucide-react";
+import { PlusIcon, PencilIcon, ClipboardCheck, School, Trash2Icon } from "lucide-react";
 import { Class, insertClassSchema } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,17 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import {
   Dialog,
@@ -48,6 +59,9 @@ export function AdminClassList() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const currentYear = new Date().getFullYear();
   
   // Get classes for the school admin's school
@@ -108,6 +122,17 @@ export function AdminClassList() {
     return null;
   };
   
+  // Form для редактирования класса
+  const editForm = useForm<z.infer<typeof classFormSchema>>({
+    resolver: zodResolver(classFormSchema),
+    defaultValues: {
+      name: "",
+      gradeLevel: undefined,
+      academicYear: `${currentYear}-${currentYear + 1}`,
+      schoolId: user?.schoolId || 2,
+    },
+  });
+  
   // Добавление класса
   const addClassMutation = useMutation({
     mutationFn: async (data: z.infer<typeof classFormSchema>) => {
@@ -137,6 +162,55 @@ export function AdminClassList() {
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось создать класс",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Редактирование класса
+  const editClassMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof classFormSchema> & { id: number }) => {
+      const { id, ...classData } = data;
+      const res = await apiRequest(`/api/classes/${id}`, "PATCH", classData);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classes"] });
+      setIsEditDialogOpen(false);
+      setSelectedClass(null);
+      toast({
+        title: "Класс обновлен",
+        description: "Класс успешно обновлен",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось обновить класс",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Удаление класса
+  const deleteClassMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest(`/api/classes/${id}`, "DELETE");
+      return res.ok;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classes"] });
+      setIsDeleteDialogOpen(false);
+      setSelectedClass(null);
+      toast({
+        title: "Класс удален",
+        description: "Класс успешно удален из системы",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить класс",
         variant: "destructive",
       });
     },
@@ -215,9 +289,34 @@ export function AdminClassList() {
                     <div className="text-sm text-gray-900">{classItem.academicYear}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <a href="#" className="text-primary hover:text-primary-dark">
-                      <PencilIcon className="h-4 w-4 inline" />
-                    </a>
+                    <div className="flex items-center justify-end space-x-2">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => {
+                          setSelectedClass(classItem);
+                          editForm.reset({
+                            name: classItem.name,
+                            gradeLevel: classItem.gradeLevel,
+                            academicYear: classItem.academicYear,
+                            schoolId: classItem.schoolId,
+                          });
+                          setIsEditDialogOpen(true);
+                        }}
+                      >
+                        <PencilIcon className="h-4 w-4 text-primary" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => {
+                          setSelectedClass(classItem);
+                          setIsDeleteDialogOpen(true);
+                        }}
+                      >
+                        <Trash2Icon className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -336,6 +435,134 @@ export function AdminClassList() {
           </Form>
         </DialogContent>
       </Dialog>
+      
+      {/* Диалог для редактирования класса */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Редактировать класс</DialogTitle>
+            <DialogDescription>
+              Изменение информации о классе
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...editForm}>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (selectedClass && editForm.formState.isValid) {
+                const values = editForm.getValues();
+                
+                if (!values.schoolId) {
+                  values.schoolId = getSchoolId();
+                  if (!values.schoolId) {
+                    toast({
+                      title: "Ошибка",
+                      description: "Не удалось определить ID школы",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                }
+                
+                editClassMutation.mutate({
+                  ...values,
+                  id: selectedClass.id,
+                });
+              }
+            }} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Название класса</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Например: 5А, 9Б и т.д." 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="gradeLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Номер класса</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min={1} 
+                        max={11} 
+                        placeholder="От 1 до 11" 
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="academicYear"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Учебный год</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Например: 2023-2024" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button 
+                  type="submit" 
+                  disabled={editClassMutation.isPending}
+                >
+                  {editClassMutation.isPending ? "Сохранение..." : "Сохранить"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Диалог подтверждения удаления класса */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Вы собираетесь удалить класс "{selectedClass?.name}". Это действие невозможно отменить.
+              Все связанные данные (расписания, домашние задания, оценки) также будут удалены.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (selectedClass) {
+                  deleteClassMutation.mutate(selectedClass.id);
+                }
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteClassMutation.isPending ? "Удаление..." : "Удалить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
