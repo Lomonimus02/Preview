@@ -63,7 +63,7 @@ export function AdminClassList() {
       name: "",
       gradeLevel: undefined,
       academicYear: `${currentYear}-${currentYear + 1}`,
-      schoolId: user?.schoolId,
+      schoolId: user?.schoolId || 2, // Устанавливаем ID школы напрямую (2 - ID Царскосельской Гимназии)
     },
   });
   

@@ -58,7 +58,7 @@ export function AdminSubjectList() {
     defaultValues: {
       name: "",
       description: "",
-      schoolId: user?.schoolId,
+      schoolId: user?.schoolId || 2, // Устанавливаем ID школы напрямую (2 - ID Царскосельской Гимназии)
     },
   });
   
