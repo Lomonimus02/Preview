@@ -1468,19 +1468,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Forbidden" });
     }
     
-    // Для роли классного руководителя проверяем, что указан класс
-    if (role === UserRoleEnum.CLASS_TEACHER && !classId) {
-      return res.status(400).json({ message: "Class ID is required for class teacher role" });
-    }
-    
-    // Проверяем, не существует ли уже такая роль у пользователя
-    const existingRoles = await dataStorage.getUserRoles(userId);
-    if (existingRoles.some(r => r.role === role && r.schoolId === schoolId && (role !== UserRoleEnum.CLASS_TEACHER || r.classId === classId))) {
-      return res.status(400).json({ message: "User already has this role" });
-    }
-    
-    // Для роли CLASS_TEACHER проверяем, что класс существует и принадлежит указанной школе
-    if (role === UserRoleEnum.CLASS_TEACHER && classId) {
+    // Особые проверки для роли классного руководителя
+    if (role === UserRoleEnum.CLASS_TEACHER) {
+      // Обязательно требуется указать и школу, и класс
+      if (!schoolId) {
+        return res.status(400).json({ message: "School ID is required for class teacher role" });
+      }
+      
+      if (!classId) {
+        return res.status(400).json({ message: "Class ID is required for class teacher role" });
+      }
+      
+      // Проверяем, что класс существует и принадлежит указанной школе
       const classData = await dataStorage.getClass(classId);
       if (!classData) {
         return res.status(404).json({ message: "Class not found" });
@@ -1488,6 +1487,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (classData.schoolId !== schoolId) {
         return res.status(400).json({ message: "Class does not belong to the selected school" });
+      }
+      
+      // Проверяем, не существует ли уже такая роль у пользователя
+      const existingRoles = await dataStorage.getUserRoles(userId);
+      if (existingRoles.some(r => r.role === role && r.schoolId === schoolId && r.classId === classId)) {
+        return res.status(400).json({ message: "User already has this role for the specified class" });
+      }
+    } else {
+      // Для других ролей - стандартная проверка на дубликаты
+      const existingRoles = await dataStorage.getUserRoles(userId);
+      if (existingRoles.some(r => r.role === role && r.schoolId === schoolId)) {
+        return res.status(400).json({ message: "User already has this role" });
       }
     }
     
@@ -1497,7 +1508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "user_role_added",
-      details: `Added role ${role} to user ${userId}${classId ? ` for class ${classId}` : ''}`,
+      details: `Added role ${role} to user ${userId}${schoolId ? ` for school ${schoolId}` : ''}${classId ? ` and class ${classId}` : ''}`,
       ipAddress: req.ip
     });
     

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
@@ -8,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, UsersIcon, CalendarIcon } from "lucide-react";
+import { UserIcon, UsersIcon, CalendarIcon, GraduationCapIcon, BookOpenIcon } from "lucide-react";
 import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -164,6 +165,26 @@ export default function ClassTeacherDashboard() {
               Вернуться к классу
             </Button>
           )}
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-wrap gap-2">
+            <Link href="/class-teacher-grades">
+              <Button className="w-full sm:w-auto">
+                <GraduationCapIcon className="h-4 w-4 mr-2" />
+                Журнал оценок
+              </Button>
+            </Link>
+            
+            {classId && (
+              <Link href={`/class-grade-details/${classId}/1`}>
+                <Button className="w-full sm:w-auto" variant="outline">
+                  <BookOpenIcon className="h-4 w-4 mr-2" />
+                  Оценки по предметам
+                </Button>
+              </Link>
+            )}
+          </div>
         </div>
 
         <Tabs defaultValue="students" className="w-full">

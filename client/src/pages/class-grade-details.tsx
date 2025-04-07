@@ -82,8 +82,8 @@ export default function ClassGradeDetailsPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
-  const { isTeacher, isSchoolAdmin, isSuperAdmin } = useRoleCheck();
-  const canEditGrades = isTeacher() || isSchoolAdmin() || isSuperAdmin();
+  const { isTeacher, isSchoolAdmin, isSuperAdmin, isClassTeacher } = useRoleCheck();
+  const canEditGrades = isTeacher() || isSchoolAdmin() || isSuperAdmin() || isClassTeacher();
   
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);

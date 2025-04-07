@@ -59,36 +59,28 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
     queryKey: ['/api/schools'],
   });
 
+  // Fetch all classes
+  const { data: allClasses = [] } = useQuery<Class[]>({
+    queryKey: ['/api/classes'],
+    enabled: !!userId,
+  });
+
   // Fetch classes for the selected school
   useEffect(() => {
     if (selectedSchoolId && (newRole === UserRoleEnum.CLASS_TEACHER)) {
-      const fetchClasses = async () => {
-        try {
-          const res = await fetch(`/api/schools/${selectedSchoolId}/classes`);
-          if (res.ok) {
-            const data = await res.json();
-            setClasses(data);
-          } else {
-            toast({
-              title: 'Ошибка',
-              description: 'Не удалось загрузить классы',
-              variant: 'destructive',
-            });
-          }
-        } catch (error) {
-          toast({
-            title: 'Ошибка',
-            description: 'Не удалось загрузить классы',
-            variant: 'destructive',
-          });
-        }
-      };
-      fetchClasses();
+      // Filter classes by selected school
+      const filteredClasses = allClasses.filter(cls => cls.schoolId === selectedSchoolId);
+      setClasses(filteredClasses);
+
+      // Reset class selection if current selection doesn't belong to the school
+      if (selectedClassId && !filteredClasses.some(cls => cls.id === selectedClassId)) {
+        setSelectedClassId(null);
+      }
     } else {
       setClasses([]);
       setSelectedClassId(null);
     }
-  }, [selectedSchoolId, newRole, toast]);
+  }, [selectedSchoolId, newRole, allClasses, selectedClassId]);
 
   // Add role mutation
   const addRoleMutation = useMutation({
@@ -327,7 +319,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
                     </SelectTrigger>
                     <SelectContent>
                       {classes.length === 0 ? (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="no-class" disabled>
                           Нет доступных классов
                         </SelectItem>
                       ) : (
@@ -390,6 +382,7 @@ const UserRolesManager: React.FC<UserRolesManagerProps> = ({ userId }) => {
                   </TableCell>
                   <TableCell>
                     {role.classId ? (
+                      allClasses.find((c) => c.id === role.classId)?.name || 
                       `Класс ID: ${role.classId}`
                     ) : (
                       <span className="text-muted-foreground">-</span>
