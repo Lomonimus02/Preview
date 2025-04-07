@@ -211,7 +211,12 @@ export default function ClassGradeDetailsPage() {
   // Mutation to add grade
   const addGradeMutation = useMutation({
     mutationFn: async (data: z.infer<typeof gradeFormSchema>) => {
-      const res = await apiRequest("/api/grades", "POST", data);
+      // Убедимся, что scheduleId всегда передается, если был выбран конкретный урок
+      const gradeData = {
+        ...data,
+        scheduleId: data.scheduleId || null,
+      };
+      const res = await apiRequest("/api/grades", "POST", gradeData);
       return res.json();
     },
     onMutate: async (newGradeData) => {
@@ -596,8 +601,8 @@ export default function ClassGradeDetailsPage() {
   const getStudentGradeForSlot = (studentId: number, slot: { date: string, scheduleId: number }) => {
     return grades.filter(g => 
       g.studentId === studentId && 
-      // Check if grade has the same date OR is linked to the same schedule
-      (format(new Date(g.createdAt), "yyyy-MM-dd") === slot.date || g.scheduleId === slot.scheduleId)
+      // Only show grades that are linked to this specific schedule
+      g.scheduleId === slot.scheduleId
     );
   };
   
