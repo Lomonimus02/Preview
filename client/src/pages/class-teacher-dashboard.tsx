@@ -66,9 +66,9 @@ export default function ClassTeacherDashboard() {
 
   // Получаем список учеников класса
   const { data: students = [], isLoading: studentsLoading } = useQuery<User[]>({
-    queryKey: ["/api/classes", classId, "students"],
+    queryKey: ["/api/students-by-class", classId],
     queryFn: async () => {
-      const res = await fetch(`/api/classes/${classId}/students`);
+      const res = await fetch(`/api/students-by-class/${classId}`);
       if (!res.ok) throw new Error("Не удалось загрузить список учеников");
       return res.json();
     },
@@ -77,10 +77,10 @@ export default function ClassTeacherDashboard() {
 
   // Получаем расписание выбранного ученика или расписание класса
   const { data: studentSchedule = [], isLoading: scheduleLoading } = useQuery({
-    queryKey: ["/api/student-schedules", selectedStudentId],
+    queryKey: ["/api/students", selectedStudentId, "schedules"],
     queryFn: async () => {
       if (!selectedStudentId) return [];
-      const res = await apiRequest(`/api/student-schedules/${selectedStudentId}`, "GET");
+      const res = await apiRequest(`/api/students/${selectedStudentId}/schedules`, "GET");
       if (!res.ok) throw new Error("Не удалось загрузить расписание ученика");
       return res.json();
     },
