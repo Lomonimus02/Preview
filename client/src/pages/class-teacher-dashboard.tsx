@@ -37,7 +37,7 @@ export default function ClassTeacherDashboard() {
   const { data: userRoles = [] } = useQuery({
     queryKey: ["/api/user-roles", user?.id],
     queryFn: async () => {
-      const res = await fetch(`/api/user-roles/${user?.id}`);
+      const res = await apiRequest(`/api/user-roles/${user?.id}`, "GET");
       if (!res.ok) throw new Error("Не удалось загрузить роли пользователя");
       return res.json();
     },

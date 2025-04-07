@@ -55,7 +55,8 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
   // Мутация для смены роли
   const switchRoleMutation = useMutation({
     mutationFn: async (role: UserRoleEnum) => {
-      const res = await apiRequest("/api/switch-role", "POST", { role });
+      if (!user || !user.id) throw new Error("Пользователь не авторизован");
+      const res = await apiRequest(`/api/users/${user.id}/active-role`, "PUT", { activeRole: role });
       return await res.json();
     },
     onSuccess: (updatedUser) => {
