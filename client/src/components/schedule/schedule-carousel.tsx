@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import useEmblaCarousel from "embla-carousel-react";
 import { 
   startOfWeek, 
   endOfWeek, 
@@ -45,117 +44,13 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
     return startOfWeek(new Date(), { weekStartsOn: 1 });
   });
   
-  // Опции для Embla Carousel
-  const options = {
-    loop: false,
-    align: "start",
-    dragFree: true,
-    containScroll: "trimSnaps"
-  };
-  
-  const [emblaRef, emblaApi] = useEmblaCarousel(options);
-  const scrollListenerRef = useRef<((event: WheelEvent) => void) | null>(null);
-
   // Создаем массив дат для текущей недели
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
   
-  // Обработчики переключения недель
-  const goToPreviousWeek = useCallback(() => {
-    const newWeekStart = subWeeks(currentWeekStart, 1);
-    setCurrentWeekStart(newWeekStart);
-  }, [currentWeekStart]);
-
-  const goToNextWeek = useCallback(() => {
-    const newWeekStart = addWeeks(currentWeekStart, 1);
-    setCurrentWeekStart(newWeekStart);
-  }, [currentWeekStart]);
+  // Состояние для текущего отображаемого индекса
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [cardsVisible, setCardsVisible] = useState(1);
   
-  // Обработчики прокрутки карточек внутри недели
-  const scrollPrev = useCallback(() => {
-    if (emblaApi) emblaApi.scrollPrev();
-  }, [emblaApi]);
-  
-  const scrollNext = useCallback(() => {
-    if (emblaApi) emblaApi.scrollNext();
-  }, [emblaApi]);
-  
-  // Состояние для отслеживания возможности прокрутки
-  const [canScrollPrev, setCanScrollPrev] = useState(false);
-  const [canScrollNext, setCanScrollNext] = useState(true);
-  
-  // Обновляем состояние кнопок навигации при прокрутке
-  useEffect(() => {
-    if (!emblaApi) return;
-    
-    const onSelect = () => {
-      setCanScrollPrev(emblaApi.canScrollPrev());
-      setCanScrollNext(emblaApi.canScrollNext());
-    };
-    
-    // Инициализация состояния кнопок
-    onSelect();
-    
-    // Подписка на события прокрутки
-    emblaApi.on('select', onSelect);
-    emblaApi.on('reInit', onSelect);
-    
-    return () => {
-      emblaApi.off('select', onSelect);
-      emblaApi.off('reInit', onSelect);
-    };
-  }, [emblaApi]);
-
-  // Добавляем прокрутку колесиком мыши
-  useEffect(() => {
-    if (!emblaApi) return;
-    
-    const handleWheel = (event: WheelEvent) => {
-      // Предотвращаем стандартное поведение прокрутки страницы
-      event.preventDefault();
-      
-      // Определяем направление прокрутки
-      if (event.deltaY < 0) {
-        emblaApi.scrollPrev();
-      } else {
-        emblaApi.scrollNext();
-      }
-    };
-    
-    // Удаляем предыдущий обработчик, если он был
-    if (scrollListenerRef.current) {
-      emblaRef.current?.removeEventListener('wheel', scrollListenerRef.current);
-    }
-    
-    // Сохраняем ссылку на текущий обработчик
-    scrollListenerRef.current = handleWheel;
-    
-    // Добавляем новый обработчик
-    emblaRef.current?.addEventListener('wheel', handleWheel, { passive: false });
-    
-    return () => {
-      if (scrollListenerRef.current) {
-        emblaRef.current?.removeEventListener('wheel', scrollListenerRef.current);
-      }
-    };
-  }, [emblaApi, emblaRef]);
-
-  // Скролл к текущему дню, когда меняется неделя
-  useEffect(() => {
-    if (emblaApi) {
-      // Находим индекс сегодняшнего дня в массиве дат недели
-      const today = new Date();
-      const todayIndex = weekDates.findIndex(date => isSameDay(date, today));
-      
-      // Если сегодняшний день в текущей неделе, скроллим к нему
-      if (todayIndex >= 0) {
-        emblaApi.scrollTo(todayIndex);
-      } else {
-        // Иначе скроллим к началу недели
-        emblaApi.scrollTo(0);
-      }
-    }
-  }, [emblaApi, weekDates, currentWeekStart]);
-
   // Получаем дни недели на русском
   const getDayName = (date: Date) => {
     return format(date, "EEEE", { locale: ru });
@@ -178,8 +73,102 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
     });
   };
 
+  // Обработчики переключения недель
+  const goToPreviousWeek = useCallback(() => {
+    const newWeekStart = subWeeks(currentWeekStart, 1);
+    setCurrentWeekStart(newWeekStart);
+    setCurrentIndex(0); // Сбрасываем на первый день недели
+  }, [currentWeekStart]);
+
+  const goToNextWeek = useCallback(() => {
+    const newWeekStart = addWeeks(currentWeekStart, 1);
+    setCurrentWeekStart(newWeekStart);
+    setCurrentIndex(0); // Сбрасываем на первый день недели
+  }, [currentWeekStart]);
+  
+  // Обработчики прокрутки карточек внутри недели
+  const scrollPrev = useCallback(() => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  }, [currentIndex]);
+  
+  const scrollNext = useCallback(() => {
+    if (currentIndex < weekDates.length - cardsVisible) {
+      setCurrentIndex(currentIndex + 1);
+    }
+  }, [currentIndex, weekDates.length, cardsVisible]);
+  
+  // Состояние для отслеживания возможности прокрутки
+  const canScrollPrev = currentIndex > 0;
+  const canScrollNext = currentIndex < weekDates.length - cardsVisible;
+  
+  // Контейнер для обработки колесика мыши
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Обновляем видимость карточек в зависимости от размера экрана
+  useEffect(() => {
+    const updateVisibleCards = () => {
+      const width = window.innerWidth;
+      if (width < 640) {
+        setCardsVisible(1);
+      } else if (width < 1024) {
+        setCardsVisible(2);
+      } else {
+        setCardsVisible(3);
+      }
+    };
+    
+    updateVisibleCards();
+    window.addEventListener('resize', updateVisibleCards);
+    
+    return () => {
+      window.removeEventListener('resize', updateVisibleCards);
+    };
+  }, []);
+  
+  // Обработчик колесика мыши
+  useEffect(() => {
+    const containerElement = containerRef.current;
+    if (!containerElement) return;
+    
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      
+      // Определяем направление прокрутки
+      if (event.deltaY < 0) {
+        scrollPrev();
+      } else {
+        scrollNext();
+      }
+    };
+    
+    containerElement.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      containerElement.removeEventListener('wheel', handleWheel);
+    };
+  }, [scrollPrev, scrollNext]);
+
+  // При изменении недели, проверяем, есть ли текущий день в видимых днях
+  useEffect(() => {
+    const today = new Date();
+    const todayIndex = weekDates.findIndex(date => isSameDay(date, today));
+    
+    if (todayIndex >= 0) {
+      // Если сегодняшний день в текущей неделе, показываем его
+      setCurrentIndex(Math.max(0, Math.min(todayIndex, weekDates.length - cardsVisible)));
+    } else {
+      // Иначе показываем начало недели
+      setCurrentIndex(0);
+    }
+  }, [weekDates, cardsVisible]);
+
   const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
   const weekRangeText = `${format(currentWeekStart, "d MMM", { locale: ru })} - ${format(currentWeekEnd, "d MMM yyyy", { locale: ru })}`;
+
+  // Вычисляем видимые дни
+  const visibleDates = weekDates.slice(currentIndex, currentIndex + cardsVisible);
 
   return (
     <div className="mb-8 relative">
@@ -229,10 +218,21 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         </Button>
       </div>
       
-      <div className="overflow-hidden" ref={emblaRef}>
-        <div className="flex gap-4">
+      <div 
+        className="overflow-hidden relative" 
+        ref={containerRef}
+        style={{ touchAction: 'none' }} // Предотвращаем стандартное поведение тач-устройств
+      >
+        <div 
+          className="flex gap-4 transition-transform duration-300 ease-in-out" 
+          style={{ transform: `translateX(-${currentIndex * (100 / cardsVisible)}%)` }}
+        >
           {weekDates.map((date) => (
-            <div className="flex-shrink-0" key={format(date, "yyyy-MM-dd")}>
+            <div 
+              className="flex-shrink-0" 
+              style={{ width: `calc(${100 / cardsVisible}% - ${(cardsVisible - 1) * 16 / cardsVisible}px)` }}
+              key={format(date, "yyyy-MM-dd")}
+            >
               <ScheduleDayCard
                 date={date}
                 dayName={getDayName(date)}
@@ -252,7 +252,23 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         </div>
       </div>
       
-      {/* Добавляем небольшую подсказку о прокрутке колесиком мыши */}
+      {/* Индикатор текущей позиции */}
+      <div className="flex justify-center gap-1 mt-4">
+        {weekDates.map((date, index) => (
+          <button
+            key={format(date, "yyyy-MM-dd")}
+            className={`w-2 h-2 rounded-full transition-all ${
+              index >= currentIndex && index < currentIndex + cardsVisible
+                ? 'bg-primary'
+                : 'bg-muted-foreground/30'
+            }`}
+            onClick={() => setCurrentIndex(Math.min(index, weekDates.length - cardsVisible))}
+            title={format(date, "EEEE, d MMMM", { locale: ru })}
+          />
+        ))}
+      </div>
+      
+      {/* Добавляем подсказку о прокрутке колесиком мыши */}
       <div className="text-center mt-2 text-sm text-muted-foreground">
         <span>Используйте колесико мыши или стрелки для навигации по дням недели</span>
       </div>
