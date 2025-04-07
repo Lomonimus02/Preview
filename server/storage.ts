@@ -57,6 +57,8 @@ export interface IStorage {
   getSchedulesByClass(classId: number): Promise<Schedule[]>;
   getSchedulesByTeacher(teacherId: number): Promise<Schedule[]>;
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
+  updateSchedule(id: number, schedule: Partial<InsertSchedule>): Promise<Schedule | undefined>;
+  updateScheduleStatus(id: number, status: string): Promise<Schedule | undefined>;
   
   // Homework operations
   getHomework(id: number): Promise<Homework | undefined>;
@@ -344,9 +346,32 @@ export class MemStorage implements IStorage {
   
   async createSchedule(schedule: InsertSchedule): Promise<Schedule> {
     const id = this.scheduleId++;
-    const newSchedule: Schedule = { ...schedule, id };
+    // Set default status if not provided
+    const scheduleWithStatus = {
+      ...schedule,
+      status: schedule.status || 'not_conducted'
+    };
+    const newSchedule: Schedule = { ...scheduleWithStatus, id };
     this.schedules.set(id, newSchedule);
     return newSchedule;
+  }
+  
+  async updateSchedule(id: number, schedule: Partial<InsertSchedule>): Promise<Schedule | undefined> {
+    const existingSchedule = this.schedules.get(id);
+    if (!existingSchedule) return undefined;
+    
+    const updatedSchedule: Schedule = { ...existingSchedule, ...schedule };
+    this.schedules.set(id, updatedSchedule);
+    return updatedSchedule;
+  }
+  
+  async updateScheduleStatus(id: number, status: string): Promise<Schedule | undefined> {
+    const existingSchedule = this.schedules.get(id);
+    if (!existingSchedule) return undefined;
+    
+    const updatedSchedule: Schedule = { ...existingSchedule, status };
+    this.schedules.set(id, updatedSchedule);
+    return updatedSchedule;
   }
   
   // Homework operations

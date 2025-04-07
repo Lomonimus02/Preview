@@ -90,7 +90,6 @@ export default function ClassGradeDetailsPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
-  const [editingGradeId, setEditingGradeId] = useState<number | null>(null);
   
   // Fetch class details
   const { data: classData, isLoading: isClassLoading } = useQuery<ClassType>({
@@ -170,8 +169,6 @@ export default function ClassGradeDetailsPage() {
         date: s.scheduleDate as string,
         scheduleId: s.id,
         startTime: s.startTime || '',
-        endTime: s.endTime || '',
-        status: s.status || 'not_conducted',
         formattedDate: format(new Date(s.scheduleDate as string), "dd.MM", { locale: ru })
       }));
   }, [schedules, subjectId]);
@@ -246,7 +243,7 @@ export default function ClassGradeDetailsPage() {
         classId: newGradeData.classId!,
         teacherId: newGradeData.teacherId!,
         grade: newGradeData.grade!,
-        comment: newGradeData.comment || null,
+        comment: newGradeData.comment || "",
         gradeType: newGradeData.gradeType || "Текущая",
         // Добавляем scheduleId для привязки к конкретному уроку
         scheduleId: newGradeData.scheduleId || null,
@@ -296,7 +293,7 @@ export default function ClassGradeDetailsPage() {
       
       toast({
         title: "Ошибка",
-        description: "Не удалось добавить оценку. Попробуйте позже.",
+        description: error.message || "Не удалось добавить оценку",
         variant: "destructive",
       });
     },
@@ -376,7 +373,7 @@ export default function ClassGradeDetailsPage() {
       
       toast({
         title: "Ошибка",
-        description: "Не удалось обновить оценку. Попробуйте позже.",
+        description: error.message || "Не удалось обновить оценку",
         variant: "destructive",
       });
     },
@@ -410,7 +407,7 @@ export default function ClassGradeDetailsPage() {
       // Показываем ошибку пользователю
       toast({
         title: "Ошибка",
-        description: "Не удалось обновить статус урока",
+        description: error.message || "Не удалось обновить статус урока",
         variant: "destructive",
       });
 
@@ -455,6 +452,7 @@ export default function ClassGradeDetailsPage() {
       return { previousGrades, previousGradesWithFilter };
     },
     onSuccess: () => {
+      // Обновляем кеш после успешного удаления
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
       
       toast({
@@ -473,7 +471,7 @@ export default function ClassGradeDetailsPage() {
       
       toast({
         title: "Ошибка",
-        description: "Не удалось удалить оценку. Попробуйте позже.",
+        description: error.message || "Не удалось удалить оценку",
         variant: "destructive",
       });
     },
@@ -481,6 +479,44 @@ export default function ClassGradeDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
     },
   });
+  
+  // Track if we're editing an existing grade
+  const [editingGradeId, setEditingGradeId] = useState<number | null>(null);
+  
+  // Handle grade form submission
+  const onGradeSubmit = (values: z.infer<typeof gradeFormSchema>) => {
+    if (editingGradeId) {
+      // Update existing grade
+      updateGradeMutation.mutate({ 
+        id: editingGradeId, 
+        data: values 
+      });
+    } else {
+      // Add new grade
+      addGradeMutation.mutate(values);
+    }
+  };
+  
+  // Open grade dialog for a specific student, date and scheduleId
+  const openGradeDialog = (studentId: number, date: string | undefined, scheduleId: number | undefined) => {
+    setSelectedStudentId(studentId);
+    setSelectedDate(date || null);
+    setEditingGradeId(null);
+    
+    gradeForm.reset({
+      studentId: studentId,
+      subjectId: subjectId,
+      classId: classId,
+      teacherId: user?.id,
+      scheduleId: scheduleId || null, // Добавляем scheduleId в форму с проверкой на undefined
+      grade: undefined,
+      comment: "",
+      gradeType: "Текущая",
+      date: date, // Важно: передаем дату в форму
+    });
+    
+    setIsGradeDialogOpen(true);
+  };
   
   // Function to get schedule by its ID
   const getScheduleById = (scheduleId: number) => {
@@ -512,218 +548,157 @@ export default function ClassGradeDetailsPage() {
     setSelectedDate(null);
     setEditingGradeId(grade.id);
     
-    // Сбрасываем и заполняем форму данными существующей оценки
     gradeForm.reset({
       studentId: grade.studentId,
-      grade: grade.grade,
-      comment: grade.comment || "", // Преобразуем null в пустую строку для полей формы
-      gradeType: grade.gradeType,
       subjectId: grade.subjectId,
-      classId: grade.classId,
+      classId: grade.classId, 
       teacherId: grade.teacherId,
-      scheduleId: grade.scheduleId || null,
+      grade: grade.grade,
+      comment: grade.comment || "",
+      gradeType: grade.gradeType || "Текущая",
+      scheduleId: grade.scheduleId, // Добавляем scheduleId при редактировании
     });
     
     setIsGradeDialogOpen(true);
   };
   
-  // Open grade dialog to add new grade
-  const openGradeDialog = (studentId: number, date?: string, scheduleId?: number) => {
-    setSelectedStudentId(studentId);
-    setSelectedDate(date || null);
-    setEditingGradeId(null);
-    
-    // Find schedule by ID to check its status
-    let canAddGrade = true;
-    
-    if (scheduleId) {
-      const schedule = getScheduleById(scheduleId);
-      if (schedule && schedule.status !== 'conducted') {
-        toast({
-          title: "Невозможно добавить оценку",
-          description: "Урок не отмечен как проведенный. Отметьте урок как проведенный, чтобы добавить оценки.",
-          variant: "destructive",
-        });
-        canAddGrade = false;
-      }
-    }
-    
-    if (canAddGrade) {
-      // Сбрасываем форму и устанавливаем значения по умолчанию
-      gradeForm.reset({
-        studentId: studentId,
-        grade: undefined,
-        comment: "",
-        gradeType: "Текущая",
-        subjectId: subjectId,
-        classId: classId,
-        teacherId: user?.id,
-        date: date || null,
-        scheduleId: scheduleId || null,
-      });
-      
-      setIsGradeDialogOpen(true);
-    }
-  };
-  
-  // Handle grade form submission
-  const onGradeSubmit = (data: z.infer<typeof gradeFormSchema>) => {
-    if (editingGradeId) {
-      // Updating existing grade
-      updateGradeMutation.mutate({
-        id: editingGradeId, 
-        data
-      });
-    } else {
-      // Adding new grade
-      addGradeMutation.mutate(data);
-    }
-  };
-  
   // Handle grade deletion
-  const handleDeleteGrade = (id: number) => {
-    if (window.confirm("Вы действительно хотите удалить оценку?")) {
-      deleteGradeMutation.mutate(id);
+  const handleDeleteGrade = (gradeId: number) => {
+    if (confirm("Вы уверены, что хотите удалить эту оценку?")) {
+      deleteGradeMutation.mutate(gradeId);
     }
   };
   
-  // Function to format date as "DD Month" (e.g. "15 марта")
-  const formatFullDate = (dateString: string) => {
-    return format(new Date(dateString), "d MMMM", { locale: ru });
-  };
-  
-  // Get all grades for a specific student and schedule slot
+  // Get student grades for a specific lesson slot (scheduleId)
   const getStudentGradeForSlot = (studentId: number, slot: { date: string, scheduleId: number }) => {
+    // Фильтруем оценки по студенту, предмету и scheduleId
+    // Теперь привязка идет только к scheduleId, дата не учитывается, так как
+    // scheduleId уже однозначно определяет урок в конкретную дату
     return grades.filter(g => 
       g.studentId === studentId && 
-      // Check if grade has the same date OR is linked to the same schedule
-      (format(new Date(g.createdAt), "yyyy-MM-dd") === slot.date || g.scheduleId === slot.scheduleId)
+      g.subjectId === subjectId && 
+      g.scheduleId === slot.scheduleId
     );
   };
   
-  // Calculate average grade for a student
+  // Calculate average grade for a student for the current subject
   const calculateAverageGrade = (studentId: number) => {
-    const studentGrades = grades.filter(g => g.studentId === studentId);
+    // Фильтруем только оценки для текущего предмета
+    const studentGrades = grades.filter(g => 
+      g.studentId === studentId && 
+      g.subjectId === subjectId
+    );
+    
     if (studentGrades.length === 0) return "-";
     
-    const sum = studentGrades.reduce((total, grade) => total + grade.grade, 0);
-    const average = sum / studentGrades.length;
-    
-    return average.toFixed(1);
+    const sum = studentGrades.reduce((total, g) => total + g.grade, 0);
+    return (sum / studentGrades.length).toFixed(1);
   };
   
-  // Determine if a lesson is conducted
-  const isLessonConducted = (scheduleId: number) => {
-    const schedule = schedules.find(s => s.id === scheduleId);
-    return schedule?.status === 'conducted';
-  };
-  
-  // Loading state
-  const isLoading = isClassLoading || isSubjectLoading || isStudentsLoading || isSchedulesLoading || isGradesLoading;
-  
-  // Redirect if user is not logged in
-  useEffect(() => {
-    if (!user) {
-      navigate("/");
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      return format(date, "dd.MM", { locale: ru });
+    } catch (e) {
+      return dateString;
     }
-  }, [user, navigate]);
+  };
+  
+  // Fetch all subjects taught by this teacher
+  const { data: subjectsData = [] } = useQuery({
+    queryKey: ["/api/subjects"],
+    enabled: !!user?.id,
+  });
+  
+  const isLoading = isClassLoading || isSubjectLoading || isStudentsLoading || 
+                    isSchedulesLoading || isGradesLoading || isTeacherSchedulesLoading;
+  
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+            <h3 className="text-lg font-medium">Загрузка данных...</h3>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
   
   return (
     <MainLayout>
-      <div className="container mx-auto py-6 space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Журнал оценок</h1>
-            <p className="text-muted-foreground">
-              Просмотр и редактирование оценок учеников
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate("/schedule")}
+              className="mb-2"
+            >
+              <CalendarIcon className="h-4 w-4 mr-2" />
+              Вернуться к расписанию
+            </Button>
+            <h1 className="text-2xl font-bold">
+              {classData?.name} - Журнал оценок
+            </h1>
+            <p className="text-gray-500">
+              Таблицы оценок учеников по предметам
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate("/grades")}>
-            Вернуться к списку журналов
-          </Button>
+          
+          {canEditGrades && (
+            <Button onClick={() => setIsGradeDialogOpen(true)}>
+              Добавить оценку
+            </Button>
+          )}
         </div>
         
-        {isLoading ? (
-          <div className="flex justify-center items-center h-[300px]">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          </div>
+        {students.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Нет учеников</CardTitle>
+              <CardDescription>В этом классе нет учеников или данные еще не загружены.</CardDescription>
+            </CardHeader>
+          </Card>
         ) : (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <GraduationCapIcon className="h-5 w-5" />
-                    Информация о классе
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {classData && (
-                    <div className="space-y-2">
-                      <div>
-                        <h3 className="font-medium">Класс:</h3>
-                        <p className="text-lg text-muted-foreground">{classData.name}</p>
-                      </div>
-                      <div>
-                        <h3 className="font-medium">Всего учеников:</h3>
-                        <p className="text-lg text-muted-foreground">{students.length}</p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BookOpenIcon className="h-5 w-5" />
-                    Информация о предмете
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {subjectData && (
-                    <div className="space-y-2">
-                      <div>
-                        <h3 className="font-medium">Предмет:</h3>
-                        <p className="text-lg text-muted-foreground">{subjectData.name}</p>
-                      </div>
-                      <div>
-                        <h3 className="font-medium">Всего уроков:</h3>
-                        <p className="text-lg text-muted-foreground">{lessonSlots.length}</p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-            
+          // Создаем таблицу для каждого предмета
+          <div className="space-y-8">
+            {/* Текущий предмет (из URL) */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarIcon className="h-5 w-5" />
-                  Оценки по предмету
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center">
+                  <BookOpenIcon className="h-5 w-5 mr-2" />
+                  {subjectData?.name}
                 </CardTitle>
                 <CardDescription>
-                  Нажмите на ячейку с "+" чтобы добавить оценку. Нажмите на дату урока, чтобы изменить его статус.
+                  Оценки учеников по предмету "{subjectData?.name}" в классе {classData?.name}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-auto">
-                  <Table className="border">
+                <div className="overflow-x-auto rounded-md border">
+                  <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="bg-muted/50 sticky left-0">
-                          Ученик
-                        </TableHead>
+                        <TableHead className="w-[180px] bg-muted/50">Ученик</TableHead>
                         {lessonSlots.map((slot) => {
-                          const isLessonConducted = schedules.find(s => s.id === slot.scheduleId)?.status === 'conducted';
+                          const schedule = getScheduleById(slot.scheduleId);
+                          const isLessonConducted = schedule?.status === 'conducted';
                           return (
                             <TableHead 
                               key={`${slot.date}-${slot.scheduleId}`} 
-                              className="text-center cursor-pointer"
-                              onClick={() => canEditGrades ? openStatusDialog(slot.scheduleId) : null}
+                              className={`text-center cursor-pointer transition-colors duration-200 
+                                ${isLessonConducted ? 'bg-green-100 hover:bg-green-200' : 'bg-gray-100 hover:bg-gray-200'}`}
+                              title={isLessonConducted ? "Урок проведен (нажмите, чтобы изменить)" : "Урок не проведен (нажмите, чтобы изменить)"}
+                              onClick={() => {
+                                if (canEditGrades) {
+                                  openStatusDialog(slot.scheduleId);
+                                }
+                              }}
                             >
-                              <div className="flex flex-col items-center justify-center">
+                              <div className="flex items-center justify-center gap-1">
                                 {slot.formattedDate}
                                 {slot.startTime && <span className="text-xs">({slot.startTime.slice(0, 5)})</span>}
                                 {isLessonConducted && (
@@ -795,7 +770,7 @@ export default function ClassGradeDetailsPage() {
                                       </div>
                                     ))}
                                     {/* Кнопка "+" для добавления еще одной оценки в тот же дату и урок */}
-                                    {canEditGrades && isLessonConducted(slot.scheduleId) && (
+                                    {canEditGrades && (
                                       <Button 
                                         variant="ghost" 
                                         size="sm" 
@@ -807,7 +782,7 @@ export default function ClassGradeDetailsPage() {
                                       </Button>
                                     )}
                                   </div>
-                                ) : canEditGrades && isLessonConducted(slot.scheduleId) ? (
+                                ) : canEditGrades ? (
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 

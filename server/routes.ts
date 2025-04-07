@@ -470,6 +470,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.json(deletedSchedule);
   });
+  
+  // Обновление статуса урока (проведен/не проведен)
+  app.patch("/api/schedules/:id/status", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+    const scheduleId = parseInt(req.params.id);
+    const { status } = req.body;
+    
+    // Проверяем, существует ли расписание
+    const schedule = await dataStorage.getSchedule(scheduleId);
+    if (!schedule) {
+      return res.status(404).json({ message: "Schedule not found" });
+    }
+    
+    // Проверяем, является ли текущий пользователь учителем этого урока
+    if (schedule.teacherId !== req.user.id) {
+      return res.status(403).json({ message: "You can only update schedules where you are the teacher" });
+    }
+    
+    // Проверяем, что статус валидный
+    if (status !== 'conducted' && status !== 'not_conducted') {
+      return res.status(400).json({ message: "Invalid status. Must be 'conducted' or 'not_conducted'" });
+    }
+    
+    // Проверяем время урока - нельзя отметить урок как проведенный, если он еще не начался или не закончился
+    if (status === 'conducted') {
+      // Получаем текущую дату и время
+      const now = new Date();
+      
+      // Создаем дату из scheduleDate, startTime и endTime
+      if (schedule.scheduleDate) {
+        const [hours, minutes] = schedule.endTime.split(':').map(Number);
+        const lessonEndDate = new Date(schedule.scheduleDate);
+        lessonEndDate.setHours(hours, minutes, 0);
+        
+        // Если текущее время раньше окончания урока, нельзя отметить как проведенный
+        if (now < lessonEndDate) {
+          return res.status(400).json({ 
+            message: "Cannot mark lesson as conducted before it ends",
+            endTime: lessonEndDate
+          });
+        }
+      }
+    }
+    
+    // Обновляем статус урока
+    const updatedSchedule = await dataStorage.updateScheduleStatus(scheduleId, status);
+    
+    // Логируем действие
+    await dataStorage.createSystemLog({
+      userId: req.user.id,
+      action: "schedule_status_updated",
+      details: `Updated schedule ${scheduleId} status to ${status}`,
+      ipAddress: req.ip
+    });
+    
+    res.json(updatedSchedule);
+  });
 
   // Homework API
   app.get("/api/homework", isAuthenticated, async (req, res) => {

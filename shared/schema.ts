@@ -83,6 +83,7 @@ export const schedules = pgTable("schedules", {
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
   room: text("room"),
+  status: text("status").default("not_conducted"), // 'conducted' or 'not_conducted'
 });
 
 // Homework table
