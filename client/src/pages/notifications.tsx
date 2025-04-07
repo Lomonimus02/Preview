@@ -38,7 +38,7 @@ export default function NotificationsPage() {
   // Мутация для отметки уведомления как прочитанного
   const markAsReadMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("PATCH", `/api/notifications/${id}/read`);
+      const res = await apiRequest(`/api/notifications/${id}/read`, "PATCH");
       return await res.json();
     },
     onSuccess: () => {
@@ -62,7 +62,7 @@ export default function NotificationsPage() {
   // Мутация для отметки всех уведомлений как прочитанных
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("PATCH", "/api/notifications/read-all");
+      const res = await apiRequest("/api/notifications/read-all", "PATCH");
       return await res.json();
     },
     onSuccess: () => {

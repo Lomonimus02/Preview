@@ -96,7 +96,7 @@ export default function ClassGradeDetailsPage() {
   const { data: classData, isLoading: isClassLoading } = useQuery<ClassType>({
     queryKey: ["/api/classes", classId],
     queryFn: async () => {
-      const res = await apiRequest(`/api/classes/${classId}`, "GET");
+      const res = await apiRequest(`/api/classes/${classId}`);
       return res.json();
     },
     enabled: !!classId && !!user,
@@ -106,7 +106,7 @@ export default function ClassGradeDetailsPage() {
   const { data: subjectData, isLoading: isSubjectLoading } = useQuery<Subject>({
     queryKey: ["/api/subjects", subjectId],
     queryFn: async () => {
-      const res = await apiRequest(`/api/subjects/${subjectId}`, "GET");
+      const res = await apiRequest(`/api/subjects/${subjectId}`);
       return res.json();
     },
     enabled: !!subjectId && !!user,
@@ -116,7 +116,7 @@ export default function ClassGradeDetailsPage() {
   const { data: students = [], isLoading: isStudentsLoading } = useQuery<User[]>({
     queryKey: ["/api/students-by-class", classId],
     queryFn: async () => {
-      const res = await apiRequest(`/api/students-by-class/${classId}`, "GET");
+      const res = await apiRequest(`/api/students-by-class/${classId}`);
       return res.json();
     },
     enabled: !!classId && !!user,
@@ -126,7 +126,7 @@ export default function ClassGradeDetailsPage() {
   const { data: schedules = [], isLoading: isSchedulesLoading } = useQuery<Schedule[]>({
     queryKey: ["/api/schedules", { classId, subjectId }],
     queryFn: async () => {
-      const res = await apiRequest(`/api/schedules?classId=${classId}&subjectId=${subjectId}`, "GET");
+      const res = await apiRequest(`/api/schedules?classId=${classId}&subjectId=${subjectId}`);
       return res.json();
     },
     enabled: !!classId && !!subjectId && !!user,
@@ -136,7 +136,7 @@ export default function ClassGradeDetailsPage() {
   const { data: teacherSchedules = [], isLoading: isTeacherSchedulesLoading } = useQuery<Schedule[]>({
     queryKey: ["/api/schedules", { teacherId: user?.id }],
     queryFn: async () => {
-      const res = await apiRequest(`/api/schedules?teacherId=${user?.id}`, "GET");
+      const res = await apiRequest(`/api/schedules?teacherId=${user?.id}`);
       return res.json();
     },
     enabled: !!user?.id,
@@ -146,7 +146,7 @@ export default function ClassGradeDetailsPage() {
   const { data: grades = [], isLoading: isGradesLoading } = useQuery<Grade[]>({
     queryKey: ["/api/grades", { classId, subjectId }],
     queryFn: async () => {
-      const res = await apiRequest(`/api/grades?classId=${classId}&subjectId=${subjectId}`, "GET");
+      const res = await apiRequest(`/api/grades?classId=${classId}&subjectId=${subjectId}`);
       return res.json();
     },
     enabled: !!classId && !!subjectId && !!user,
