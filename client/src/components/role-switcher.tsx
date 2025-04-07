@@ -56,6 +56,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
   const switchRoleMutation = useMutation({
     mutationFn: async (role: UserRoleEnum) => {
       if (!user || !user.id) throw new Error("Пользователь не авторизован");
+      // Исправлен порядок аргументов: сначала URL, затем HTTP метод, затем данные
       const res = await apiRequest(`/api/users/${user.id}/active-role`, "PUT", { activeRole: role });
       return await res.json();
     },
