@@ -6,7 +6,7 @@ import { UserRoleEnum, User, insertUserSchema, Class, ParentStudent } from "@sha
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, Plus, Search, Filter, BookOpen, UsersIcon, UserIcon, UserPlusIcon, Loader2 } from "lucide-react";
+import { Pencil, Plus, Search, Filter, BookOpen, UsersIcon, UserIcon, UserPlusIcon, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -100,6 +100,7 @@ export default function UsersPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   // Only Super admin and School admin can access this page
   if (!isAdmin()) {
@@ -272,6 +273,30 @@ export default function UsersPage() {
     },
   });
   
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest(`/api/users/${id}`, "DELETE");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setIsDeleteDialogOpen(false);
+      setSelectedUser(null);
+      toast({
+        title: "Пользователь удален",
+        description: "Пользователь был успешно удален из системы",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить пользователя",
+        variant: "destructive",
+      });
+    },
+  });
+  
   const onSubmitAdd = (values: UserFormData) => {
     addUserMutation.mutate(values);
   };
@@ -295,6 +320,17 @@ export default function UsersPage() {
     setSelectedUser(user);
     setFormForEdit(user);
     setIsEditDialogOpen(true);
+  };
+  
+  const handleDelete = (user: User) => {
+    setSelectedUser(user);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  const confirmDelete = () => {
+    if (selectedUser) {
+      deleteUserMutation.mutate(selectedUser.id);
+    }
   };
   
   // States for student-class management
@@ -557,6 +593,41 @@ export default function UsersPage() {
 
   return (
     <MainLayout>
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Удаление пользователя</DialogTitle>
+            <DialogDescription>
+              Вы уверены, что хотите удалить пользователя {selectedUser?.firstName} {selectedUser?.lastName}?
+              Это действие нельзя будет отменить.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Отмена
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteUserMutation.isPending}
+            >
+              {deleteUserMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Удаление...
+                </>
+              ) : (
+                <>Удалить</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       <Tabs defaultValue="users" className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="users" className="flex items-center">
@@ -652,9 +723,14 @@ export default function UsersPage() {
                       <TableCell>{getRoleName(u.role)}</TableCell>
                       <TableCell>{u.schoolId || '-'}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => handleEdit(u)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(u)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(u)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

@@ -287,6 +287,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.json(updatedUser);
   });
+  
+  // Delete user
+  app.delete("/api/users/:id", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    const id = parseInt(req.params.id);
+    const user = await dataStorage.getUser(id);
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Check permissions
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && user.schoolId !== req.user.schoolId) {
+      return res.status(403).json({ message: "Вы не можете удалить пользователя из другой школы" });
+    }
+    
+    // Don't allow deleting self
+    if (req.user.id === id) {
+      return res.status(403).json({ message: "Вы не можете удалить свою учетную запись" });
+    }
+    
+    // Don't allow school admin to delete super admin
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && user.role === UserRoleEnum.SUPER_ADMIN) {
+      return res.status(403).json({ message: "Вы не можете удалить администратора системы" });
+    }
+    
+    const deletedUser = await dataStorage.deleteUser(id);
+    
+    // Log the action
+    await dataStorage.createSystemLog({
+      userId: req.user.id,
+      action: "user_deleted",
+      details: `Deleted user: ${deletedUser?.username}`,
+      ipAddress: req.ip
+    });
+    
+    res.json({ success: true, message: "Пользователь успешно удален" });
+  });
 
   // Classes API
   app.get("/api/classes", isAuthenticated, async (req, res) => {
