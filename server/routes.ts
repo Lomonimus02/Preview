@@ -195,11 +195,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Получение всех пользователей для SUPER_ADMIN");
       const users = await dataStorage.getUsers();
       return res.json(users);
-    } else if (activeRole === UserRoleEnum.SCHOOL_ADMIN && req.user.schoolId) {
-      console.log("Получение пользователей школы для SCHOOL_ADMIN, ID школы:", req.user.schoolId);
-      const users = await dataStorage.getUsersBySchool(req.user.schoolId);
-      console.log("Найдено пользователей:", users.length);
-      return res.json(users);
+    } else if (activeRole === UserRoleEnum.SCHOOL_ADMIN) {
+      // Get school ID from the user's roles if not present in the user object
+      const userRoles = await dataStorage.getUserRoles(req.user.id);
+      const schoolAdminRole = userRoles.find(role => 
+        role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
+      );
+      
+      const schoolId = req.user.schoolId || (schoolAdminRole ? schoolAdminRole.schoolId : null);
+      
+      console.log("Проверка роли администратора школы...");
+      console.log("schoolId из профиля:", req.user.schoolId);
+      console.log("schoolId из роли:", schoolAdminRole?.schoolId);
+      console.log("Используемый schoolId:", schoolId);
+      
+      if (schoolId) {
+        console.log("Получение пользователей школы для SCHOOL_ADMIN, ID школы:", schoolId);
+        const users = await dataStorage.getUsersBySchool(schoolId);
+        console.log("Найдено пользователей:", users.length);
+        return res.json(users);
+      } else {
+        console.log("Не найден ID школы для администратора");
+        
+        // Проверим все роли пользователя и выведем информацию
+        console.log("Все роли пользователя:", JSON.stringify(userRoles));
+        
+        // Если школа не найдена, но есть роли школьного администратора,
+        // пробуем найти первую школу и использовать её для этого администратора
+        if (userRoles.some(role => role.role === UserRoleEnum.SCHOOL_ADMIN)) {
+          const schools = await dataStorage.getSchools();
+          console.log("Доступные школы:", schools.map(s => `${s.id}: ${s.name}`).join(", "));
+          
+          if (schools.length > 0) {
+            const defaultSchool = schools[0];
+            console.log("Использование первой доступной школы:", defaultSchool.id, defaultSchool.name);
+            const users = await dataStorage.getUsersBySchool(defaultSchool.id);
+            console.log("Найдено пользователей в школе по умолчанию:", users.length);
+            return res.json(users);
+          }
+        }
+      }
     } else {
       console.log("Не удовлетворены условия для получения пользователей");
       console.log("Роль:", activeRole);
@@ -388,9 +423,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/classes", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
-    // Validate school access
-    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && req.body.schoolId !== req.user.schoolId) {
-      return res.status(403).json({ message: "You can only create classes for your school" });
+    // Get the correct schoolId for the school admin
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+      const schoolId = req.body.schoolId;
+      // If the user doesn't have a schoolId, check if they have a role with schoolId
+      if (!req.user.schoolId) {
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const schoolAdminRole = userRoles.find(role => 
+          role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
+        );
+        
+        if (schoolAdminRole && schoolAdminRole.schoolId) {
+          // If the client didn't send a schoolId, use the one from the role
+          if (!schoolId) {
+            req.body.schoolId = schoolAdminRole.schoolId;
+          } 
+          // If the client sent a different schoolId than the one in their role, reject
+          else if (schoolId !== schoolAdminRole.schoolId) {
+            return res.status(403).json({ message: "You can only create classes for your school" });
+          }
+        } else {
+          return res.status(403).json({ message: "You don't have access to any school" });
+        }
+      } 
+      // User has schoolId in their profile
+      else if (schoolId && schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "You can only create classes for your school" });
+      } else if (!schoolId) {
+        // If no schoolId in request, use the one from the user profile
+        req.body.schoolId = req.user.schoolId;
+      }
+    }
+    
+    // Ensure we have a schoolId at this point
+    if (!req.body.schoolId) {
+      return res.status(400).json({ message: "School ID is required" });
     }
     
     const newClass = await dataStorage.createClass(req.body);
@@ -449,9 +516,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/subjects", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
-    // Validate school access
-    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && req.body.schoolId !== req.user.schoolId) {
-      return res.status(403).json({ message: "You can only create subjects for your school" });
+    // Get the correct schoolId for the school admin
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+      const schoolId = req.body.schoolId;
+      // If the user doesn't have a schoolId, check if they have a role with schoolId
+      if (!req.user.schoolId) {
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const schoolAdminRole = userRoles.find(role => 
+          role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
+        );
+        
+        if (schoolAdminRole && schoolAdminRole.schoolId) {
+          // If the client didn't send a schoolId, use the one from the role
+          if (!schoolId) {
+            req.body.schoolId = schoolAdminRole.schoolId;
+          } 
+          // If the client sent a different schoolId than the one in their role, reject
+          else if (schoolId !== schoolAdminRole.schoolId) {
+            return res.status(403).json({ message: "You can only create subjects for your school" });
+          }
+        } else {
+          return res.status(403).json({ message: "You don't have access to any school" });
+        }
+      } 
+      // User has schoolId in their profile
+      else if (schoolId && schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "You can only create subjects for your school" });
+      } else if (!schoolId) {
+        // If no schoolId in request, use the one from the user profile
+        req.body.schoolId = req.user.schoolId;
+      }
+    }
+    
+    // Ensure we have a schoolId at this point
+    if (!req.body.schoolId) {
+      return res.status(400).json({ message: "School ID is required" });
     }
     
     const subject = await dataStorage.createSubject(req.body);

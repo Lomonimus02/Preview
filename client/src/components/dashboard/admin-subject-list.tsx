@@ -62,9 +62,33 @@ export function AdminSubjectList() {
     },
   });
   
+  // Get school ID from user roles if not available directly
+  // Query for user roles to get schoolId if it's not in the user object
+  const { data: userRoles = [] } = useQuery({
+    queryKey: ["/api/my-roles"],
+    enabled: !!user && user.role === "school_admin" && !user.schoolId
+  });
+  
+  // Extract schoolId from school_admin role if present
+  const getSchoolId = () => {
+    if (user?.schoolId) return user.schoolId;
+    
+    // Find schoolId from user roles
+    const schoolAdminRole = userRoles.find(role => 
+      role.role === "school_admin" && role.schoolId
+    );
+    
+    return schoolAdminRole?.schoolId || null;
+  };
+
   // Добавление предмета
   const addSubjectMutation = useMutation({
     mutationFn: async (data: z.infer<typeof subjectFormSchema>) => {
+      // Ensure schoolId is set
+      if (!data.schoolId) {
+        data.schoolId = getSchoolId();
+      }
+      
       const res = await apiRequest("/api/subjects", "POST", data);
       return res.json();
     },
@@ -74,7 +98,7 @@ export function AdminSubjectList() {
       form.reset({
         name: "",
         description: "",
-        schoolId: user?.schoolId,
+        schoolId: getSchoolId(),
       });
       toast({
         title: "Предмет добавлен",
@@ -93,8 +117,8 @@ export function AdminSubjectList() {
   const onSubmit = (values: z.infer<typeof subjectFormSchema>) => {
     console.log("Форма предмета отправлена:", values);
     // Убедимся, что у нас есть schoolId
-    if (!values.schoolId && user?.schoolId) {
-      values.schoolId = user.schoolId;
+    if (!values.schoolId) {
+      values.schoolId = getSchoolId();
     }
     console.log("Данные для отправки:", values);
     addSubjectMutation.mutate(values);
@@ -184,11 +208,22 @@ export function AdminSubjectList() {
                 const values = form.getValues();
                 console.log("Значения формы:", values);
                 
-                // Убедимся, что у нас есть schoolId
-                if (!values.schoolId && user?.schoolId) {
-                  values.schoolId = user.schoolId;
+                // Убедимся, что у нас есть schoolId, используя нашу вспомогательную функцию
+                if (!values.schoolId) {
+                  values.schoolId = getSchoolId();
+                  
+                  // Если все еще нет schoolId, не отправляем форму
+                  if (!values.schoolId) {
+                    toast({
+                      title: "Ошибка",
+                      description: "Не удалось определить ID школы. Пожалуйста, обратитесь к администратору.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
                 }
                 
+                console.log("Отправка данных с schoolId:", values.schoolId);
                 addSubjectMutation.mutate(values);
               } else {
                 form.handleSubmit(onSubmit)(e);
