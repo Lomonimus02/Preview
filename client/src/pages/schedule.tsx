@@ -162,7 +162,7 @@ export default function SchedulePage() {
   const addScheduleMutation = useMutation({
     mutationFn: async (data: ScheduleFormData) => {
       console.log("Добавление урока в расписание:", data);
-      const res = await apiRequest("POST", "/api/schedules", data);
+      const res = await apiRequest("/api/schedules", "POST", data);
       return res.json();
     },
     onSuccess: () => {
@@ -186,7 +186,7 @@ export default function SchedulePage() {
   // Mutation для удаления расписания
   const deleteScheduleMutation = useMutation({
     mutationFn: async (scheduleId: number) => {
-      const res = await apiRequest("DELETE", `/api/schedules/${scheduleId}`);
+      const res = await apiRequest(`/api/schedules/${scheduleId}`, "DELETE");
       if (!res.ok) throw new Error("Не удалось удалить урок");
       return res.json();
     },
@@ -223,7 +223,7 @@ export default function SchedulePage() {
   // Добавить оценку
   const addGradeMutation = useMutation({
     mutationFn: async (data: z.infer<typeof gradeFormSchema>) => {
-      const res = await apiRequest("POST", "/api/grades", data);
+      const res = await apiRequest("/api/grades", "POST", data);
       return res.json();
     },
     onSuccess: () => {

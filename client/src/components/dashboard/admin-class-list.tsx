@@ -70,7 +70,7 @@ export function AdminClassList() {
   // Добавление класса
   const addClassMutation = useMutation({
     mutationFn: async (data: z.infer<typeof classFormSchema>) => {
-      const res = await apiRequest("POST", "/api/classes", data);
+      const res = await apiRequest("/api/classes", "POST", data);
       return res.json();
     },
     onSuccess: () => {

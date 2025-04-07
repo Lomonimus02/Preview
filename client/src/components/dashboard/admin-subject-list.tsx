@@ -65,7 +65,7 @@ export function AdminSubjectList() {
   // Добавление предмета
   const addSubjectMutation = useMutation({
     mutationFn: async (data: z.infer<typeof subjectFormSchema>) => {
-      const res = await apiRequest("POST", "/api/subjects", data);
+      const res = await apiRequest("/api/subjects", "POST", data);
       return res.json();
     },
     onSuccess: () => {
