@@ -233,7 +233,7 @@ export default function HomeworkPage() {
   // Delete homework mutation
   const deleteHomeworkMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/homework/${id}`);
+      const res = await apiRequest("DELETE", `/api/homework/${id}`, {});
       return res.json();
     },
     onSuccess: () => {
