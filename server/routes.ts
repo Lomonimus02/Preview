@@ -1650,6 +1650,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Получение расписания студента для классного руководителя
+  app.get("/api/student-schedules/:studentId", isAuthenticated, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      
+      // Проверяем права доступа - только классный руководитель, администраторы и родители могут просматривать расписание ученика
+      if (req.user.role === UserRoleEnum.CLASS_TEACHER) {
+        // Классный руководитель может видеть расписание только студентов своего класса
+        // Получаем роли пользователя, чтобы найти роль классного руководителя
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const classTeacherRole = userRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER && r.classId);
+        
+        if (!classTeacherRole || !classTeacherRole.classId) {
+          return res.status(403).json({ message: "You need to be assigned to a class as a class teacher" });
+        }
+        
+        // Проверяем, принадлежит ли ученик к классу учителя
+        const classStudents = await dataStorage.getClassStudents(classTeacherRole.classId);
+        const isStudentInClass = classStudents.some(student => student.id === studentId);
+        
+        if (!isStudentInClass) {
+          return res.status(403).json({ message: "You can only view schedules of students in your assigned class" });
+        }
+      } else if (![UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+        // Проверяем, является ли текущий пользователь родителем этого ученика
+        if (req.user.role === UserRoleEnum.PARENT) {
+          const parentStudents = await dataStorage.getParentStudents(req.user.id);
+          const isParentOfStudent = parentStudents.some(ps => ps.studentId === studentId);
+          
+          if (!isParentOfStudent) {
+            return res.status(403).json({ message: "You can only view schedules of your children" });
+          }
+        } else {
+          return res.status(403).json({ message: "You don't have permission to view student schedules" });
+        }
+      }
+      
+      // Получаем классы, к которым принадлежит студент
+      const studentClasses = await dataStorage.getStudentClasses(studentId);
+      
+      // Получаем расписание для каждого класса студента
+      const studentSchedules = [];
+      for (const cls of studentClasses) {
+        const classSchedules = await dataStorage.getSchedulesByClass(cls.id);
+        studentSchedules.push(...classSchedules);
+      }
+      
+      res.json(studentSchedules);
+    } catch (error) {
+      console.error("Error fetching student schedules:", error);
+      return res.status(500).json({ message: "Failed to fetch student schedules" });
+    }
+  });
+  
   const httpServer = createServer(app);
   return httpServer;
 }

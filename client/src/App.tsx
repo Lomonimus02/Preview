@@ -21,6 +21,7 @@ import Notifications from "./pages/notifications";
 import SystemLogs from "./pages/system-logs";
 import StudentClassAssignments from "./pages/student-class-assignments";
 import ParentStudentConnections from "./pages/parent-student-connections";
+import ClassTeacherDashboard from "./pages/class-teacher-dashboard";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -45,6 +46,7 @@ function Router() {
       <ProtectedRoute path="/system-logs" component={SystemLogs} />
       <ProtectedRoute path="/student-class-assignments" component={StudentClassAssignments} />
       <ProtectedRoute path="/parent-student-connections" component={ParentStudentConnections} />
+      <ProtectedRoute path="/class-teacher-dashboard" component={ClassTeacherDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

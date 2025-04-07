@@ -213,7 +213,8 @@ export default function UsersPage() {
       [UserRoleEnum.STUDENT]: "Ученик",
       [UserRoleEnum.PARENT]: "Родитель",
       [UserRoleEnum.PRINCIPAL]: "Директор",
-      [UserRoleEnum.VICE_PRINCIPAL]: "Завуч"
+      [UserRoleEnum.VICE_PRINCIPAL]: "Завуч",
+      [UserRoleEnum.CLASS_TEACHER]: "Классный руководитель"
     };
     
     return roleNames[role] || role;

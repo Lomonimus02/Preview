@@ -30,7 +30,8 @@ const getRoleName = (role: UserRoleEnum) => {
     [UserRoleEnum.STUDENT]: "Ученик",
     [UserRoleEnum.PARENT]: "Родитель",
     [UserRoleEnum.PRINCIPAL]: "Директор",
-    [UserRoleEnum.VICE_PRINCIPAL]: "Завуч"
+    [UserRoleEnum.VICE_PRINCIPAL]: "Завуч",
+    [UserRoleEnum.CLASS_TEACHER]: "Классный руководитель"
   };
   return roleMap[role] || role;
 };
@@ -54,7 +55,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
   // Мутация для смены роли
   const switchRoleMutation = useMutation({
     mutationFn: async (role: UserRoleEnum) => {
-      const res = await apiRequest("/api/switch-role", "POST", { role });
+      const res = await apiRequest("POST", "/api/switch-role", { role });
       return await res.json();
     },
     onSuccess: (updatedUser) => {
