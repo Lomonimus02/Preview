@@ -97,10 +97,12 @@ export function AdminClassList() {
   });
   
   const onSubmit = (values: z.infer<typeof classFormSchema>) => {
+    console.log("Форма класса отправлена:", values);
     // Убедимся, что у нас есть schoolId
     if (!values.schoolId && user?.schoolId) {
       values.schoolId = user.schoolId;
     }
+    console.log("Данные для отправки:", values);
     addClassMutation.mutate(values);
   };
   

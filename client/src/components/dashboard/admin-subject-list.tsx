@@ -91,10 +91,12 @@ export function AdminSubjectList() {
   });
   
   const onSubmit = (values: z.infer<typeof subjectFormSchema>) => {
+    console.log("Форма предмета отправлена:", values);
     // Убедимся, что у нас есть schoolId
     if (!values.schoolId && user?.schoolId) {
       values.schoolId = user.schoolId;
     }
+    console.log("Данные для отправки:", values);
     addSubjectMutation.mutate(values);
   };
   
