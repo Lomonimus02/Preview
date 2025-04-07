@@ -164,7 +164,21 @@ export default function SchedulePage() {
   const addScheduleMutation = useMutation({
     mutationFn: async (data: ScheduleFormData) => {
       console.log("Добавление урока в расписание:", data);
-      const res = await apiRequest("/api/schedules", "POST", data);
+      
+      // Нормализуем дату без часового пояса, устанавливая полночь UTC
+      const formattedData = {
+        ...data,
+        scheduleDate: new Date(
+          Date.UTC(
+            data.scheduleDate.getFullYear(),
+            data.scheduleDate.getMonth(),
+            data.scheduleDate.getDate()
+          )
+        )
+      };
+      
+      console.log("Отправка данных с нормализованной датой:", formattedData);
+      const res = await apiRequest("/api/schedules", "POST", formattedData);
       return res.json();
     },
     onSuccess: () => {
@@ -190,8 +204,22 @@ export default function SchedulePage() {
   const updateScheduleMutation = useMutation({
     mutationFn: async (data: ScheduleFormData & { id: number }) => {
       console.log("Обновление урока в расписании:", data);
+      
+      // Нормализуем дату без часового пояса, устанавливая полночь UTC
       const { id, ...scheduleData } = data;
-      const res = await apiRequest(`/api/schedules/${id}`, "PATCH", scheduleData);
+      const formattedData = {
+        ...scheduleData,
+        scheduleDate: new Date(
+          Date.UTC(
+            data.scheduleDate.getFullYear(),
+            data.scheduleDate.getMonth(),
+            data.scheduleDate.getDate()
+          )
+        )
+      };
+      
+      console.log("Отправка данных для обновления с нормализованной датой:", formattedData);
+      const res = await apiRequest(`/api/schedules/${id}`, "PATCH", formattedData);
       return res.json();
     },
     onSuccess: () => {

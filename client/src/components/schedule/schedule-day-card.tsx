@@ -326,7 +326,13 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   <h4 className="text-gray-500 mb-1">Дата</h4>
                   <p className="font-medium">
                     {selectedSchedule.scheduleDate 
-                      ? format(new Date(selectedSchedule.scheduleDate), "dd.MM.yyyy")
+                      ? format(new Date(
+                          Date.UTC(
+                            new Date(selectedSchedule.scheduleDate).getFullYear(),
+                            new Date(selectedSchedule.scheduleDate).getMonth(),
+                            new Date(selectedSchedule.scheduleDate).getDate()
+                          )
+                        ), "dd.MM.yyyy")
                       : format(date, "dd.MM.yyyy")
                     }
                   </p>
