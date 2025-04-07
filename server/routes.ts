@@ -544,9 +544,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/homework", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+    // Получаем расписание урока, чтобы задать срок сдачи автоматически
+    const scheduleId = req.body.scheduleId;
+    const schedule = await dataStorage.getSchedule(scheduleId);
+    
+    if (!schedule) {
+      return res.status(400).json({ message: "Указанный урок не найден" });
+    }
+    
+    // Рассчитываем срок сдачи (7 дней после даты урока)
+    const lessonDate = new Date(schedule.scheduleDate);
+    const dueDate = new Date(lessonDate);
+    dueDate.setDate(dueDate.getDate() + 7); // Срок сдачи через неделю после урока
+    
     const homework = await dataStorage.createHomework({
       ...req.body,
-      teacherId: req.user.id
+      teacherId: req.user.id,
+      dueDate
     });
     
     // Create notifications for all students in the class

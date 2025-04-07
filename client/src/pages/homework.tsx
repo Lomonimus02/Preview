@@ -333,11 +333,6 @@ export default function HomeworkPage() {
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-heading font-bold text-gray-800">Домашние задания</h2>
-        {canCreateHomework && (
-          <Button onClick={() => setIsAddDialogOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" /> Создать задание
-          </Button>
-        )}
       </div>
 
       {/* Filters and search */}
