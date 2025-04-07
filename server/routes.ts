@@ -470,6 +470,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.json(deletedSchedule);
   });
+  
+  // Обновление статуса урока (проведен/не проведен)
+  app.patch("/api/schedules/:id/status", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+    try {
+      const scheduleId = parseInt(req.params.id);
+      if (isNaN(scheduleId)) {
+        return res.status(400).json({ message: "Invalid schedule ID" });
+      }
+      
+      // Получаем урок из расписания
+      const schedule = await dataStorage.getSchedule(scheduleId);
+      if (!schedule) {
+        return res.status(404).json({ message: "Урок не найден" });
+      }
+      
+      // Проверяем, что учитель, который пытается изменить статус, ведет этот урок
+      if (schedule.teacherId !== req.user.id) {
+        return res.status(403).json({ 
+          message: 'Вы можете изменять статус только своих уроков' 
+        });
+      }
+      
+      // Проверяем, что передан валидный статус
+      const { status } = req.body;
+      if (status !== LessonStatusEnum.CONDUCTED && status !== LessonStatusEnum.NOT_CONDUCTED) {
+        return res.status(400).json({ 
+          message: 'Некорректный статус урока'
+        });
+      }
+      
+      // Проверяем время урока (должен начаться или закончиться до отметки проведения)
+      // Текущее время
+      const now = new Date();
+      
+      // Получаем дату урока
+      let lessonDate;
+      if (schedule.scheduleDate) {
+        lessonDate = new Date(schedule.scheduleDate);
+      } else {
+        // Если конкретная дата не указана, используем текущую дату
+        lessonDate = new Date();
+        lessonDate.setHours(0, 0, 0, 0);
+      }
+      
+      // Получаем время начала и конца урока
+      const [startHour, startMinute] = schedule.startTime.split(':').map(Number);
+      const [endHour, endMinute] = schedule.endTime.split(':').map(Number);
+      
+      // Создаем объекты даты/времени для начала и конца урока
+      const lessonStart = new Date(lessonDate);
+      lessonStart.setHours(startHour, startMinute, 0, 0);
+      
+      const lessonEnd = new Date(lessonDate);
+      lessonEnd.setHours(endHour, endMinute, 0, 0);
+      
+      // Проверяем, что урок уже начался или закончился
+      if (now < lessonStart) {
+        return res.status(403).json({
+          message: 'Нельзя отметить статус урока до его начала'
+        });
+      }
+      
+      // Обновляем статус урока
+      const updatedSchedule = await dataStorage.updateSchedule(scheduleId, { 
+        status 
+      });
+      
+      // Логируем действие
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "schedule_status_updated",
+        details: `Обновлен статус урока #${scheduleId} на '${status}'`,
+        ipAddress: req.ip
+      });
+      
+      res.json(updatedSchedule);
+    } catch (error) {
+      console.error('Ошибка при обновлении статуса урока:', error);
+      res.status(500).json({ 
+        message: 'Не удалось обновить статус урока', 
+        error: error.message 
+      });
+    }
+  });
 
   // Homework API
   app.get("/api/homework", isAuthenticated, async (req, res) => {
@@ -727,8 +811,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Если указана дата, используем её для установки createdAt
       let gradeData = { ...req.body, teacherId: req.user.id };
       
-      // Если не передан scheduleId, установим его как null (опционально)
-      if (gradeData.scheduleId === undefined) {
+      // Если передан scheduleId, проверяем статус урока
+      if (gradeData.scheduleId) {
+        const schedule = await dataStorage.getSchedule(gradeData.scheduleId);
+        
+        // Проверяем, существует ли урок по расписанию
+        if (!schedule) {
+          return res.status(404).json({ 
+            message: 'Урок по расписанию не найден' 
+          });
+        }
+        
+        // Проверяем, что учитель, который пытается выставить оценку, ведет этот урок
+        if (schedule.teacherId !== req.user.id) {
+          return res.status(403).json({ 
+            message: 'Вы можете выставлять оценки только для своих уроков' 
+          });
+        }
+        
+        // Проверяем статус урока - оценки можно выставлять только на проведенные уроки
+        if (schedule.status !== 'conducted') {
+          return res.status(403).json({ 
+            message: 'Нельзя выставлять оценки для непроведенных уроков. Сначала отметьте урок как проведенный.' 
+          });
+        }
+      } else {
         gradeData.scheduleId = null;
       }
       

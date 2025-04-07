@@ -57,6 +57,8 @@ export interface IStorage {
   getSchedulesByClass(classId: number): Promise<Schedule[]>;
   getSchedulesByTeacher(teacherId: number): Promise<Schedule[]>;
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
+  updateSchedule(id: number, scheduleData: Partial<InsertSchedule>): Promise<Schedule | undefined>;
+  deleteSchedule(id: number): Promise<Schedule | undefined>;
   
   // Homework operations
   getHomework(id: number): Promise<Homework | undefined>;
@@ -347,6 +349,23 @@ export class MemStorage implements IStorage {
     const newSchedule: Schedule = { ...schedule, id };
     this.schedules.set(id, newSchedule);
     return newSchedule;
+  }
+  
+  async updateSchedule(id: number, scheduleData: Partial<InsertSchedule>): Promise<Schedule | undefined> {
+    const existingSchedule = this.schedules.get(id);
+    if (!existingSchedule) return undefined;
+    
+    const updatedSchedule: Schedule = { ...existingSchedule, ...scheduleData };
+    this.schedules.set(id, updatedSchedule);
+    return updatedSchedule;
+  }
+  
+  async deleteSchedule(id: number): Promise<Schedule | undefined> {
+    const schedule = this.schedules.get(id);
+    if (!schedule) return undefined;
+    
+    this.schedules.delete(id);
+    return schedule;
   }
   
   // Homework operations
