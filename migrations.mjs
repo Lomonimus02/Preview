@@ -1,70 +1,56 @@
-import pkg from 'pg';
-const { Pool } = pkg;
+import postgres from 'postgres';
+import dotenv from 'dotenv';
 
-// Создаем подключение к базе данных PostgreSQL
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+dotenv.config();
 
-/**
- * Добавляет поле status в таблицу schedules
- */
-async function addStatusToSchedules() {
-  const client = await pool.connect();
+const DATABASE_URL = process.env.DATABASE_URL;
+
+async function runMigration() {
+  if (!DATABASE_URL) {
+    console.error('DATABASE_URL not set');
+    process.exit(1);
+  }
+
+  const sql = postgres(DATABASE_URL);
+
   try {
-    // Проверяем, существует ли уже колонка status
-    const checkResult = await client.query(`
+    // Проверяем, существует ли колонка schedule_date в таблице schedules
+    const checkScheduleDateColumn = await sql`
       SELECT column_name 
       FROM information_schema.columns 
-      WHERE table_name = 'schedules' AND column_name = 'status'
-    `);
-
-    if (checkResult.rows.length === 0) {
-      console.log('Добавление колонки status в таблицу schedules...');
-      
-      // Создаем тип enum для статуса урока
-      await client.query(`
-        DO $$
-        BEGIN
-          IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lesson_status_enum') THEN
-            CREATE TYPE lesson_status_enum AS ENUM ('not_conducted', 'conducted');
-          END IF;
-        END
-        $$;
-      `);
-      
-      // Добавляем колонку с дефолтным значением 'not_conducted'
-      await client.query(`
-        ALTER TABLE schedules 
-        ADD COLUMN status lesson_status_enum DEFAULT 'not_conducted'
-      `);
-      
-      console.log('Колонка status успешно добавлена в таблицу schedules');
+      WHERE table_name = 'schedules' AND column_name = 'schedule_date'
+    `;
+    
+    if (checkScheduleDateColumn.length === 0) {
+      console.log('Добавляем колонку schedule_date в таблицу schedules...');
+      await sql`ALTER TABLE schedules ADD COLUMN schedule_date DATE`;
+      console.log('Колонка schedule_date успешно добавлена');
     } else {
-      console.log('Колонка status уже существует в таблице schedules');
+      console.log('Колонка schedule_date уже существует в таблице schedules');
     }
+    
+    // Проверяем, существует ли колонка schedule_id в таблице grades
+    const checkScheduleIdColumn = await sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'grades' AND column_name = 'schedule_id'
+    `;
+    
+    if (checkScheduleIdColumn.length === 0) {
+      console.log('Добавляем колонку schedule_id в таблицу grades...');
+      await sql`ALTER TABLE grades ADD COLUMN schedule_id INTEGER`;
+      console.log('Колонка schedule_id успешно добавлена');
+    } else {
+      console.log('Колонка schedule_id уже существует в таблице grades');
+    }
+    
+    console.log('Миграция успешно выполнена');
   } catch (error) {
-    console.error('Ошибка при добавлении колонки status:', error);
-    throw error;
+    console.error('Ошибка миграции:', error);
+    process.exit(1);
   } finally {
-    client.release();
+    await sql.end();
   }
 }
 
-/**
- * Выполняет все необходимые миграции
- */
-async function runMigrations() {
-  try {
-    await addStatusToSchedules();
-    console.log('Все миграции успешно выполнены');
-  } catch (error) {
-    console.error('Ошибка при выполнении миграций:', error);
-  } finally {
-    // Закрываем пул подключений
-    await pool.end();
-  }
-}
-
-// Запускаем миграции
-runMigrations();
+runMigration();

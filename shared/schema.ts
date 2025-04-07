@@ -73,12 +73,6 @@ export const teacherSubjects = pgTable("teacher_subjects", {
 });
 
 // Schedule table
-// Enum для статуса урока
-export enum LessonStatusEnum {
-  NOT_CONDUCTED = "not_conducted", // Не проведен
-  CONDUCTED = "conducted", // Проведен
-}
-
 export const schedules = pgTable("schedules", {
   id: serial("id").primaryKey(),
   classId: integer("class_id").notNull(),
@@ -89,7 +83,6 @@ export const schedules = pgTable("schedules", {
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
   room: text("room"),
-  status: text("status").$type<LessonStatusEnum>().default(LessonStatusEnum.NOT_CONDUCTED),
 });
 
 // Homework table

@@ -161,14 +161,6 @@ export class DatabaseStorage implements IStorage {
     return newSchedule;
   }
   
-  async updateSchedule(id: number, scheduleData: Partial<InsertSchedule>): Promise<Schedule | undefined> {
-    const [updatedSchedule] = await db.update(schedules)
-      .set(scheduleData)
-      .where(eq(schedules.id, id))
-      .returning();
-    return updatedSchedule;
-  }
-
   async deleteSchedule(id: number): Promise<Schedule | undefined> {
     const [deletedSchedule] = await db.delete(schedules)
       .where(eq(schedules.id, id))
