@@ -421,6 +421,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.json(classes);
   });
+  
+  // Get a specific class by ID
+  app.get("/api/classes/:id", isAuthenticated, async (req, res) => {
+    try {
+      const classId = parseInt(req.params.id);
+      if (isNaN(classId)) {
+        return res.status(400).json({ message: "Invalid class ID" });
+      }
+      
+      const classObj = await dataStorage.getClass(classId);
+      if (!classObj) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      // Check permissions
+      if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
+        // Super admin can access any class
+      } else if (req.user.role === UserRoleEnum.SCHOOL_ADMIN || 
+                req.user.role === UserRoleEnum.PRINCIPAL || 
+                req.user.role === UserRoleEnum.VICE_PRINCIPAL) {
+        // School admin, principal, and vice principal can access classes in their school only
+        if (classObj.schoolId !== req.user.schoolId) {
+          return res.status(403).json({ message: "You can only access classes in your school" });
+        }
+      } else if (req.user.role === UserRoleEnum.CLASS_TEACHER) {
+        // Class teacher can access their assigned class
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const classTeacherRole = userRoles.find(r => 
+          r.role === UserRoleEnum.CLASS_TEACHER && r.classId === classId
+        );
+        
+        if (!classTeacherRole) {
+          return res.status(403).json({ message: "You can only access your assigned class" });
+        }
+      } else if (req.user.role === UserRoleEnum.TEACHER) {
+        // Teacher can access classes they teach
+        const schedules = await dataStorage.getSchedulesByTeacher(req.user.id);
+        const teacherClassIds = [...new Set(schedules.map(s => s.classId))];
+        
+        if (!teacherClassIds.includes(classId)) {
+          return res.status(403).json({ message: "You can only access classes you teach" });
+        }
+      } else if (req.user.role === UserRoleEnum.STUDENT) {
+        // Student can access classes they are enrolled in
+        const studentClasses = await dataStorage.getStudentClasses(req.user.id);
+        const studentClassIds = studentClasses.map(c => c.id);
+        
+        if (!studentClassIds.includes(classId)) {
+          return res.status(403).json({ message: "You can only access classes you are enrolled in" });
+        }
+      } else {
+        return res.status(403).json({ message: "You don't have permission to access this class" });
+      }
+      
+      res.json(classObj);
+    } catch (error) {
+      console.error("Error fetching class:", error);
+      res.status(500).json({ message: "Failed to fetch class" });
+    }
+  });
 
   app.post("/api/classes", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
     // Get the correct schoolId for the school admin
