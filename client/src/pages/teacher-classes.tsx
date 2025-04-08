@@ -4,14 +4,24 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
 import { UserRoleEnum, Grade, Class, Subject, User, Schedule } from "@shared/schema";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, BookOpen, UserCheck, Calendar, Search, Filter } from "lucide-react";
+import { AlertCircle, BookOpen, UserCheck, Calendar, Search, Filter, Check, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -44,9 +54,125 @@ export default function TeacherClasses() {
   const { user } = useAuth();
   const { isTeacher } = useRoleCheck();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedCombination, setSelectedCombination] = useState<ClassSubjectCombination | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState<number | "all">("all");
+  
+  // Стейт для модальных окон
+  const [lessonStatusDialogOpen, setLessonStatusDialogOpen] = useState(false);
+  const [currentSchedule, setCurrentSchedule] = useState<Schedule | null>(null);
+  
+  const [gradeDialogOpen, setGradeDialogOpen] = useState(false);
+  const [gradeData, setGradeData] = useState<{
+    studentId: number;
+    scheduleId: number;
+    grade?: number;
+    comment?: string;
+    gradeId?: number;
+    gradeType?: string;
+  } | null>(null);
+  
+  // Мутации для обновления данных
+  const updateScheduleStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest(`/api/schedules/${id}`, "PATCH", { status });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Не удалось обновить статус урока");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+      toast({
+        title: "Статус урока обновлен",
+        description: "Статус урока успешно обновлен",
+        variant: "default"
+      });
+      setLessonStatusDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const createGradeMutation = useMutation({
+    mutationFn: async (data: { studentId: number; scheduleId: number; grade: number; comment?: string; classId: number; subjectId: number; gradeType: string }) => {
+      const res = await apiRequest(`/api/grades`, "POST", data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Не удалось создать оценку");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      toast({
+        title: "Оценка добавлена",
+        description: "Оценка успешно добавлена",
+        variant: "default"
+      });
+      setGradeDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  const updateGradeMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: { grade: number; comment?: string; gradeType?: string } }) => {
+      const res = await apiRequest(`/api/grades/${id}`, "PATCH", data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Не удалось обновить оценку");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      toast({
+        title: "Оценка обновлена",
+        description: "Оценка успешно обновлена",
+        variant: "default"
+      });
+      setGradeDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Открытие диалога для изменения статуса урока
+  const openLessonStatusDialog = (schedule: Schedule) => {
+    setCurrentSchedule(schedule);
+    setLessonStatusDialogOpen(true);
+  };
+  
+  // Открытие диалога для выставления оценки
+  const openGradeDialog = (studentId: number, scheduleId: number, existingGrade?: number, existingComment?: string, gradeId?: number, gradeType?: string) => {
+    setGradeData({
+      studentId,
+      scheduleId,
+      grade: existingGrade,
+      comment: existingComment,
+      gradeId,
+      gradeType: gradeType || 'classwork' // Используем существующий тип или 'classwork' по умолчанию
+    });
+    setGradeDialogOpen(true);
+  };
 
   // Проверяем, что пользователь является учителем
   useEffect(() => {
@@ -363,12 +489,11 @@ export default function TeacherClasses() {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="sticky left-0 bg-white">Ученик</TableHead>
-                            {/* Показываем даты проведенных уроков в качестве заголовков столбцов */}
+                            {/* Показываем даты всех уроков в качестве заголовков столбцов */}
                             {schedules
                               .filter(schedule => 
                                 schedule.classId === selectedCombination.classId && 
-                                schedule.subjectId === selectedCombination.subjectId && 
-                                schedule.status === 'conducted'
+                                schedule.subjectId === selectedCombination.subjectId
                               )
                               .sort((a, b) => {
                                 // Сортируем по дате
@@ -376,11 +501,32 @@ export default function TeacherClasses() {
                                 const dateB = b.scheduleDate ? new Date(b.scheduleDate) : new Date(0);
                                 return dateA.getTime() - dateB.getTime();
                               })
-                              .map(schedule => (
-                                <TableHead key={schedule.id} className="text-center">
-                                  {schedule.scheduleDate ? new Date(schedule.scheduleDate).toLocaleDateString('ru-RU') : 'Без даты'}
-                                </TableHead>
-                              ))}
+                              .map(schedule => {
+                                const isLessonConducted = schedule.status === 'conducted';
+                                return (
+                                  <TableHead 
+                                    key={schedule.id} 
+                                    className={`text-center cursor-pointer ${isLessonConducted ? 'bg-green-50' : 'bg-gray-50'}`}
+                                    onClick={() => openLessonStatusDialog(schedule)}
+                                  >
+                                    <div className="flex flex-col items-center justify-center">
+                                      {schedule.scheduleDate ? new Date(schedule.scheduleDate).toLocaleDateString('ru-RU') : 'Без даты'}
+                                      {schedule.startTime && 
+                                        <span className="text-xs text-gray-500">
+                                          ({schedule.startTime.slice(0, 5)})
+                                        </span>
+                                      }
+                                      {isLessonConducted && (
+                                        <span className="text-green-600 ml-1">
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                          </svg>
+                                        </span>
+                                      )}
+                                    </div>
+                                  </TableHead>
+                                );
+                              })}
                             <TableHead className="text-center">Средний балл</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -418,12 +564,11 @@ export default function TeacherClasses() {
                                     {student.lastName} {student.firstName}
                                   </TableCell>
                                   
-                                  {/* Для каждого урока показываем оценку, если она есть */}
+                                  {/* Для каждого урока показываем оценку или возможность её выставить */}
                                   {schedules
                                     .filter(schedule => 
                                       schedule.classId === selectedCombination.classId && 
-                                      schedule.subjectId === selectedCombination.subjectId &&
-                                      schedule.status === 'conducted'
+                                      schedule.subjectId === selectedCombination.subjectId
                                     )
                                     .sort((a, b) => {
                                       const dateA = a.scheduleDate ? new Date(a.scheduleDate) : new Date(0);
@@ -436,17 +581,40 @@ export default function TeacherClasses() {
                                         grade.scheduleId === schedule.id
                                       );
                                       
+                                      const isLessonConducted = schedule.status === 'conducted';
+                                      
                                       return (
-                                        <TableCell key={schedule.id} className="text-center">
-                                          {gradeForSchedule ? (
-                                            <span className={`px-2 py-1 rounded-full ${
-                                              gradeForSchedule.grade >= 4 ? 'bg-green-100 text-green-800' : 
-                                              gradeForSchedule.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
-                                              'bg-red-100 text-red-800'
-                                            }`}>
-                                              {gradeForSchedule.grade}
-                                            </span>
-                                          ) : "–"}
+                                        <TableCell key={schedule.id} className={`text-center ${isLessonConducted ? '' : 'bg-gray-50'}`}>
+                                          {isLessonConducted ? (
+                                            <div className="w-full">
+                                              {gradeForSchedule ? (
+                                                <span 
+                                                  className={`px-2 py-1 rounded-full cursor-pointer ${
+                                                    gradeForSchedule.grade >= 4 ? 'bg-green-100 text-green-800' : 
+                                                    gradeForSchedule.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
+                                                    'bg-red-100 text-red-800'
+                                                  }`}
+                                                  onClick={() => openGradeDialog(student.id, schedule.id, gradeForSchedule.grade, gradeForSchedule.comment || '', gradeForSchedule.id, gradeForSchedule.gradeType)}
+                                                >
+                                                  <div className="flex flex-col">
+                                                    <span>{gradeForSchedule.grade}</span>
+                                                    <span className="text-xs text-gray-500">{getGradeTypeName(gradeForSchedule.gradeType || 'classwork')}</span>
+                                                  </div>
+                                                </span>
+                                              ) : (
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="text-xs"
+                                                  onClick={() => openGradeDialog(student.id, schedule.id)}
+                                                >
+                                                  Оценить
+                                                </Button>
+                                              )}
+                                            </div>
+                                          ) : (
+                                            <span className="text-gray-400">—</span>
+                                          )}
                                         </TableCell>
                                       );
                                     })
@@ -540,6 +708,215 @@ export default function TeacherClasses() {
           </>
         )}
       </div>
+      
+      {/* Модальное окно для изменения статуса урока */}
+      <Dialog open={lessonStatusDialogOpen} onOpenChange={setLessonStatusDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Изменить статус урока</DialogTitle>
+            <DialogDescription>
+              {currentSchedule && (
+                <div className="mt-2">
+                  <p className="mb-2">
+                    Дата: {currentSchedule.scheduleDate ? new Date(currentSchedule.scheduleDate).toLocaleDateString('ru-RU') : 'Без даты'}
+                  </p>
+                  <p className="mb-2">
+                    Время: {currentSchedule.startTime ? currentSchedule.startTime.slice(0, 5) : 'Не указано'} 
+                    {currentSchedule.endTime ? ` - ${currentSchedule.endTime.slice(0, 5)}` : ''}
+                  </p>
+                  <p className="mb-4">
+                    Текущий статус: <span className={currentSchedule.status === 'conducted' ? 'text-green-600 font-medium' : 'text-gray-600'}>
+                      {currentSchedule.status === 'conducted' ? 'Проведен' : 'Запланирован'}
+                    </span>
+                  </p>
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="flex items-center justify-center gap-4">
+              <Button
+                variant={currentSchedule?.status === 'conducted' ? "default" : "outline"}
+                className="flex-1 flex items-center gap-2"
+                onClick={() => {
+                  if (currentSchedule) {
+                    updateScheduleStatusMutation.mutate({
+                      id: currentSchedule.id,
+                      status: 'conducted'
+                    });
+                  }
+                }}
+              >
+                <Check className="h-4 w-4" />
+                Проведен
+              </Button>
+              
+              <Button
+                variant={currentSchedule?.status !== 'conducted' ? "default" : "outline"}
+                className="flex-1 flex items-center gap-2"
+                onClick={() => {
+                  if (currentSchedule) {
+                    updateScheduleStatusMutation.mutate({
+                      id: currentSchedule.id,
+                      status: 'scheduled'
+                    });
+                  }
+                }}
+              >
+                <X className="h-4 w-4" />
+                Не проведен
+              </Button>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLessonStatusDialogOpen(false)}>
+              Отмена
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Модальное окно для выставления оценки */}
+      <Dialog open={gradeDialogOpen} onOpenChange={setGradeDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {gradeData?.grade ? "Редактировать оценку" : "Добавить оценку"}
+            </DialogTitle>
+            <DialogDescription>
+              {gradeData && (
+                <div className="mt-2">
+                  <p className="mb-2">
+                    Ученик: {students.find(s => s.id === gradeData.studentId)?.lastName} {students.find(s => s.id === gradeData.studentId)?.firstName}
+                  </p>
+                  <p className="mb-2">
+                    Урок: {schedules.find(s => s.id === gradeData.scheduleId)?.scheduleDate ? 
+                      new Date(schedules.find(s => s.id === gradeData.scheduleId)?.scheduleDate || '').toLocaleDateString('ru-RU') : 
+                      'Без даты'}
+                  </p>
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <Label htmlFor="grade">Оценка</Label>
+                <Select
+                  defaultValue={gradeData?.grade?.toString() || ""}
+                  onValueChange={(value) => {
+                    if (gradeData) {
+                      setGradeData({
+                        ...gradeData,
+                        grade: parseInt(value)
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Выберите оценку" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 (Отлично)</SelectItem>
+                    <SelectItem value="4">4 (Хорошо)</SelectItem>
+                    <SelectItem value="3">3 (Удовлетворительно)</SelectItem>
+                    <SelectItem value="2">2 (Неудовлетворительно)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="gradeType">Тип оценки</Label>
+                <Select
+                  defaultValue={gradeData?.gradeType || "classwork"}
+                  onValueChange={(value) => {
+                    if (gradeData) {
+                      setGradeData({
+                        ...gradeData,
+                        gradeType: value
+                      });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Выберите тип оценки" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="classwork">Классная работа</SelectItem>
+                    <SelectItem value="homework">Домашнее задание</SelectItem>
+                    <SelectItem value="test">Тест</SelectItem>
+                    <SelectItem value="exam">Экзамен</SelectItem>
+                    <SelectItem value="project">Проект</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="comment">Комментарий (необязательно)</Label>
+                <Textarea
+                  id="comment"
+                  placeholder="Введите комментарий к оценке"
+                  value={gradeData?.comment || ""}
+                  onChange={(e) => {
+                    if (gradeData) {
+                      setGradeData({
+                        ...gradeData,
+                        comment: e.target.value
+                      });
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGradeDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button
+              onClick={() => {
+                if (gradeData && selectedCombination && gradeData.grade) {
+                  if (gradeData.gradeId) {
+                    // Обновляем существующую оценку
+                    updateGradeMutation.mutate({
+                      id: gradeData.gradeId,
+                      data: {
+                        grade: gradeData.grade,
+                        comment: gradeData.comment,
+                        gradeType: gradeData.gradeType
+                      }
+                    });
+                  } else {
+                    // Создаем новую оценку
+                    createGradeMutation.mutate({
+                      studentId: gradeData.studentId,
+                      scheduleId: gradeData.scheduleId,
+                      grade: gradeData.grade,
+                      comment: gradeData.comment,
+                      classId: selectedCombination.classId,
+                      subjectId: selectedCombination.subjectId,
+                      gradeType: gradeData.gradeType || 'classwork' // Используем выбранный тип оценки или значение по умолчанию
+                    });
+                  }
+                } else {
+                  toast({
+                    title: "Ошибка",
+                    description: "Пожалуйста, заполните все обязательные поля",
+                    variant: "destructive"
+                  });
+                }
+              }}
+              disabled={!gradeData?.grade || updateScheduleStatusMutation.isPending || createGradeMutation.isPending || updateGradeMutation.isPending}
+            >
+              {gradeData?.gradeId ? "Обновить" : "Сохранить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

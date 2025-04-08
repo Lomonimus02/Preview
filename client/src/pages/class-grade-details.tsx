@@ -316,8 +316,15 @@ export default function ClassGradeDetailsPage() {
   // Mutation to update grade
   const updateGradeMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: Partial<z.infer<typeof gradeFormSchema>> }) => {
-      const res = await apiRequest(`/api/grades/${id}`, "PUT", data);
-      return res.json();
+      // Если мы обновляем только тип оценки, используем PATCH для частичного обновления
+      if (Object.keys(data).length === 1 && 'gradeType' in data) {
+        const res = await apiRequest(`/api/grades/${id}`, "PATCH", data);
+        return res.json();
+      } else {
+        // Для полного обновления используем PUT 
+        const res = await apiRequest(`/api/grades/${id}`, "PUT", data);
+        return res.json();
+      }
     },
     onMutate: async ({ id, data }) => {
       // Отменяем исходящие запросы
@@ -609,6 +616,24 @@ export default function ClassGradeDetailsPage() {
     );
   };
   
+  // Функция для получения читаемого названия типа оценки
+  const getGradeTypeName = (gradeType: string): string => {
+    const gradeTypes: Record<string, string> = {
+      'test': 'Контрольная работа',
+      'exam': 'Экзамен',
+      'homework': 'Домашняя работа',
+      'project': 'Проект',
+      'classwork': 'Классная работа',
+      'Текущая': 'Текущая оценка',
+      'Контрольная': 'Контрольная работа',
+      'Экзамен': 'Экзамен',
+      'Практическая': 'Практическая работа',
+      'Домашняя': 'Домашняя работа'
+    };
+    
+    return gradeTypes[gradeType] || gradeType;
+  };
+
   // Calculate average grade for a student
   const calculateAverageGrade = (studentId: number) => {
     const studentGrades = grades.filter(g => g.studentId === studentId);
@@ -765,8 +790,14 @@ export default function ClassGradeDetailsPage() {
                                     {studentGrades.map((grade) => (
                                       <div key={grade.id} className="relative group">
                                         <span 
-                                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-help"
-                                          title={grade.comment || ""}
+                                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-help
+                                            ${grade.gradeType === 'test' || grade.gradeType === 'Контрольная' ? 'bg-blue-600' : 
+                                            grade.gradeType === 'exam' || grade.gradeType === 'Экзамен' ? 'bg-purple-600' : 
+                                            grade.gradeType === 'homework' || grade.gradeType === 'Домашняя' ? 'bg-amber-600' : 
+                                            grade.gradeType === 'project' ? 'bg-emerald-600' : 
+                                            grade.gradeType === 'classwork' || grade.gradeType === 'Практическая' ? 'bg-green-600' :
+                                            'bg-primary'} text-primary-foreground`}
+                                          title={`${getGradeTypeName(grade.gradeType)}${grade.comment ? ': ' + grade.comment : ''}`}
                                         >
                                           {grade.grade}
                                         </span>
@@ -1023,11 +1054,12 @@ export default function ClassGradeDetailsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Текущая">Текущая</SelectItem>
-                          <SelectItem value="Контрольная">Контрольная</SelectItem>
-                          <SelectItem value="Экзамен">Экзамен</SelectItem>
-                          <SelectItem value="Практическая">Практическая</SelectItem>
-                          <SelectItem value="Домашняя">Домашняя</SelectItem>
+                          <SelectItem value="Текущая">Текущая оценка</SelectItem>
+                          <SelectItem value="test">Контрольная работа</SelectItem>
+                          <SelectItem value="exam">Экзамен</SelectItem>
+                          <SelectItem value="classwork">Классная работа</SelectItem>
+                          <SelectItem value="homework">Домашняя работа</SelectItem>
+                          <SelectItem value="project">Проект</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

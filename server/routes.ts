@@ -1309,7 +1309,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Удаление оценки
+  // PATCH endpoint для частичного обновления оценки
+  app.patch("/api/grades/:id", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+    try {
+      const gradeId = parseInt(req.params.id);
+      if (isNaN(gradeId)) {
+        return res.status(400).json({ message: "Invalid grade ID" });
+      }
+      
+      // Проверяем, существует ли оценка
+      const existingGrade = await dataStorage.getGrade(gradeId);
+      if (!existingGrade) {
+        return res.status(404).json({ message: "Оценка не найдена" });
+      }
+      
+      // Проверяем, имеет ли учитель право редактировать эту оценку
+      if (existingGrade.teacherId !== req.user.id) {
+        return res.status(403).json({ message: "Вы можете редактировать только выставленные вами оценки" });
+      }
+      
+      const data = req.body;
+      if (!data) {
+        return res.status(400).json({ message: "Данные для обновления не предоставлены" });
+      }
+      
+      // Проверяем корректность типа оценки
+      if (data.gradeType) {
+        const validTypes = ['classwork', 'homework', 'test', 'exam', 'project', 'Текущая', 'Контрольная', 'Экзамен', 'Практическая', 'Домашняя'];
+        if (!validTypes.includes(data.gradeType)) {
+          return res.status(400).json({ message: "Некорректный тип оценки" });
+        }
+      }
+      
+      const updatedGrade = await dataStorage.updateGrade(gradeId, data);
+      if (!updatedGrade) {
+        return res.status(404).json({ message: "Не удалось обновить оценку" });
+      }
+      
+      res.json(updatedGrade);
+    } catch (error) {
+      console.error('Error updating grade:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
   app.delete("/api/grades/:id", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
     try {
       const gradeId = parseInt(req.params.id);
