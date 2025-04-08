@@ -555,6 +555,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(subjects);
   });
   
+  // Get specific teacher's subjects
+  app.get("/api/teacher-subjects/:teacherId", isAuthenticated, async (req, res) => {
+    try {
+      const teacherId = parseInt(req.params.teacherId);
+      if (isNaN(teacherId)) {
+        return res.status(400).json({ message: "Invalid teacher ID" });
+      }
+      
+      const subjects = await dataStorage.getTeacherSubjects(teacherId);
+      res.json(subjects);
+    } catch (error) {
+      console.error("Error getting teacher subjects:", error);
+      res.status(500).json({ message: "Failed to get teacher subjects" });
+    }
+  });
+
   // Get a specific subject by ID
   app.get("/api/subjects/:id", isAuthenticated, async (req, res) => {
     try {
@@ -1590,6 +1606,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Teacher-subject relationships
+  app.get("/api/teacher-subjects/:teacherId", isAuthenticated, async (req, res) => {
+    const teacherId = parseInt(req.params.teacherId);
+    
+    if (isNaN(teacherId)) {
+      return res.status(400).json({ message: "Invalid teacher ID" });
+    }
+    
+    // Проверка прав доступа
+    if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
+        req.user.role !== UserRoleEnum.SCHOOL_ADMIN && 
+        req.user.id !== teacherId) {
+      return res.status(403).json({ message: "You can only view your own subjects or subjects of teachers in your school" });
+    }
+    
+    // Получение предметов учителя
+    try {
+      const subjects = await dataStorage.getTeacherSubjects(teacherId);
+      res.json(subjects);
+    } catch (error) {
+      console.error("Error fetching teacher subjects:", error);
+      res.status(500).json({ message: "Failed to fetch teacher subjects" });
+    }
+  });
+  
   app.post("/api/teacher-subjects", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
     const { teacherId, subjectId } = req.body;
     
