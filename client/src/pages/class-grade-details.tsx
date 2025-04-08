@@ -619,7 +619,7 @@ export default function ClassGradeDetailsPage() {
       // Проверяем оценки, которые привязаны к дате без scheduleId
       (g.scheduleId === null && g.createdAt && new Date(g.createdAt).toISOString().split('T')[0] === slot.date) ||
       // Проверяем оценки, привязанные к предмету и классу, с совпадающей датой
-      (g.subjectId === subject && g.classId === classId && 
+      (g.subjectId === subjectId && g.classId === classId && 
        g.createdAt && new Date(g.createdAt).toISOString().split('T')[0] === slot.date)
     );
   };

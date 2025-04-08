@@ -822,7 +822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Обновление статуса урока (проведен/не проведен)
-  app.patch("/api/schedules/:id/status", hasRole([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
+  app.patch("/api/schedules/:id/status", hasRole([UserRoleEnum.TEACHER, UserRoleEnum.CLASS_TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.SUPER_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL]), async (req, res) => {
     const scheduleId = parseInt(req.params.id);
     const { status } = req.body;
     
