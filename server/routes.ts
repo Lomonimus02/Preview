@@ -888,6 +888,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(updatedSchedule);
   });
 
+  // Student-Class relationships API
+  app.get("/api/student-classes", isAuthenticated, async (req, res) => {
+    try {
+      const classId = req.query.classId ? parseInt(String(req.query.classId)) : null;
+      const studentId = req.query.studentId ? parseInt(String(req.query.studentId)) : null;
+      
+      if (!classId && !studentId) {
+        return res.status(400).json({ message: "Either classId or studentId must be provided" });
+      }
+      
+      let result = [];
+      
+      if (classId) {
+        // Получить студентов для конкретного класса
+        const students = await dataStorage.getClassStudents(classId);
+        result = students.map(student => ({
+          studentId: student.id,
+          classId: classId
+        }));
+      } else if (studentId) {
+        // Получить классы для конкретного студента
+        const classes = await dataStorage.getStudentClasses(studentId);
+        result = classes.map(classObj => ({
+          studentId: studentId,
+          classId: classObj.id
+        }));
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching student-class relationships:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+  
   // Homework API
   app.get("/api/homework", isAuthenticated, async (req, res) => {
     let homework = [];

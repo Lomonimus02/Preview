@@ -130,17 +130,27 @@ export default function TeacherClasses() {
       return combinations;
     }, [] as ClassSubjectCombination[]);
 
+  // Получаем список ID учеников в выбранном классе
+  const { data: studentClassAssignments = [], isLoading: studentClassLoading } = useQuery<{ studentId: number; classId: number }[]>({
+    queryKey: ['/api/student-classes', selectedCombination?.classId],
+    queryFn: async () => {
+      const res = await apiRequest(`/api/student-classes?classId=${selectedCombination?.classId}`, 'GET');
+      if (!res.ok) throw new Error('Не удалось загрузить связи студентов с классами');
+      return res.json();
+    },
+    enabled: !!selectedCombination
+  });
+  
   // Фильтруем студентов на основе выбранного класса
   const classStudents = students.filter(student => {
     // Если нет выбранной комбинации, показываем всех студентов
     if (!selectedCombination) return true;
     
-    // Проверяем, что у студента есть расписание с этим классом
-    const hasClassSchedule = schedules.some(schedule => 
-      schedule.classId === selectedCombination.classId
+    // Проверяем, есть ли студент в выбранном классе
+    return studentClassAssignments.some(
+      assignment => assignment.studentId === student.id && 
+                   assignment.classId === selectedCombination.classId
     );
-    
-    return hasClassSchedule;
   });
 
   // Фильтруем оценки на основе выбранной комбинации класс-предмет и студента
@@ -361,51 +371,116 @@ export default function TeacherClasses() {
                       </div>
                     </div>
                     
-                    {/* Таблица оценок */}
-                    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                    {/* Журнал оценок - ученики в рядах, даты уроков в столбцах */}
+                    <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Дата</TableHead>
-                            <TableHead>Ученик</TableHead>
-                            <TableHead>Тип</TableHead>
-                            <TableHead>Оценка</TableHead>
-                            <TableHead>Комментарий</TableHead>
+                            <TableHead className="sticky left-0 bg-white">Ученик</TableHead>
+                            {/* Показываем даты проведенных уроков в качестве заголовков столбцов */}
+                            {schedules
+                              .filter(schedule => 
+                                schedule.classId === selectedCombination.classId && 
+                                schedule.subjectId === selectedCombination.subjectId && 
+                                schedule.status === 'conducted'
+                              )
+                              .sort((a, b) => {
+                                // Сортируем по дате
+                                const dateA = a.scheduleDate ? new Date(a.scheduleDate) : new Date(0);
+                                const dateB = b.scheduleDate ? new Date(b.scheduleDate) : new Date(0);
+                                return dateA.getTime() - dateB.getTime();
+                              })
+                              .map(schedule => (
+                                <TableHead key={schedule.id} className="text-center">
+                                  {schedule.scheduleDate ? new Date(schedule.scheduleDate).toLocaleDateString('ru-RU') : 'Без даты'}
+                                </TableHead>
+                              ))}
+                            <TableHead className="text-center">Средний балл</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {gradesLoading ? (
+                          {gradesLoading || studentsLoading ? (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center py-6">
+                              <TableCell colSpan={100} className="text-center py-6">
                                 Загрузка...
                               </TableCell>
                             </TableRow>
-                          ) : filteredGrades.length === 0 ? (
+                          ) : classStudents.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center py-6">
-                                Нет оценок для отображения
+                              <TableCell colSpan={100} className="text-center py-6">
+                                В этом классе нет учеников
                               </TableCell>
                             </TableRow>
                           ) : (
-                            filteredGrades.map((grade) => (
-                              <TableRow key={grade.id}>
-                                <TableCell>
-                                  {new Date(grade.createdAt).toLocaleDateString('ru-RU')}
-                                </TableCell>
-                                <TableCell>{getStudentName(grade.studentId)}</TableCell>
-                                <TableCell>{getGradeTypeName(grade.gradeType)}</TableCell>
-                                <TableCell className="font-bold">
-                                  <span className={`px-2 py-1 rounded-full ${
-                                    grade.grade >= 4 ? 'bg-green-100 text-green-800' : 
-                                    grade.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
-                                    'bg-red-100 text-red-800'
-                                  }`}>
-                                    {grade.grade}
-                                  </span>
-                                </TableCell>
-                                <TableCell>{grade.comment || "-"}</TableCell>
-                              </TableRow>
-                            ))
+                            // Для каждого ученика создаем строку
+                            classStudents.map(student => {
+                              // Получаем все оценки этого ученика по выбранному предмету и классу
+                              const studentGrades = grades.filter(grade => 
+                                grade.studentId === student.id && 
+                                grade.classId === selectedCombination.classId && 
+                                grade.subjectId === selectedCombination.subjectId
+                              );
+                              
+                              // Вычисляем средний балл
+                              const avgGrade = studentGrades.length > 0 
+                                ? (studentGrades.reduce((sum, grade) => sum + grade.grade, 0) / studentGrades.length).toFixed(1)
+                                : "-";
+                              
+                              return (
+                                <TableRow key={student.id}>
+                                  <TableCell className="sticky left-0 bg-white font-medium">
+                                    {student.lastName} {student.firstName}
+                                  </TableCell>
+                                  
+                                  {/* Для каждого урока показываем оценку, если она есть */}
+                                  {schedules
+                                    .filter(schedule => 
+                                      schedule.classId === selectedCombination.classId && 
+                                      schedule.subjectId === selectedCombination.subjectId &&
+                                      schedule.status === 'conducted'
+                                    )
+                                    .sort((a, b) => {
+                                      const dateA = a.scheduleDate ? new Date(a.scheduleDate) : new Date(0);
+                                      const dateB = b.scheduleDate ? new Date(b.scheduleDate) : new Date(0);
+                                      return dateA.getTime() - dateB.getTime();
+                                    })
+                                    .map(schedule => {
+                                      // Ищем оценку для данного урока и ученика
+                                      const gradeForSchedule = studentGrades.find(grade => 
+                                        grade.scheduleId === schedule.id
+                                      );
+                                      
+                                      return (
+                                        <TableCell key={schedule.id} className="text-center">
+                                          {gradeForSchedule ? (
+                                            <span className={`px-2 py-1 rounded-full ${
+                                              gradeForSchedule.grade >= 4 ? 'bg-green-100 text-green-800' : 
+                                              gradeForSchedule.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
+                                              'bg-red-100 text-red-800'
+                                            }`}>
+                                              {gradeForSchedule.grade}
+                                            </span>
+                                          ) : "–"}
+                                        </TableCell>
+                                      );
+                                    })
+                                  }
+                                  
+                                  {/* Показываем средний балл */}
+                                  <TableCell className="text-center font-bold">
+                                    {avgGrade !== "-" ? (
+                                      <span className={`px-2 py-1 rounded-full ${
+                                        Number(avgGrade) >= 4 ? 'bg-green-100 text-green-800' : 
+                                        Number(avgGrade) >= 3 ? 'bg-yellow-100 text-yellow-800' : 
+                                        'bg-red-100 text-red-800'
+                                      }`}>
+                                        {avgGrade}
+                                      </span>
+                                    ) : "–"}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
                           )}
                         </TableBody>
                       </Table>
