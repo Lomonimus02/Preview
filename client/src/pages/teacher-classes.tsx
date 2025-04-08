@@ -87,10 +87,16 @@ export default function TeacherClasses() {
     enabled: !!user
   });
 
-  // Получаем список студентов
+  // Получаем список студентов выбранного класса
   const { data: students = [], isLoading: studentsLoading } = useQuery<User[]>({
-    queryKey: ["/api/users", { role: UserRoleEnum.STUDENT }],
-    enabled: !!selectedCombination
+    queryKey: ["/api/students-by-class", selectedCombination?.classId],
+    queryFn: async () => {
+      if (!selectedCombination) return [];
+      const res = await apiRequest(`/api/students-by-class/${selectedCombination.classId}`, "GET");
+      if (!res.ok) throw new Error("Не удалось загрузить студентов класса");
+      return res.json();
+    },
+    enabled: !!selectedCombination?.classId
   });
 
   // Получаем оценки
@@ -130,28 +136,8 @@ export default function TeacherClasses() {
       return combinations;
     }, [] as ClassSubjectCombination[]);
 
-  // Получаем список ID учеников в выбранном классе
-  const { data: studentClassAssignments = [], isLoading: studentClassLoading } = useQuery<{ studentId: number; classId: number }[]>({
-    queryKey: ['/api/student-classes', selectedCombination?.classId],
-    queryFn: async () => {
-      const res = await apiRequest(`/api/student-classes?classId=${selectedCombination?.classId}`, 'GET');
-      if (!res.ok) throw new Error('Не удалось загрузить связи студентов с классами');
-      return res.json();
-    },
-    enabled: !!selectedCombination
-  });
-  
-  // Фильтруем студентов на основе выбранного класса
-  const classStudents = students.filter(student => {
-    // Если нет выбранной комбинации, показываем всех студентов
-    if (!selectedCombination) return true;
-    
-    // Проверяем, есть ли студент в выбранном классе
-    return studentClassAssignments.some(
-      assignment => assignment.studentId === student.id && 
-                   assignment.classId === selectedCombination.classId
-    );
-  });
+  // Используем непосредственно данные из students, так как мы уже загружаем их через API
+  const classStudents = students;
 
   // Фильтруем оценки на основе выбранной комбинации класс-предмет и студента
   const filteredGrades = grades.filter(grade => {
