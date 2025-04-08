@@ -609,10 +609,18 @@ export default function ClassGradeDetailsPage() {
   
   // Get all grades for a specific student and schedule slot
   const getStudentGradeForSlot = (studentId: number, slot: { date: string, scheduleId: number }) => {
-    return grades.filter(g => 
-      g.studentId === studentId && 
-      // Only show grades that are linked to this specific schedule
-      g.scheduleId === slot.scheduleId
+    // Фильтруем оценки для конкретного ученика
+    const studentGrades = grades.filter(g => g.studentId === studentId);
+    
+    // Проверяем оценки по нескольким критериям
+    return studentGrades.filter(g => 
+      // Проверяем оценки, привязанные к конкретному уроку по scheduleId
+      g.scheduleId === slot.scheduleId ||
+      // Проверяем оценки, которые привязаны к дате без scheduleId
+      (g.scheduleId === null && g.createdAt && new Date(g.createdAt).toISOString().split('T')[0] === slot.date) ||
+      // Проверяем оценки, привязанные к предмету и классу, с совпадающей датой
+      (g.subjectId === subject && g.classId === classId && 
+       g.createdAt && new Date(g.createdAt).toISOString().split('T')[0] === slot.date)
     );
   };
   
@@ -634,14 +642,38 @@ export default function ClassGradeDetailsPage() {
     return gradeTypes[gradeType] || gradeType;
   };
 
-  // Calculate average grade for a student
+  // Calculate average grade for a student with weight based on grade type
   const calculateAverageGrade = (studentId: number) => {
     const studentGrades = grades.filter(g => g.studentId === studentId);
     if (studentGrades.length === 0) return "-";
     
-    const sum = studentGrades.reduce((total, grade) => total + grade.grade, 0);
-    const average = sum / studentGrades.length;
+    // Весовые коэффициенты для разных типов оценок
+    const weights: Record<string, number> = {
+      'test': 2,
+      'exam': 3,
+      'homework': 1,
+      'project': 2,
+      'classwork': 1,
+      'Текущая': 1,
+      'Контрольная': 2,
+      'Экзамен': 3,
+      'Практическая': 1.5,
+      'Домашняя': 1
+    };
     
+    let weightedSum = 0;
+    let totalWeight = 0;
+    
+    studentGrades.forEach(grade => {
+      const weight = weights[grade.gradeType] || 1;
+      weightedSum += grade.grade * weight;
+      totalWeight += weight;
+    });
+    
+    // Если нет оценок с весами, возвращаем "-"
+    if (totalWeight === 0) return "-";
+    
+    const average = weightedSum / totalWeight;
     return average.toFixed(1);
   };
   

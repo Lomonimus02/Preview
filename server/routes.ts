@@ -822,7 +822,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Обновление статуса урока (проведен/не проведен)
-  app.patch("/api/schedules/:id/status", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
+  app.patch("/api/schedules/:id/status", hasRole([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
     const scheduleId = parseInt(req.params.id);
     const { status } = req.body;
     
@@ -832,9 +832,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: "Schedule not found" });
     }
     
-    // Проверяем, является ли текущий пользователь учителем этого урока
-    if (schedule.teacherId !== req.user.id) {
+    // Проверяем права доступа пользователя
+    // Учитель может изменять только свои уроки
+    if (req.user.role === UserRoleEnum.TEACHER && schedule.teacherId !== req.user.id) {
       return res.status(403).json({ message: "You can only update schedules where you are the teacher" });
+    }
+    
+    // Школьный администратор может изменять уроки только в своей школе
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+      const classData = await dataStorage.getClass(schedule.classId);
+      if (!classData || classData.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "You can only update schedules from your school" });
+      }
     }
     
     // Проверяем, что статус валидный
