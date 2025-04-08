@@ -76,7 +76,7 @@ export default function TeacherClasses() {
   // Мутации для обновления данных
   const updateScheduleStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
-      const res = await apiRequest(`/api/schedules/${id}`, "PATCH", { status });
+      const res = await apiRequest(`/api/schedules/${id}/status`, "PATCH", { status });
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message || "Не удалось обновить статус урока");
