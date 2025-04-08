@@ -90,15 +90,31 @@ app.use((req, res, next) => {
   const server = await registerRoutes(app);
 
   // Глобальный обработчик ошибок
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
     
     console.error('Server error:', err);
     
+    // Проверка на ошибки десериализации пользователя
+    if (err?.message?.includes('Failed to deserialize user') || 
+        (err?.message?.includes('User with id') && err?.message?.includes('not found'))) {
+      console.log('User deserialization error, destroying session');
+      req.session?.destroy((destroyErr) => {
+        if (destroyErr) {
+          console.error("Error destroying session:", destroyErr);
+        }
+        // Отправляем статус 401 для перенаправления на страницу логина
+        if (!res.headersSent) {
+          return res.status(401).json({ 
+            message: "Session expired or user no longer exists. Please login again."
+          });
+        }
+      });
+    }
     // Проверка на ошибки соединения с базой данных Neon
-    if (err?.message?.includes('terminating connection due to administrator command') || 
-        err?.code === '57P01') {
+    else if (err?.message?.includes('terminating connection due to administrator command') || 
+             err?.code === '57P01') {
       console.log('Neon database connection was terminated. This is normal with serverless databases.');
       // Не бросаем ошибку в случае, если это просто разрыв соединения с Neon
     }
@@ -125,11 +141,28 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  
+  // Обработчик ошибок при запуске сервера
+  function startServer() {
+    server.listen({
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    }, () => {
+      log(`serving on port ${port}`);
+    }).on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${port} is already in use. Waiting 3 seconds to retry...`);
+        setTimeout(() => {
+          console.log('Attempting to restart server...');
+          server.close();
+          startServer();
+        }, 3000);
+      } else {
+        console.error('Error starting server:', err);
+      }
+    });
+  }
+  
+  startServer();
 })();

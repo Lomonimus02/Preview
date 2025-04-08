@@ -69,8 +69,17 @@ export function setupAuth(app: Express) {
 
   passport.serializeUser((user: any, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
-    const user = await dataStorage.getUser(id);
-    done(null, user);
+    try {
+      const user = await dataStorage.getUser(id);
+      if (!user) {
+        // Если пользователь не найден, возвращаем ошибку
+        return done(new Error(`User with id ${id} not found`), null);
+      }
+      return done(null, user);
+    } catch (error) {
+      console.error("Error during user deserialization:", error);
+      return done(error, null);
+    }
   });
 
   app.post("/api/register", async (req, res, next) => {
