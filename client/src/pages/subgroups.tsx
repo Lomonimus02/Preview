@@ -210,7 +210,7 @@ export default function SubgroupsPage() {
   // Create subgroup mutation
   const createSubgroupMutation = useMutation({
     mutationFn: (data: Partial<InsertSubgroup>) => 
-      apiRequest('/api/subgroups', { method: 'POST', data }),
+      apiRequest('/api/subgroups', 'POST', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/subgroups'] });
       setIsCreateDialogOpen(false);
@@ -231,7 +231,7 @@ export default function SubgroupsPage() {
   // Update subgroup mutation
   const updateSubgroupMutation = useMutation({
     mutationFn: ({ id, data }: { id: number, data: Partial<InsertSubgroup> }) => 
-      apiRequest(`/api/subgroups/${id}`, { method: 'PATCH', data }),
+      apiRequest(`/api/subgroups/${id}`, 'PATCH', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/subgroups'] });
       setIsEditDialogOpen(false);
@@ -252,7 +252,7 @@ export default function SubgroupsPage() {
   // Delete subgroup mutation
   const deleteSubgroupMutation = useMutation({
     mutationFn: (id: number) => 
-      apiRequest(`/api/subgroups/${id}`, { method: 'DELETE' }),
+      apiRequest(`/api/subgroups/${id}`, 'DELETE'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/subgroups'] });
       setIsDeleteDialogOpen(false);
@@ -274,7 +274,7 @@ export default function SubgroupsPage() {
   // Add student to subgroup mutation
   const addStudentToSubgroupMutation = useMutation({
     mutationFn: (data: { studentId: number, subgroupId: number }) => 
-      apiRequest('/api/student-subgroups', { method: 'POST', data }),
+      apiRequest('/api/student-subgroups', 'POST', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/student-subgroups', selectedSubgroup?.id] });
       setIsStudentAssignDialogOpen(false);
@@ -295,10 +295,7 @@ export default function SubgroupsPage() {
   // Remove student from subgroup mutation
   const removeStudentFromSubgroupMutation = useMutation({
     mutationFn: (data: { studentId: number, subgroupId: number }) => 
-      apiRequest('/api/student-subgroups', { 
-        method: 'DELETE',
-        data 
-      }),
+      apiRequest('/api/student-subgroups', 'DELETE', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/student-subgroups', selectedSubgroup?.id] });
       toast({
