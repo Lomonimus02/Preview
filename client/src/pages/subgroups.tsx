@@ -452,9 +452,9 @@ export default function SubgroupsPage() {
             <CardContent className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
               <div className="flex-1">
                 <Select
-                  value={selectedSchool || ""}
+                  value={selectedSchool || "all"}
                   onValueChange={(value) => {
-                    setSelectedSchool(value === "" ? null : value);
+                    setSelectedSchool(value === "all" ? null : value);
                     setSelectedClass(null);
                   }}
                 >
@@ -462,7 +462,7 @@ export default function SubgroupsPage() {
                     <SelectValue placeholder="Выберите школу" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Все школы</SelectItem>
+                    <SelectItem value="all">Все школы</SelectItem>
                     {schools.map((school) => (
                       <SelectItem key={school.id} value={school.id.toString()}>
                         {school.name}
@@ -474,15 +474,15 @@ export default function SubgroupsPage() {
               
               <div className="flex-1">
                 <Select
-                  value={selectedClass || ""}
-                  onValueChange={(value) => setSelectedClass(value === "" ? null : value)}
+                  value={selectedClass || "all"}
+                  onValueChange={(value) => setSelectedClass(value === "all" ? null : value)}
                   disabled={!selectedSchool}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Выберите класс" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Все классы</SelectItem>
+                    <SelectItem value="all">Все классы</SelectItem>
                     {classes.map((cls) => (
                       <SelectItem key={cls.id} value={cls.id.toString()}>
                         {cls.name}
