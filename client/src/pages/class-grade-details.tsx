@@ -703,9 +703,6 @@ export default function ClassGradeDetailsPage() {
               Просмотр и редактирование оценок учеников
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate("/grades")}>
-            Вернуться к списку журналов
-          </Button>
         </div>
         
         {isLoading ? (

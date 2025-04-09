@@ -112,12 +112,20 @@ export function TeacherClassesMenu() {
       {/* Основной пункт меню "Мои классы" */}
       <div
         className={cn(
-          "flex items-center py-2 px-3 rounded-md cursor-pointer w-full",
-          isActive ? "bg-accent text-accent-foreground" : "hover:bg-muted",
+          "group flex items-center px-2 py-2 text-sm font-medium rounded-md cursor-pointer w-full",
+          isActive 
+            ? "bg-primary text-white" 
+            : "text-gray-700 hover:bg-primary-50 hover:text-gray-900"
         )}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <BookOpen className="h-4 w-4 mr-3" />
+        <span className={cn(
+          isActive 
+            ? "text-white" 
+            : "text-gray-500 group-hover:text-gray-700"
+        )}>
+          <BookOpen className="h-4 w-4 mr-3" />
+        </span>
         <span className="truncate flex-1">Мои классы</span>
         {isExpanded ? (
           <ChevronDown className="h-4 w-4" />
