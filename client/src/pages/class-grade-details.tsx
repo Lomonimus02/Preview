@@ -590,8 +590,13 @@ export default function ClassGradeDetailsPage() {
         data
       });
     } else {
-      // Adding new grade
-      addGradeMutation.mutate(data);
+      // Adding new grade - обеспечиваем, что scheduleId всегда будет установлен,
+      // так как это критически важно для правильного отображения оценок
+      const finalData = {
+        ...data,
+        scheduleId: data.scheduleId || null
+      };
+      addGradeMutation.mutate(finalData);
     }
   };
   
@@ -612,15 +617,10 @@ export default function ClassGradeDetailsPage() {
     // Фильтруем оценки для конкретного ученика
     const studentGrades = grades.filter(g => g.studentId === studentId);
     
-    // Проверяем оценки по нескольким критериям
+    // Проверяем оценки - теперь только те, которые привязаны к конкретному scheduleId
     return studentGrades.filter(g => 
-      // Проверяем оценки, привязанные к конкретному уроку по scheduleId
-      g.scheduleId === slot.scheduleId ||
-      // Проверяем оценки, которые привязаны к дате без scheduleId
-      (g.scheduleId === null && g.createdAt && new Date(g.createdAt).toISOString().split('T')[0] === slot.date) ||
-      // Проверяем оценки, привязанные к предмету и классу, с совпадающей датой
-      (g.subjectId === subjectId && g.classId === classId && 
-       g.createdAt && new Date(g.createdAt).toISOString().split('T')[0] === slot.date)
+      // Проверяем только оценки, привязанные к конкретному уроку по scheduleId
+      g.scheduleId === slot.scheduleId
     );
   };
   
