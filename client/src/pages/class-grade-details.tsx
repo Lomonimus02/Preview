@@ -39,7 +39,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
-import { CalendarIcon, BookOpenIcon, GraduationCapIcon, Loader2, AlertCircle } from "lucide-react";
+import { CalendarIcon, BookOpenIcon, GraduationCapIcon, Loader2, AlertCircle, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -693,6 +693,56 @@ export default function ClassGradeDetailsPage() {
     }
   }, [user, navigate]);
   
+  // Функция экспорта данных таблицы в CSV
+  const exportToCSV = () => {
+    if (!classData || !subjectData || !students.length) return;
+    
+    // Создаем заголовок таблицы
+    let csvContent = "Ученик,";
+    
+    // Добавляем даты уроков в заголовок
+    lessonSlots.forEach(slot => {
+      csvContent += `${slot.formattedDate},`;
+    });
+    
+    csvContent += "Средний балл\n";
+    
+    // Добавляем данные по каждому ученику
+    students.forEach(student => {
+      const studentName = `${student.lastName} ${student.firstName}`;
+      csvContent += `${studentName},`;
+      
+      // Добавляем оценки по каждому уроку
+      lessonSlots.forEach(slot => {
+        const grades = getStudentGradeForSlot(student.id, slot);
+        if (grades.length > 0) {
+          // Если есть несколько оценок для одного урока, разделяем их точкой с запятой
+          csvContent += grades.map(g => g.grade).join(";");
+        }
+        csvContent += ",";
+      });
+      
+      // Добавляем средний балл
+      csvContent += calculateAverageGrade(student.id) + "\n";
+    });
+    
+    // Создаем Blob для скачивания
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // Создаем временную ссылку для скачивания файла
+    const link = document.createElement("a");
+    const fileName = `Оценки_${subjectData?.name}_${classData?.name}_${new Date().toLocaleDateString()}.csv`;
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", fileName);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <MainLayout>
       <div className="container mx-auto py-6 space-y-6">
@@ -703,6 +753,15 @@ export default function ClassGradeDetailsPage() {
               Просмотр и редактирование оценок учеников
             </p>
           </div>
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={exportToCSV}
+            disabled={isLoading || !students.length}
+          >
+            <Download className="h-4 w-4" />
+            Экспорт
+          </Button>
         </div>
         
         {isLoading ? (

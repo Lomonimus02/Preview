@@ -735,7 +735,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     
+    // Создаем расписание
     const schedule = await dataStorage.createSchedule(req.body);
+    
+    try {
+      // Автоматически назначаем учителя на предмет при создании расписания, если ещё не назначен
+      if (req.body.teacherId && req.body.subjectId) {
+        // Получаем текущие предметы учителя
+        const teacherSubjects = await dataStorage.getTeacherSubjects(req.body.teacherId);
+        
+        // Проверяем, назначен ли учитель уже на этот предмет
+        const isAlreadyAssigned = teacherSubjects.some(subject => subject.id === req.body.subjectId);
+        
+        // Если не назначен, то назначаем
+        if (!isAlreadyAssigned) {
+          await dataStorage.assignTeacherToSubject(req.body.teacherId, req.body.subjectId);
+          console.log(`Teacher (ID: ${req.body.teacherId}) assigned to subject (ID: ${req.body.subjectId})`);
+        }
+      }
+    } catch (error) {
+      console.error('Error assigning teacher to subject:', error);
+      // Не возвращаем ошибку, чтобы не мешать созданию расписания
+    }
     
     // Log the action
     await dataStorage.createSystemLog({
