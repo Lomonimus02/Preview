@@ -158,11 +158,12 @@ export default function SubgroupsPage() {
   
   // Fetch students for the student assignment dialog
   const { data: students = [], isLoading: isLoadingStudents } = useQuery<UserType[]>({
-    queryKey: ['/api/users', 'student', selectedClass],
+    queryKey: ['/api/classes', selectedClass, 'students'],
     queryFn: async () => {
       if (!selectedClass) return [];
       
-      const response = await fetch(`/api/users?role=student&classId=${selectedClass}`);
+      // Используем специальный endpoint для получения только учеников данного класса
+      const response = await fetch(`/api/classes/${selectedClass}/students`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch students');

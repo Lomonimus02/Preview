@@ -93,13 +93,16 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
   const [selectedClassId, setSelectedClassId] = useState<number | undefined>(scheduleToEdit?.classId);
   
   // Запрос на получение подгрупп для выбранного класса
-  const { data: subgroupsData } = useQuery({
-    queryKey: ['subgroups', selectedClassId],
+  const { data: subgroupsData = [] } = useQuery({
+    queryKey: ['subgroups/class', selectedClassId],
     queryFn: async () => {
       if (!selectedClassId) return [];
+      console.log(`Fetching subgroups with params: classId=${selectedClassId}`);
       const response = await fetch(`/api/subgroups/class/${selectedClassId}`);
       if (!response.ok) throw new Error('Не удалось загрузить подгруппы');
-      return response.json();
+      const data = await response.json();
+      console.log('Received subgroups:', data);
+      return data;
     },
     enabled: !!selectedClassId, // Запрос выполняется только если выбран класс
   });
