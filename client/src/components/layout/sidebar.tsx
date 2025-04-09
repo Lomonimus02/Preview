@@ -22,6 +22,22 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { UserRoleEnum } from "@shared/schema";
 import { RoleSwitcher } from "@/components/role-switcher";
+import { TeacherClassesMenu } from "./teacher-classes-menu";
+import { ReactNode } from "react";
+
+interface LinkMenuItem {
+  id: string;
+  label: string;
+  icon: ReactNode;
+  href: string;
+}
+
+interface ComponentMenuItem {
+  id: string;
+  component: ReactNode;
+}
+
+type NavItem = LinkMenuItem | ComponentMenuItem;
 
 interface SidebarProps {
   isOpen: boolean;
@@ -35,8 +51,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
   const roleAccess = {
     [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "user-roles", "analytics", "messages", "notifications", "settings", "support"],
     [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "user-roles", "schedule", "homework", "grades", "analytics", "messages", "notifications", "settings", "support"],
-    [UserRoleEnum.TEACHER]: ["dashboard", "teacher-classes", "schedule", "homework", "messages", "documents", "support"],
-    [UserRoleEnum.CLASS_TEACHER]: ["dashboard", "class-teacher-dashboard", "teacher-classes", "schedule", "homework", "grades", "messages", "documents", "support"],
+    [UserRoleEnum.TEACHER]: ["dashboard", "teacher-classes-menu", "schedule", "homework", "messages", "documents", "support"],
+    [UserRoleEnum.CLASS_TEACHER]: ["dashboard", "class-teacher-dashboard", "teacher-classes-menu", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.STUDENT]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.PARENT]: ["dashboard", "grades", "messages", "documents", "support"],
     [UserRoleEnum.PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"],
@@ -44,10 +60,10 @@ export function Sidebar({ isOpen }: SidebarProps) {
   };
 
   // Navigation items
-  const navItems = [
+  const navItems: NavItem[] = [
     { id: "dashboard", label: "Главная", icon: <HomeIcon className="h-4 w-4 mr-3" />, href: "/" },
     { id: "class-teacher-dashboard", label: "Панель классного руководителя", icon: <UsersIcon className="h-4 w-4 mr-3" />, href: "/class-teacher-dashboard" },
-    { id: "teacher-classes", label: "Мои классы", icon: <NotebookPenIcon className="h-4 w-4 mr-3" />, href: "/teacher-classes" },
+    { id: "teacher-classes-menu", component: <TeacherClassesMenu /> },
     { id: "schools", label: "Школы", icon: <BuildingIcon className="h-4 w-4 mr-3" />, href: "/schools" },
     { id: "users", label: "Пользователи", icon: <Users2Icon className="h-4 w-4 mr-3" />, href: "/users" },
     { id: "user-roles", label: "Роли пользователей", icon: <UserCogIcon className="h-4 w-4 mr-3" />, href: "/user-roles" },
@@ -110,11 +126,18 @@ export function Sidebar({ isOpen }: SidebarProps) {
       <nav className="py-4 px-2">
         <div className="space-y-1">
           {allowedItems.map((item) => {
-            const isActive = location === item.href || 
-                            (item.href !== "/" && location.startsWith(item.href));
+            // Если у пункта есть компонент, отображаем его
+            if ('component' in item) {
+              return <div key={item.id}>{item.component}</div>;
+            }
+            
+            // Иначе отображаем обычный пункт меню со ссылкой
+            const linkItem = item as LinkMenuItem;
+            const isActive = location === linkItem.href || 
+                            (linkItem.href !== "/" && location.startsWith(linkItem.href));
 
             return (
-              <Link key={item.id} href={item.href}>
+              <Link key={linkItem.id} href={linkItem.href}>
                 <div className={cn(
                   "group flex items-center px-2 py-2 text-sm font-medium rounded-md",
                   isActive 
@@ -126,9 +149,9 @@ export function Sidebar({ isOpen }: SidebarProps) {
                       ? "text-white" 
                       : "text-gray-500 group-hover:text-gray-700"
                   )}>
-                    {item.icon}
+                    {linkItem.icon}
                   </span>
-                  {item.label}
+                  {linkItem.label}
                 </div>
               </Link>
             );
