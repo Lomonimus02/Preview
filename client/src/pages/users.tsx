@@ -103,7 +103,7 @@ export default function UsersPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   // Only Super admin and School admin can access this page
-  if (!isAdmin()) {
+  if (!isAdmin) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -119,14 +119,14 @@ export default function UsersPage() {
   // Fetch users
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: isAdmin()
+    enabled: isAdmin
   });
   
   // Fetch schools for dropdown
   const { isSuperAdmin } = useRoleCheck();
   const { data: schools = [] } = useQuery({
     queryKey: ["/api/schools"],
-    enabled: isSuperAdmin()
+    enabled: isSuperAdmin
   });
   
   // Filter users based on search query and role filter
@@ -393,7 +393,7 @@ export default function UsersPage() {
   // Fetch classes for student assignment
   const { data: classes = [] } = useQuery<Class[]>({
     queryKey: ["/api/classes"],
-    enabled: isAdmin()
+    enabled: isAdmin
   });
   
   // Fetch student classes for selected student
@@ -1222,7 +1222,7 @@ export default function UsersPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {isSuperAdmin() && (
+                        {isSuperAdmin && (
                           <SelectItem value={UserRoleEnum.SUPER_ADMIN}>Супер-администратор</SelectItem>
                         )}
                         {isAdmin() && (
@@ -1243,7 +1243,7 @@ export default function UsersPage() {
                 )}
               />
               
-              {isSuperAdmin() && (
+              {isSuperAdmin && (
                 <FormField
                   control={form.control}
                   name="schoolId"
@@ -1585,7 +1585,7 @@ export default function UsersPage() {
                 />
               </div>
               
-              {isSuperAdmin() && (
+              {isSuperAdmin && (
                 <>
                   <FormField
                     control={form.control}

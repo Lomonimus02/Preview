@@ -78,13 +78,13 @@ export function useRoleCheck(requiredRoles?: UserRoleEnum[]) {
   
   return {
     hasRole,
-    isAdmin: hasRequiredRole && isAdmin(),
-    isSuperAdmin: isSuperAdmin,
-    isSchoolAdmin: isSchoolAdmin,
-    isTeacher: isTeacher,
-    isClassTeacher: isClassTeacher,
-    isStudent: isStudent,
-    isParent: isParent,
+    isAdmin,
+    isSuperAdmin,
+    isSchoolAdmin,
+    isTeacher,
+    isClassTeacher,
+    isStudent,
+    isParent,
     currentRole,
     isLoading
   };
