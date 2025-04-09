@@ -19,10 +19,13 @@ import {
   ParentStudent, InsertParentStudent,
   SystemLog, InsertSystemLog,
   UserRoleEnum, UserRoleModel, InsertUserRole,
+  Subgroup, InsertSubgroup,
+  StudentSubgroup, InsertStudentSubgroup,
   users, schools, classes, subjects, schedules,
   homework, homeworkSubmissions, grades, attendance,
   documents, messages, notifications, parentStudents,
-  systemLogs, teacherSubjects, studentClasses, userRoles
+  systemLogs, teacherSubjects, studentClasses, userRoles,
+  subgroups, studentSubgroups
 } from '@shared/schema';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
@@ -522,6 +525,113 @@ export class DatabaseStorage implements IStorage {
 
   async removeUserRole(id: number): Promise<void> {
     await db.delete(userRoles).where(eq(userRoles.id, id));
+  }
+  
+  // ===== Subgroup operations =====
+  async getSubgroup(id: number): Promise<Subgroup | undefined> {
+    const result = await db.select().from(subgroups).where(eq(subgroups.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async getSubgroupsByClass(classId: number): Promise<Subgroup[]> {
+    return await db.select().from(subgroups).where(eq(subgroups.classId, classId));
+  }
+  
+  async getSubgroupsBySchool(schoolId: number): Promise<Subgroup[]> {
+    // Get all classes for the school
+    const classesList = await this.getClasses(schoolId);
+    if (classesList.length === 0) return [];
+    
+    // Get all subgroups for these classes
+    const classIds = classesList.map(cls => cls.id);
+    return await db.select().from(subgroups).where(inArray(subgroups.classId, classIds));
+  }
+  
+  async createSubgroup(subgroup: InsertSubgroup): Promise<Subgroup> {
+    const [newSubgroup] = await db.insert(subgroups).values({
+      ...subgroup,
+      description: subgroup.description || null
+    }).returning();
+    return newSubgroup;
+  }
+  
+  async updateSubgroup(id: number, subgroup: Partial<InsertSubgroup>): Promise<Subgroup | undefined> {
+    const [updatedSubgroup] = await db.update(subgroups)
+      .set(subgroup)
+      .where(eq(subgroups.id, id))
+      .returning();
+    return updatedSubgroup;
+  }
+  
+  async deleteSubgroup(id: number): Promise<Subgroup | undefined> {
+    // First, delete all associations between students and this subgroup
+    await db.delete(studentSubgroups).where(eq(studentSubgroups.subgroupId, id));
+    
+    // Then delete the subgroup
+    const [deletedSubgroup] = await db.delete(subgroups)
+      .where(eq(subgroups.id, id))
+      .returning();
+    return deletedSubgroup;
+  }
+  
+  // ===== Student-Subgroup operations =====
+  async getStudentSubgroups(studentId: number): Promise<Subgroup[]> {
+    // Get associations between student and subgroups
+    const associations = await db.select().from(studentSubgroups)
+      .where(eq(studentSubgroups.studentId, studentId));
+    
+    if (associations.length === 0) return [];
+    
+    // Get the actual subgroup objects
+    const subgroupIds = associations.map(assoc => assoc.subgroupId);
+    return await db.select().from(subgroups)
+      .where(inArray(subgroups.id, subgroupIds));
+  }
+  
+  async getSubgroupStudents(subgroupId: number): Promise<User[]> {
+    // Get associations between subgroup and students
+    const associations = await db.select().from(studentSubgroups)
+      .where(eq(studentSubgroups.subgroupId, subgroupId));
+    
+    if (associations.length === 0) return [];
+    
+    // Get the actual student objects
+    const studentIds = associations.map(assoc => assoc.studentId);
+    return await db.select().from(users)
+      .where(inArray(users.id, studentIds));
+  }
+  
+  async addStudentToSubgroup(studentSubgroup: InsertStudentSubgroup): Promise<StudentSubgroup> {
+    // Check if the association already exists
+    const existing = await db.select().from(studentSubgroups)
+      .where(and(
+        eq(studentSubgroups.studentId, studentSubgroup.studentId),
+        eq(studentSubgroups.subgroupId, studentSubgroup.subgroupId)
+      )).limit(1);
+    
+    if (existing.length > 0) {
+      return existing[0];
+    }
+    
+    // Create new association
+    const [newAssociation] = await db.insert(studentSubgroups)
+      .values(studentSubgroup)
+      .returning();
+      
+    return newAssociation;
+  }
+  
+  async removeStudentFromSubgroup(studentId: number, subgroupId: number): Promise<void> {
+    await db.delete(studentSubgroups)
+      .where(and(
+        eq(studentSubgroups.studentId, studentId),
+        eq(studentSubgroups.subgroupId, subgroupId)
+      ));
+  }
+  
+  async getSchedulesBySubgroup(subgroupId: number): Promise<Schedule[]> {
+    return await db.select().from(schedules)
+      .where(eq(schedules.subgroupId, subgroupId));
   }
 }
 

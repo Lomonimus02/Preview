@@ -20,6 +20,291 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(401).json({ message: "Unauthorized" });
   };
   
+  // Subgroups API
+  app.get("/api/subgroups", isAuthenticated, async (req, res) => {
+    try {
+      const { classId, schoolId } = req.query;
+      let subgroups = [];
+      
+      if (classId) {
+        // Get subgroups for a specific class
+        subgroups = await dataStorage.getSubgroupsByClass(Number(classId));
+      } else if (schoolId) {
+        // Get all subgroups for a school
+        subgroups = await dataStorage.getSubgroupsBySchool(Number(schoolId));
+      } else if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
+        // Super admin can see all subgroups from all schools
+        const schools = await dataStorage.getSchools();
+        for (const school of schools) {
+          const schoolSubgroups = await dataStorage.getSubgroupsBySchool(school.id);
+          subgroups.push(...schoolSubgroups);
+        }
+      } else if (req.user.role === UserRoleEnum.SCHOOL_ADMIN || 
+                req.user.role === UserRoleEnum.PRINCIPAL || 
+                req.user.role === UserRoleEnum.VICE_PRINCIPAL) {
+        // School administrators can see all subgroups in their school
+        if (req.user.schoolId) {
+          subgroups = await dataStorage.getSubgroupsBySchool(req.user.schoolId);
+        }
+      } else if (req.user.role === UserRoleEnum.STUDENT) {
+        // Students can see their own subgroups
+        subgroups = await dataStorage.getStudentSubgroups(req.user.id);
+      }
+      
+      res.json(subgroups);
+    } catch (error) {
+      console.error("Error fetching subgroups:", error);
+      res.status(500).json({ message: "Failed to fetch subgroups" });
+    }
+  });
+  
+  app.get("/api/subgroups/:id", isAuthenticated, async (req, res) => {
+    try {
+      const subgroupId = parseInt(req.params.id);
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      res.json(subgroup);
+    } catch (error) {
+      console.error("Error fetching subgroup:", error);
+      res.status(500).json({ message: "Failed to fetch subgroup" });
+    }
+  });
+  
+  app.post("/api/subgroups", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      // Ensure the user has access to the school
+      if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && req.body.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "You can only create subgroups in your own school" });
+      }
+      
+      const newSubgroup = await dataStorage.createSubgroup({
+        name: req.body.name,
+        classId: req.body.classId,
+        schoolId: req.body.schoolId,
+        description: req.body.description || null
+      });
+      
+      // Log the action
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "subgroup_created",
+        details: `Created subgroup: ${newSubgroup.name} for class ID: ${newSubgroup.classId}`,
+        ipAddress: req.ip
+      });
+      
+      res.status(201).json(newSubgroup);
+    } catch (error) {
+      console.error("Error creating subgroup:", error);
+      res.status(500).json({ message: "Failed to create subgroup" });
+    }
+  });
+  
+  app.patch("/api/subgroups/:id", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      const subgroupId = parseInt(req.params.id);
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      // Verify that school admin only updates subgroups in their own school
+      if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+        const classData = await dataStorage.getClass(subgroup.classId);
+        if (!classData || classData.schoolId !== req.user.schoolId) {
+          return res.status(403).json({ message: "You can only update subgroups in your own school" });
+        }
+      }
+      
+      const updatedSubgroup = await dataStorage.updateSubgroup(subgroupId, req.body);
+      
+      // Log the action
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "subgroup_updated",
+        details: `Updated subgroup ID: ${subgroupId}, Name: ${updatedSubgroup?.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.json(updatedSubgroup);
+    } catch (error) {
+      console.error("Error updating subgroup:", error);
+      res.status(500).json({ message: "Failed to update subgroup" });
+    }
+  });
+  
+  app.delete("/api/subgroups/:id", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      const subgroupId = parseInt(req.params.id);
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      // Verify that school admin only deletes subgroups in their own school
+      if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+        const classData = await dataStorage.getClass(subgroup.classId);
+        if (!classData || classData.schoolId !== req.user.schoolId) {
+          return res.status(403).json({ message: "You can only delete subgroups in your own school" });
+        }
+      }
+      
+      const deletedSubgroup = await dataStorage.deleteSubgroup(subgroupId);
+      
+      // Log the action
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "subgroup_deleted",
+        details: `Deleted subgroup ID: ${subgroupId}, Name: ${deletedSubgroup?.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.json(deletedSubgroup);
+    } catch (error) {
+      console.error("Error deleting subgroup:", error);
+      res.status(500).json({ message: "Failed to delete subgroup" });
+    }
+  });
+  
+  // Student-Subgroup Association API
+  app.get("/api/student-subgroups", isAuthenticated, async (req, res) => {
+    try {
+      let result = [];
+      
+      if (req.query.subgroupId) {
+        // Get all students in a specific subgroup
+        const subgroupId = parseInt(req.query.subgroupId as string);
+        const students = await dataStorage.getSubgroupStudents(subgroupId);
+        
+        result = students.map(student => ({
+          studentId: student.id,
+          subgroupId
+        }));
+      } else if (req.query.studentId) {
+        // Get all subgroups for a specific student
+        const studentId = parseInt(req.query.studentId as string);
+        const subgroups = await dataStorage.getStudentSubgroups(studentId);
+        
+        result = subgroups.map(subgroup => ({
+          studentId,
+          subgroupId: subgroup.id
+        }));
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching student-subgroup associations:", error);
+      res.status(500).json({ message: "Failed to fetch student-subgroup associations" });
+    }
+  });
+  
+  app.post("/api/student-subgroups", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      const { studentId, subgroupId } = req.body;
+      
+      if (!studentId || !subgroupId) {
+        return res.status(400).json({ message: "studentId and subgroupId are required" });
+      }
+      
+      // Check if subgroup exists
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      // Check if student exists
+      const student = await dataStorage.getUser(studentId);
+      if (!student || student.role !== UserRoleEnum.STUDENT) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Verify that school admin only adds students to subgroups in their own school
+      if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+        const classData = await dataStorage.getClass(subgroup.classId);
+        if (!classData || classData.schoolId !== req.user.schoolId) {
+          return res.status(403).json({ message: "You can only add students to subgroups in your own school" });
+        }
+        
+        if (student.schoolId !== req.user.schoolId) {
+          return res.status(403).json({ message: "You can only add students from your own school" });
+        }
+      }
+      
+      // Ensure student belongs to the class that this subgroup is for
+      const studentClasses = await dataStorage.getStudentClasses(studentId);
+      const isInClass = studentClasses.some(cls => cls.id === subgroup.classId);
+      
+      if (!isInClass) {
+        return res.status(400).json({ 
+          message: "Student must belong to the class that this subgroup is for" 
+        });
+      }
+      
+      // Add student to subgroup
+      const result = await dataStorage.addStudentToSubgroup({ studentId, subgroupId });
+      
+      // Log the action
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "student_added_to_subgroup",
+        details: `Added student ID: ${studentId} to subgroup ID: ${subgroupId}`,
+        ipAddress: req.ip
+      });
+      
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("Error adding student to subgroup:", error);
+      res.status(500).json({ message: "Failed to add student to subgroup" });
+    }
+  });
+  
+  app.delete("/api/student-subgroups", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      const { studentId, subgroupId } = req.query;
+      
+      if (!studentId || !subgroupId) {
+        return res.status(400).json({ message: "studentId and subgroupId are required" });
+      }
+      
+      const studentIdNum = parseInt(studentId as string);
+      const subgroupIdNum = parseInt(subgroupId as string);
+      
+      // Check if subgroup exists
+      const subgroup = await dataStorage.getSubgroup(subgroupIdNum);
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      // Verify that school admin only removes students from subgroups in their own school
+      if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+        const classData = await dataStorage.getClass(subgroup.classId);
+        if (!classData || classData.schoolId !== req.user.schoolId) {
+          return res.status(403).json({ message: "You can only remove students from subgroups in your own school" });
+        }
+      }
+      
+      await dataStorage.removeStudentFromSubgroup(studentIdNum, subgroupIdNum);
+      
+      // Log the action
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "student_removed_from_subgroup",
+        details: `Removed student ID: ${studentIdNum} from subgroup ID: ${subgroupIdNum}`,
+        ipAddress: req.ip
+      });
+      
+      res.status(200).json({ message: "Student removed from subgroup successfully" });
+    } catch (error) {
+      console.error("Error removing student from subgroup:", error);
+      res.status(500).json({ message: "Failed to remove student from subgroup" });
+    }
+  });
+  
   // API для смены активной роли
   app.post("/api/switch-role", isAuthenticated, async (req, res) => {
     const { role } = req.body;
@@ -696,6 +981,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const cls of classes) {
         const classSchedules = await dataStorage.getSchedulesByClass(cls.id);
         schedules.push(...classSchedules);
+      }
+      
+      // Also get subgroups for this student
+      const studentSubgroups = await dataStorage.getStudentSubgroups(req.user.id);
+      for (const subgroup of studentSubgroups) {
+        const subgroupSchedules = await dataStorage.getSchedulesBySubgroup(subgroup.id);
+        schedules.push(...subgroupSchedules);
       }
     } else if (req.user.role === UserRoleEnum.PARENT) {
       // Родители могут видеть расписание своих детей

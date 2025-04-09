@@ -85,6 +85,7 @@ export const schedules = pgTable("schedules", {
   endTime: text("end_time").notNull(),
   room: text("room"),
   status: text("status").default("not_conducted"), // 'conducted' or 'not_conducted'
+  subgroupId: integer("subgroup_id"), // Опциональная привязка к подгруппе
 });
 
 // Homework table
@@ -185,6 +186,23 @@ export const userRoles = pgTable("user_roles", {
   classId: integer("class_id"), // класс, связанный с этой ролью (для классного руководителя)
 });
 
+// Подгруппы
+export const subgroups = pgTable("subgroups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  classId: integer("class_id").notNull(), // К какому классу привязана подгруппа
+  schoolId: integer("school_id").notNull(), // К какой школе относится подгруппа
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Связь студентов с подгруппами
+export const studentSubgroups = pgTable("student_subgroups", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").notNull(),
+  subgroupId: integer("subgroup_id").notNull(),
+});
+
 // System logs
 export const systemLogs = pgTable("system_logs", {
   id: serial("id").primaryKey(),
@@ -263,6 +281,15 @@ export const insertUserRoleSchema = createInsertSchema(userRoles).omit({
   id: true
 });
 
+export const insertSubgroupSchema = createInsertSchema(subgroups).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertStudentSubgroupSchema = createInsertSchema(studentSubgroups).omit({
+  id: true
+});
+
 export const insertSystemLogSchema = createInsertSchema(systemLogs).omit({
   id: true,
   createdAt: true
@@ -310,6 +337,12 @@ export type ParentStudent = typeof parentStudents.$inferSelect;
 
 export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
 export type UserRoleModel = typeof userRoles.$inferSelect;
+
+export type InsertSubgroup = z.infer<typeof insertSubgroupSchema>;
+export type Subgroup = typeof subgroups.$inferSelect;
+
+export type InsertStudentSubgroup = z.infer<typeof insertStudentSubgroupSchema>;
+export type StudentSubgroup = typeof studentSubgroups.$inferSelect;
 
 export type InsertSystemLog = z.infer<typeof insertSystemLogSchema>;
 export type SystemLog = typeof systemLogs.$inferSelect;
