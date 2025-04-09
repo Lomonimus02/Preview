@@ -642,6 +642,10 @@ export default function UsersPage() {
             <UserPlusIcon className="mr-2 h-4 w-4" />
             Родители и дети
           </TabsTrigger>
+          <TabsTrigger value="subgroups" className="flex items-center">
+            <UsersIcon className="mr-2 h-4 w-4" />
+            Подгруппы
+          </TabsTrigger>
         </TabsList>
         
         {/* Users Tab */}
@@ -910,6 +914,61 @@ export default function UsersPage() {
                     <p>Для управления классами выберите ученика из списка слева</p>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+        
+        {/* Subgroups Tab */}
+        <TabsContent value="subgroups">
+          <div className="mb-6">
+            <h2 className="text-2xl font-heading font-bold text-gray-800">Управление подгруппами</h2>
+            <p className="text-gray-600 mt-2">
+              Создание подгрупп для дифференцированного обучения в рамках классов
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Список подгрупп */}
+            <Card className="md:col-span-1">
+              <CardHeader>
+                <CardTitle>Подгруппы</CardTitle>
+                <CardDescription>Создание и управление подгруппами</CardDescription>
+                <Button 
+                  onClick={() => {
+                    /* TO-DO: Открыть диалог создания подгруппы */
+                  }} 
+                  className="mt-2 w-full"
+                >
+                  <Plus className="h-4 w-4 mr-2" /> Создать подгруппу
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[400px] overflow-y-auto">
+                  <div className="space-y-2">
+                    {/* TO-DO: Вывести список подгрупп */}
+                    <div className="p-4 text-center text-gray-500">
+                      Подгруппы будут отображаться здесь
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Управление подгруппой */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>Детали подгруппы</CardTitle>
+                <CardDescription>
+                  Выберите подгруппу слева для просмотра и редактирования деталей
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-gray-500">
+                  <UsersIcon className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                  <p>Выберите подгруппу для просмотра подробностей</p>
+                  <p className="text-sm mt-2">или создайте новую подгруппу</p>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1222,7 +1281,7 @@ export default function UsersPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {isSuperAdmin && (
+                        {isSuperAdmin() && (
                           <SelectItem value={UserRoleEnum.SUPER_ADMIN}>Супер-администратор</SelectItem>
                         )}
                         {isAdmin() && (
@@ -1243,7 +1302,7 @@ export default function UsersPage() {
                 )}
               />
               
-              {isSuperAdmin && (
+              {isSuperAdmin() && (
                 <FormField
                   control={form.control}
                   name="schoolId"
@@ -1585,7 +1644,7 @@ export default function UsersPage() {
                 />
               </div>
               
-              {isSuperAdmin && (
+              {isSuperAdmin() && (
                 <>
                   <FormField
                     control={form.control}
