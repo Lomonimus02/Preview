@@ -41,7 +41,11 @@ export function TeacherClassesMenu() {
       if (!res.ok) throw new Error("Не удалось загрузить расписание");
       return res.json();
     },
-    enabled: !!user && isTeacher()
+    enabled: !!user && isTeacher(),
+    // Добавляем более частое обновление, чтобы новые уроки быстрее отображались в меню
+    refetchInterval: 10000, // Проверка каждые 10 секунд
+    refetchOnWindowFocus: true, // Обновление при фокусе окна
+    staleTime: 5000 // Данные считаются устаревшими через 5 секунд
   });
 
   // Получаем список предметов, которые преподает учитель

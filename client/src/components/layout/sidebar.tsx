@@ -52,7 +52,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "user-roles", "analytics", "messages", "notifications", "settings", "support"],
     [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "user-roles", "schedule", "homework", "grades", "analytics", "messages", "notifications", "settings", "support"],
     [UserRoleEnum.TEACHER]: ["dashboard", "teacher-classes-menu", "schedule", "homework", "messages", "documents", "support"],
-    [UserRoleEnum.CLASS_TEACHER]: ["dashboard", "class-teacher-dashboard", "teacher-classes-menu", "schedule", "homework", "grades", "messages", "documents", "support"],
+    [UserRoleEnum.CLASS_TEACHER]: ["dashboard", "class-teacher-dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.STUDENT]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.PARENT]: ["dashboard", "grades", "messages", "documents", "support"],
     [UserRoleEnum.PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "analytics", "messages", "documents", "settings", "support"],
