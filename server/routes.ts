@@ -6,7 +6,7 @@ import { dbStorage } from "./db-storage";
 const dataStorage = dbStorage;
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { UserRoleEnum } from "@shared/schema";
+import { UserRoleEnum, insertSubgroupSchema, insertSubgroupClassSchema, insertStudentSubgroupSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -2247,6 +2247,507 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching student schedules:", error);
       return res.status(500).json({ message: "Failed to fetch student schedules" });
+    }
+  });
+  
+  // API для работы с подгруппами
+  // Получение всех подгрупп для школы
+  app.get("/api/subgroups", hasRole([
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.PRINCIPAL, 
+    UserRoleEnum.VICE_PRINCIPAL,
+    UserRoleEnum.TEACHER,
+    UserRoleEnum.CLASS_TEACHER
+  ]), async (req, res) => {
+    try {
+      let schoolId = req.query.schoolId ? parseInt(req.query.schoolId as string) : req.user.schoolId;
+      
+      // Если пользователь не суперадмин и пытается получить подгруппы другой школы
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const subgroups = await dataStorage.getSubgroups(schoolId);
+      res.json(subgroups);
+    } catch (error) {
+      console.error("Error getting subgroups:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Создание новой подгруппы
+  app.post("/api/subgroups", hasRole([
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.PRINCIPAL
+  ]), async (req, res) => {
+    try {
+      // Валидация данных
+      const validatedData = insertSubgroupSchema.parse(req.body);
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && validatedData.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "Forbidden. You can only create subgroups for your school" });
+      }
+      
+      const subgroup = await dataStorage.createSubgroup(validatedData);
+      
+      // Если указаны классы, связываем подгруппу с ними
+      if (req.body.classIds && Array.isArray(req.body.classIds)) {
+        for (const classId of req.body.classIds) {
+          await dataStorage.addSubgroupToClass(subgroup.id, classId);
+        }
+      }
+      
+      // Логирование
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "subgroup_created",
+        details: `Created subgroup: ${subgroup.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.status(201).json(subgroup);
+    } catch (error) {
+      console.error("Error creating subgroup:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ message: "Invalid data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Получение подгруппы по ID
+  app.get("/api/subgroups/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const subgroup = await dataStorage.getSubgroup(id);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
+          subgroup.schoolId !== req.user.schoolId &&
+          ![UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      res.json(subgroup);
+    } catch (error) {
+      console.error("Error getting subgroup:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Обновление подгруппы
+  app.put("/api/subgroups/:id", hasRole([
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.PRINCIPAL
+  ]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const subgroup = await dataStorage.getSubgroup(id);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && subgroup.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const updatedSubgroup = await dataStorage.updateSubgroup(id, req.body);
+      
+      // Логирование
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "subgroup_updated",
+        details: `Updated subgroup: ${updatedSubgroup?.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.json(updatedSubgroup);
+    } catch (error) {
+      console.error("Error updating subgroup:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Удаление подгруппы
+  app.delete("/api/subgroups/:id", hasRole([
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.PRINCIPAL
+  ]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const subgroup = await dataStorage.getSubgroup(id);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && subgroup.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const deletedSubgroup = await dataStorage.deleteSubgroup(id);
+      
+      // Логирование
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "subgroup_deleted",
+        details: `Deleted subgroup: ${deletedSubgroup?.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.json({ success: true, message: "Subgroup successfully deleted" });
+    } catch (error) {
+      console.error("Error deleting subgroup:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // API для связи подгрупп и классов
+  // Получение классов в подгруппе
+  app.get("/api/subgroups/:id/classes", isAuthenticated, async (req, res) => {
+    try {
+      const subgroupId = parseInt(req.params.id);
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
+          subgroup.schoolId !== req.user.schoolId &&
+          ![UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const classes = await dataStorage.getSubgroupClasses(subgroupId);
+      res.json(classes);
+    } catch (error) {
+      console.error("Error getting subgroup classes:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Получение подгрупп в классе
+  app.get("/api/classes/:id/subgroups", isAuthenticated, async (req, res) => {
+    try {
+      const classId = parseInt(req.params.id);
+      const classObj = await dataStorage.getClass(classId);
+      
+      if (!classObj) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      // Проверяем доступ к классу
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
+          classObj.schoolId !== req.user.schoolId &&
+          ![UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL, UserRoleEnum.TEACHER, UserRoleEnum.CLASS_TEACHER].includes(req.user.role)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const subgroups = await dataStorage.getClassSubgroups(classId);
+      res.json(subgroups);
+    } catch (error) {
+      console.error("Error getting class subgroups:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Добавление класса в подгруппу
+  app.post("/api/subgroups/:subgroupId/classes/:classId", hasRole([
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.PRINCIPAL
+  ]), async (req, res) => {
+    try {
+      const subgroupId = parseInt(req.params.subgroupId);
+      const classId = parseInt(req.params.classId);
+      
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      const classObj = await dataStorage.getClass(classId);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      if (!classObj) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      // Проверяем, что подгруппа и класс относятся к одной школе
+      if (subgroup.schoolId !== classObj.schoolId) {
+        return res.status(400).json({ message: "Subgroup and class must belong to the same school" });
+      }
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
+          subgroup.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const relation = await dataStorage.addSubgroupToClass(subgroupId, classId);
+      
+      // Логирование
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "subgroup_class_added",
+        details: `Added class ${classObj.name} to subgroup ${subgroup.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.status(201).json(relation);
+    } catch (error) {
+      console.error("Error adding class to subgroup:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Удаление класса из подгруппы
+  app.delete("/api/subgroups/:subgroupId/classes/:classId", hasRole([
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.PRINCIPAL
+  ]), async (req, res) => {
+    try {
+      const subgroupId = parseInt(req.params.subgroupId);
+      const classId = parseInt(req.params.classId);
+      
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      const classObj = await dataStorage.getClass(classId);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      if (!classObj) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
+          subgroup.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      await dataStorage.removeSubgroupFromClass(subgroupId, classId);
+      
+      // Логирование
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "subgroup_class_removed",
+        details: `Removed class ${classObj.name} from subgroup ${subgroup.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.json({ success: true, message: "Class removed from subgroup successfully" });
+    } catch (error) {
+      console.error("Error removing class from subgroup:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // API для связи студентов и подгрупп
+  // Получение студентов в подгруппе
+  app.get("/api/subgroups/:id/students", isAuthenticated, async (req, res) => {
+    try {
+      const subgroupId = parseInt(req.params.id);
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
+          subgroup.schoolId !== req.user.schoolId &&
+          ![UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL, UserRoleEnum.TEACHER, UserRoleEnum.CLASS_TEACHER].includes(req.user.role)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const students = await dataStorage.getSubgroupStudents(subgroupId);
+      res.json(students);
+    } catch (error) {
+      console.error("Error getting subgroup students:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Получение подгрупп, в которых состоит студент
+  app.get("/api/students/:id/subgroups", isAuthenticated, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.id);
+      const student = await dataStorage.getUser(studentId);
+      
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
+          student.schoolId !== req.user.schoolId &&
+          req.user.id !== studentId &&
+          ![UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL, UserRoleEnum.TEACHER, UserRoleEnum.CLASS_TEACHER].includes(req.user.role)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      const subgroups = await dataStorage.getStudentSubgroups(studentId);
+      res.json(subgroups);
+    } catch (error) {
+      console.error("Error getting student subgroups:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Добавление студента в подгруппу
+  app.post("/api/subgroups/:subgroupId/students/:studentId", hasRole([
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.PRINCIPAL,
+    UserRoleEnum.CLASS_TEACHER
+  ]), async (req, res) => {
+    try {
+      const subgroupId = parseInt(req.params.subgroupId);
+      const studentId = parseInt(req.params.studentId);
+      
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      const student = await dataStorage.getUser(studentId);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      if (student.role !== UserRoleEnum.STUDENT) {
+        return res.status(400).json({ message: "User is not a student" });
+      }
+      
+      // Проверяем, что подгруппа и студент относятся к одной школе
+      if (subgroup.schoolId !== student.schoolId) {
+        return res.status(400).json({ message: "Subgroup and student must belong to the same school" });
+      }
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
+          subgroup.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Если классный руководитель, проверяем, что студент в его классе
+      if (req.user.role === UserRoleEnum.CLASS_TEACHER) {
+        // Получаем классы, которыми управляет учитель
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const teacherClassIds = userRoles
+          .filter(r => r.role === UserRoleEnum.CLASS_TEACHER && r.classId)
+          .map(r => r.classId);
+          
+        // Получаем классы студента
+        const studentClassIds = await dataStorage.getStudentClassIds(studentId);
+        
+        // Проверяем, что у учителя и студента есть общий класс
+        const hasSharedClass = teacherClassIds.some(classId => 
+          studentClassIds.includes(classId)
+        );
+        
+        if (!hasSharedClass) {
+          return res.status(403).json({ message: "Forbidden. You can only add students from your classes to subgroups" });
+        }
+      }
+      
+      const relation = await dataStorage.addStudentToSubgroup(studentId, subgroupId);
+      
+      // Логирование
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "student_subgroup_added",
+        details: `Added student ${student.firstName} ${student.lastName} to subgroup ${subgroup.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.status(201).json(relation);
+    } catch (error) {
+      console.error("Error adding student to subgroup:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+  
+  // Удаление студента из подгруппы
+  app.delete("/api/subgroups/:subgroupId/students/:studentId", hasRole([
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.PRINCIPAL,
+    UserRoleEnum.CLASS_TEACHER
+  ]), async (req, res) => {
+    try {
+      const subgroupId = parseInt(req.params.subgroupId);
+      const studentId = parseInt(req.params.studentId);
+      
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      const student = await dataStorage.getUser(studentId);
+      
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      // Проверяем доступ
+      if (req.user.role !== UserRoleEnum.SUPER_ADMIN && 
+          subgroup.schoolId !== req.user.schoolId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      
+      // Если классный руководитель, проверяем, что студент в его классе
+      if (req.user.role === UserRoleEnum.CLASS_TEACHER) {
+        // Получаем классы, которыми управляет учитель
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const teacherClassIds = userRoles
+          .filter(r => r.role === UserRoleEnum.CLASS_TEACHER && r.classId)
+          .map(r => r.classId);
+          
+        // Получаем классы студента
+        const studentClassIds = await dataStorage.getStudentClassIds(studentId);
+        
+        // Проверяем, что у учителя и студента есть общий класс
+        const hasSharedClass = teacherClassIds.some(classId => 
+          studentClassIds.includes(classId)
+        );
+        
+        if (!hasSharedClass) {
+          return res.status(403).json({ message: "Forbidden. You can only manage students from your classes" });
+        }
+      }
+      
+      await dataStorage.removeStudentFromSubgroup(studentId, subgroupId);
+      
+      // Логирование
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "student_subgroup_removed",
+        details: `Removed student ${student.firstName} ${student.lastName} from subgroup ${subgroup.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.json({ success: true, message: "Student removed from subgroup successfully" });
+    } catch (error) {
+      console.error("Error removing student from subgroup:", error);
+      res.status(500).json({ message: "Internal server error" });
     }
   });
   

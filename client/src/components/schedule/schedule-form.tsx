@@ -6,6 +6,7 @@ import { z } from "zod";
 import { 
   Form, 
   FormControl, 
+  FormDescription,
   FormField, 
   FormItem, 
   FormLabel, 
@@ -36,7 +37,7 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon, ClockIcon } from "lucide-react";
 import { ru } from "date-fns/locale";
-import { Schedule, User, Subject, Class } from "@shared/schema";
+import { Schedule, User, Subject, Class, Subgroup } from "@shared/schema";
 
 // Схема для добавления расписания
 const scheduleFormSchema = z.object({
@@ -58,6 +59,7 @@ const scheduleFormSchema = z.object({
   startTime: z.string().min(1, "Укажите время начала"),
   endTime: z.string().min(1, "Укажите время окончания"),
   room: z.string().optional(),
+  subgroupId: z.number().nullable().optional(),
 });
 
 type ScheduleFormValues = z.infer<typeof scheduleFormSchema>;
@@ -70,6 +72,7 @@ interface ScheduleFormProps {
   classes: Class[];
   subjects: Subject[];
   teachers: User[];
+  subgroups?: Subgroup[];
   isSubmitting: boolean;
   scheduleToEdit?: Schedule | null;
 }
@@ -82,6 +85,7 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
   classes,
   subjects,
   teachers,
+  subgroups = [],
   isSubmitting,
   scheduleToEdit
 }) => {
@@ -96,6 +100,7 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
       startTime: scheduleToEdit?.startTime || "",
       endTime: scheduleToEdit?.endTime || "",
       room: scheduleToEdit?.room || "",
+      subgroupId: scheduleToEdit?.subgroupId || null,
     },
   });
 
@@ -341,6 +346,40 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
                 </FormItem>
               )}
             />
+            
+            {subgroups && subgroups.length > 0 && (
+              <FormField
+                control={form.control}
+                name="subgroupId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Подгруппа (необязательно)</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
+                      value={field.value?.toString() || ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите подгруппу" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Нет подгруппы (весь класс)</SelectItem>
+                        {subgroups.map((subgroup) => (
+                          <SelectItem key={subgroup.id} value={subgroup.id.toString()}>
+                            {subgroup.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Выберите подгруппу, если урок проводится только для части класса
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleClose}>
