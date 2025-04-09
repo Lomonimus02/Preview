@@ -11,6 +11,7 @@ import {
   insertGradeSchema,
   Grade,
   Homework,
+  Subgroup,
 } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -130,6 +131,12 @@ export default function SchedulePage() {
   // Получаем список домашних заданий
   const { data: homework = [] } = useQuery<Homework[]>({
     queryKey: ["/api/homework"],
+    enabled: !!user
+  });
+  
+  // Получаем список подгрупп
+  const { data: subgroups = [] } = useQuery<Subgroup[]>({
+    queryKey: ["/api/subgroups"],
     enabled: !!user
   });
   
@@ -386,6 +393,7 @@ export default function SchedulePage() {
           classes={classes}
           subjects={subjects}
           teachers={teachers}
+          subgroups={subgroups}
           isSubmitting={addScheduleMutation.isPending}
           scheduleToEdit={scheduleToEdit}
         />
