@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Pencil, Trash2, User, Search } from 'lucide-react';
 import { useRoleCheck } from '@/hooks/use-role-check';
+import { useAuth } from '@/hooks/use-auth';
 import { Subgroup, Class, User as UserType, InsertSubgroup } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 import {
@@ -72,7 +73,8 @@ const studentAssignmentSchema = z.object({
 type StudentAssignmentData = z.infer<typeof studentAssignmentSchema>;
 
 export default function SubgroupsPage() {
-  const { isAdmin, isSuperAdmin } = useRoleCheck();
+  const { isAdmin, isSuperAdmin, isSchoolAdmin } = useRoleCheck();
+  const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
@@ -343,11 +345,16 @@ export default function SubgroupsPage() {
   
   // Reset and set up the form for creating a new subgroup
   const handleCreateSubgroup = () => {
+    // Для школьного администратора автоматически используем ID его школы
+    const schoolId = isSchoolAdmin() && user?.schoolId ? 
+                     user.schoolId.toString() : 
+                     selectedSchool || "";
+    
     subgroupForm.reset({
       name: "",
       description: "",
       classId: selectedClass || "",
-      schoolId: selectedSchool || "",
+      schoolId,
     });
     setIsCreateDialogOpen(true);
   };
@@ -486,7 +493,7 @@ export default function SubgroupsPage() {
                 <Select
                   value={selectedClass || "all"}
                   onValueChange={(value) => setSelectedClass(value === "all" ? null : value)}
-                  disabled={!selectedSchool}
+                  disabled={isSuperAdmin() && !selectedSchool} // Отключено только для суперадмина без выбора школы
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Выберите класс" />
