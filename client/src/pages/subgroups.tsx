@@ -306,8 +306,21 @@ export default function SubgroupsPage() {
   
   // Remove student from subgroup mutation
   const removeStudentFromSubgroupMutation = useMutation({
-    mutationFn: (data: { studentId: number, subgroupId: number }) => 
-      apiRequest(`/api/student-subgroups?studentId=${data.studentId}&subgroupId=${data.subgroupId}`, 'DELETE'),
+    mutationFn: async (data: { studentId: number, subgroupId: number }) => {
+      const response = await fetch(`/api/student-subgroups?studentId=${data.studentId}&subgroupId=${data.subgroupId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Не удалось удалить ученика из подгруппы");
+      }
+      
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/student-subgroups', selectedSubgroup?.id] });
       toast({
@@ -316,6 +329,7 @@ export default function SubgroupsPage() {
       });
     },
     onError: (error: any) => {
+      console.error("Error removing student from subgroup:", error);
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось удалить ученика из подгруппы",
