@@ -527,7 +527,6 @@ export class DatabaseStorage implements IStorage {
   async removeUserRole(id: number): Promise<void> {
     await db.delete(userRoles).where(eq(userRoles.id, id));
   }
-
   // ===== Subgroup operations =====
   async getSubgroup(id: number): Promise<Subgroup | undefined> {
     const result = await db.select().from(subgroups).where(eq(subgroups.id, id)).limit(1);

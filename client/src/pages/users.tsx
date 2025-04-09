@@ -852,10 +852,19 @@ export default function UsersPage() {
   
   // Handlers for subgroup management
   const onCreateSubgroup = (values: { name: string; description?: string }) => {
-    // Include the user's schoolId
+    // Проверим, что schoolId существует и не null
+    if (!user?.schoolId) {
+      toast({
+        title: "Ошибка",
+        description: "Для создания подгруппы необходимо, чтобы пользователь был привязан к школе",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     createSubgroupMutation.mutate({
       ...values,
-      schoolId: user?.schoolId as number
+      schoolId: user.schoolId
     });
   };
   
