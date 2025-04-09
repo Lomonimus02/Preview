@@ -1,12 +1,23 @@
 import { useAuth } from "./use-auth";
 import { UserRoleEnum } from "@shared/schema";
+import { useState, useEffect } from "react";
 
 /**
  * Хук для проверки текущей активной роли пользователя
  * Используется для условного рендеринга компонентов в зависимости от роли
+ * @param requiredRoles - Необязательный параметр: список ролей, которые должны быть у пользователя
  */
-export function useRoleCheck() {
+export function useRoleCheck(requiredRoles?: UserRoleEnum[]) {
   const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    // Простая имитация загрузки для проверки ролей
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [user]);
   
   // Получаем активную роль пользователя
   const activeRole = user?.activeRole || user?.role;
@@ -62,15 +73,19 @@ export function useRoleCheck() {
   // Получаем текущую активную роль
   const currentRole = () => activeRole;
   
+  // Если переданы требуемые роли, проверяем их
+  const hasRequiredRole = requiredRoles ? hasRole(requiredRoles) : true;
+  
   return {
     hasRole,
-    isAdmin,
-    isSuperAdmin,
-    isSchoolAdmin,
-    isTeacher,
-    isClassTeacher, // Добавлена новая функция проверки
-    isStudent,
-    isParent,
-    currentRole
+    isAdmin: hasRequiredRole && isAdmin(),
+    isSuperAdmin: isSuperAdmin,
+    isSchoolAdmin: isSchoolAdmin,
+    isTeacher: isTeacher,
+    isClassTeacher: isClassTeacher,
+    isStudent: isStudent,
+    isParent: isParent,
+    currentRole,
+    isLoading
   };
 }

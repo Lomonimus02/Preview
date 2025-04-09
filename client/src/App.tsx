@@ -24,6 +24,7 @@ import ParentStudentConnections from "./pages/parent-student-connections";
 import ClassTeacherDashboard from "./pages/class-teacher-dashboard";
 import ClassTeacherGradesPage from "./pages/class-teacher-grades";
 import TeacherClasses from "./pages/teacher-classes";
+import SubgroupsManagement from "./pages/subgroups-management";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -51,6 +52,7 @@ function Router() {
       <ProtectedRoute path="/class-teacher-dashboard" component={ClassTeacherDashboard} />
       <ProtectedRoute path="/class-teacher-grades" component={ClassTeacherGradesPage} />
       <ProtectedRoute path="/teacher-classes" component={TeacherClasses} />
+      <ProtectedRoute path="/subgroups-management" component={SubgroupsManagement} />
       <Route component={NotFound} />
     </Switch>
   );
