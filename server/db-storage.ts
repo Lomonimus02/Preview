@@ -19,14 +19,10 @@ import {
   ParentStudent, InsertParentStudent,
   SystemLog, InsertSystemLog,
   UserRoleEnum, UserRoleModel, InsertUserRole,
-  Subgroup, InsertSubgroup,
-  SubgroupClass, InsertSubgroupClass,
-  StudentSubgroup, InsertStudentSubgroup,
   users, schools, classes, subjects, schedules,
   homework, homeworkSubmissions, grades, attendance,
   documents, messages, notifications, parentStudents,
-  systemLogs, teacherSubjects, studentClasses, userRoles,
-  subgroups, subgroupClasses, studentSubgroups
+  systemLogs, teacherSubjects, studentClasses, userRoles
 } from '@shared/schema';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
@@ -527,112 +523,7 @@ export class DatabaseStorage implements IStorage {
   async removeUserRole(id: number): Promise<void> {
     await db.delete(userRoles).where(eq(userRoles.id, id));
   }
-
-  // ===== Subgroup operations =====
-  async getSubgroup(id: number): Promise<Subgroup | undefined> {
-    const result = await db.select().from(subgroups).where(eq(subgroups.id, id)).limit(1);
-    return result[0];
-  }
-
-  async getSubgroups(schoolId: number): Promise<Subgroup[]> {
-    return await db.select().from(subgroups).where(eq(subgroups.schoolId, schoolId));
-  }
-
-  async createSubgroup(subgroup: InsertSubgroup): Promise<Subgroup> {
-    const [newSubgroup] = await db.insert(subgroups).values(subgroup).returning();
-    return newSubgroup;
-  }
-
-  async updateSubgroup(id: number, subgroup: Partial<InsertSubgroup>): Promise<Subgroup | undefined> {
-    const [updatedSubgroup] = await db.update(subgroups)
-      .set(subgroup)
-      .where(eq(subgroups.id, id))
-      .returning();
-    return updatedSubgroup;
-  }
-
-  async deleteSubgroup(id: number): Promise<Subgroup | undefined> {
-    const [deletedSubgroup] = await db.delete(subgroups)
-      .where(eq(subgroups.id, id))
-      .returning();
-    return deletedSubgroup;
-  }
-
-  // ===== Subgroup-Class operations =====
-  async getSubgroupClasses(subgroupId: number): Promise<Class[]> {
-    const subgroupClassList = await db.select()
-      .from(subgroupClasses)
-      .where(eq(subgroupClasses.subgroupId, subgroupId));
-    
-    if (subgroupClassList.length === 0) return [];
-    
-    const classIds = subgroupClassList.map(sc => sc.classId);
-    return await db.select().from(classes).where(inArray(classes.id, classIds));
-  }
-
-  async getClassSubgroups(classId: number): Promise<Subgroup[]> {
-    const subgroupClassList = await db.select()
-      .from(subgroupClasses)
-      .where(eq(subgroupClasses.classId, classId));
-    
-    if (subgroupClassList.length === 0) return [];
-    
-    const subgroupIds = subgroupClassList.map(sc => sc.subgroupId);
-    return await db.select().from(subgroups).where(inArray(subgroups.id, subgroupIds));
-  }
-
-  async addSubgroupToClass(subgroupId: number, classId: number): Promise<SubgroupClass> {
-    const [newSubgroupClass] = await db.insert(subgroupClasses)
-      .values({ subgroupId, classId })
-      .returning();
-    return newSubgroupClass;
-  }
-
-  async removeSubgroupFromClass(subgroupId: number, classId: number): Promise<void> {
-    await db.delete(subgroupClasses)
-      .where(and(
-        eq(subgroupClasses.subgroupId, subgroupId),
-        eq(subgroupClasses.classId, classId)
-      ));
-  }
-
-  // ===== Student-Subgroup operations =====
-  async getStudentSubgroups(studentId: number): Promise<Subgroup[]> {
-    const studentSubgroupList = await db.select()
-      .from(studentSubgroups)
-      .where(eq(studentSubgroups.studentId, studentId));
-    
-    if (studentSubgroupList.length === 0) return [];
-    
-    const subgroupIds = studentSubgroupList.map(ss => ss.subgroupId);
-    return await db.select().from(subgroups).where(inArray(subgroups.id, subgroupIds));
-  }
-
-  async getSubgroupStudents(subgroupId: number): Promise<User[]> {
-    const studentSubgroupList = await db.select()
-      .from(studentSubgroups)
-      .where(eq(studentSubgroups.subgroupId, subgroupId));
-    
-    if (studentSubgroupList.length === 0) return [];
-    
-    const studentIds = studentSubgroupList.map(ss => ss.studentId);
-    return await db.select().from(users).where(inArray(users.id, studentIds));
-  }
-
-  async addStudentToSubgroup(studentId: number, subgroupId: number): Promise<StudentSubgroup> {
-    const [newStudentSubgroup] = await db.insert(studentSubgroups)
-      .values({ studentId, subgroupId })
-      .returning();
-    return newStudentSubgroup;
-  }
-
-  async removeStudentFromSubgroup(studentId: number, subgroupId: number): Promise<void> {
-    await db.delete(studentSubgroups)
-      .where(and(
-        eq(studentSubgroups.studentId, studentId),
-        eq(studentSubgroups.subgroupId, subgroupId)
-      ));
-  }
 }
 
+// Экспортируем экземпляр хранилища
 export const dbStorage = new DatabaseStorage();

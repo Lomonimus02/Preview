@@ -85,7 +85,6 @@ export const schedules = pgTable("schedules", {
   endTime: text("end_time").notNull(),
   room: text("room"),
   status: text("status").default("not_conducted"), // 'conducted' or 'not_conducted'
-  subgroupId: integer("subgroup_id"), // Опциональная подгруппа для урока
 });
 
 // Homework table
@@ -186,29 +185,6 @@ export const userRoles = pgTable("user_roles", {
   classId: integer("class_id"), // класс, связанный с этой ролью (для классного руководителя)
 });
 
-// Subgroups table
-export const subgroups = pgTable("subgroups", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  schoolId: integer("school_id").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-// Subgroup-Class relation
-export const subgroupClasses = pgTable("subgroup_classes", {
-  id: serial("id").primaryKey(),
-  subgroupId: integer("subgroup_id").notNull(),
-  classId: integer("class_id").notNull(),
-});
-
-// Student-Subgroup relation
-export const studentSubgroups = pgTable("student_subgroups", {
-  id: serial("id").primaryKey(),
-  studentId: integer("student_id").notNull(),
-  subgroupId: integer("subgroup_id").notNull(),
-});
-
 // System logs
 export const systemLogs = pgTable("system_logs", {
   id: serial("id").primaryKey(),
@@ -287,19 +263,6 @@ export const insertUserRoleSchema = createInsertSchema(userRoles).omit({
   id: true
 });
 
-export const insertSubgroupSchema = createInsertSchema(subgroups).omit({
-  id: true,
-  createdAt: true
-});
-
-export const insertSubgroupClassSchema = createInsertSchema(subgroupClasses).omit({
-  id: true
-});
-
-export const insertStudentSubgroupSchema = createInsertSchema(studentSubgroups).omit({
-  id: true
-});
-
 export const insertSystemLogSchema = createInsertSchema(systemLogs).omit({
   id: true,
   createdAt: true
@@ -347,15 +310,6 @@ export type ParentStudent = typeof parentStudents.$inferSelect;
 
 export type InsertUserRole = z.infer<typeof insertUserRoleSchema>;
 export type UserRoleModel = typeof userRoles.$inferSelect;
-
-export type InsertSubgroup = z.infer<typeof insertSubgroupSchema>;
-export type Subgroup = typeof subgroups.$inferSelect;
-
-export type InsertSubgroupClass = z.infer<typeof insertSubgroupClassSchema>;
-export type SubgroupClass = typeof subgroupClasses.$inferSelect;
-
-export type InsertStudentSubgroup = z.infer<typeof insertStudentSubgroupSchema>;
-export type StudentSubgroup = typeof studentSubgroups.$inferSelect;
 
 export type InsertSystemLog = z.infer<typeof insertSystemLogSchema>;
 export type SystemLog = typeof systemLogs.$inferSelect;

@@ -2,11 +2,11 @@ import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
-import { UserRoleEnum, User, insertUserSchema, Class, ParentStudent, Subgroup, insertSubgroupSchema } from "@shared/schema";
+import { UserRoleEnum, User, insertUserSchema, Class, ParentStudent } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, Plus, Search, Filter, BookOpen, UsersIcon, UserIcon, UserPlusIcon, Loader2, Trash2, Info } from "lucide-react";
+import { Pencil, Plus, Search, Filter, BookOpen, UsersIcon, UserIcon, UserPlusIcon, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -51,7 +51,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import {
   Tabs,
@@ -59,20 +58,9 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Textarea } from "@/components/ui/textarea";
 
 // Extended user schema with validation
 const userFormSchema = insertUserSchema.extend({
@@ -114,20 +102,8 @@ export default function UsersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Subgroup management states
-  const [isSubgroupDialogOpen, setIsSubgroupDialogOpen] = useState(false);
-  const [isEditSubgroupDialogOpen, setIsEditSubgroupDialogOpen] = useState(false);
-  const [isDeleteSubgroupDialogOpen, setIsDeleteSubgroupDialogOpen] = useState(false);
-  
-  // State for subgroup management
-  const [selectedSubgroup, setSelectedSubgroup] = useState<Subgroup | null>(null);
-  const [selectedClassToAdd, setSelectedClassToAdd] = useState<number | null>(null);
-  const [selectedStudentToAdd, setSelectedStudentToAdd] = useState<number | null>(null);
-  const [removeClassIdToDelete, setRemoveClassIdToDelete] = useState<number | null>(null);
-  const [removeStudentIdToDelete, setRemoveStudentIdToDelete] = useState<number | null>(null);
-  
   // Only Super admin and School admin can access this page
-  if (!isAdmin) {
+  if (!isAdmin()) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center h-96">
@@ -143,14 +119,14 @@ export default function UsersPage() {
   // Fetch users
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: isAdmin
+    enabled: isAdmin()
   });
   
   // Fetch schools for dropdown
   const { isSuperAdmin } = useRoleCheck();
   const { data: schools = [] } = useQuery({
     queryKey: ["/api/schools"],
-    enabled: isSuperAdmin
+    enabled: isSuperAdmin()
   });
   
   // Filter users based on search query and role filter
@@ -180,20 +156,6 @@ export default function UsersPage() {
       role: UserRoleEnum.STUDENT,
       schoolId: null,
     },
-  });
-  
-  // Form for subgroup management
-  const subgroupForm = useForm({
-    resolver: zodResolver(
-      z.object({
-        name: z.string().min(1, "Требуется название подгруппы"),
-        description: z.string().optional()
-      })
-    ),
-    defaultValues: {
-      name: "",
-      description: ""
-    }
   });
   
   // Reset form when dialog closes
@@ -379,227 +341,6 @@ export default function UsersPage() {
   const [selectedParent, setSelectedParent] = useState<number | null>(null);
   const [searchParentTerm, setSearchParentTerm] = useState("");
   
-  // Subgroups management
-  // Fetch subgroups
-  const { data: subgroups = [], isLoading: isSubgroupsLoading, refetch: refetchSubgroups } = useQuery<Subgroup[]>({
-    queryKey: ["/api/subgroups"],
-    enabled: isAdmin
-  });
-  
-  // Fetch classes for subgroup assignment
-  const { data: availableClasses = [] } = useQuery<Class[]>({
-    queryKey: ["/api/classes"],
-    enabled: isAdmin
-  });
-  
-  // Fetch students for subgroup assignment
-  const { data: availableStudents = [] } = useQuery<User[]>({
-    queryKey: ["/api/students"],
-    queryFn: async () => {
-      const res = await fetch("/api/users?role=student");
-      if (!res.ok) throw new Error("Failed to fetch students");
-      return res.json();
-    },
-    enabled: isAdmin
-  });
-  
-  // Fetch classes for selected subgroup
-  const { data: subgroupClasses = [], isLoading: isSubgroupClassesLoading, refetch: refetchSubgroupClasses } = useQuery<Class[]>({
-    queryKey: ["/api/subgroup-classes", selectedSubgroup?.id],
-    queryFn: async ({ queryKey }) => {
-      const subgroupId = queryKey[1];
-      if (!subgroupId) return [];
-      const res = await fetch(`/api/subgroup-classes?subgroupId=${subgroupId}`);
-      if (!res.ok) throw new Error("Failed to fetch subgroup classes");
-      return res.json();
-    },
-    enabled: !!selectedSubgroup
-  });
-  
-  // Fetch students for selected subgroup
-  const { data: subgroupStudents = [], isLoading: isSubgroupStudentsLoading, refetch: refetchSubgroupStudents } = useQuery<User[]>({
-    queryKey: ["/api/subgroup-students", selectedSubgroup?.id],
-    queryFn: async ({ queryKey }) => {
-      const subgroupId = queryKey[1];
-      if (!subgroupId) return [];
-      const res = await fetch(`/api/subgroup-students?subgroupId=${subgroupId}`);
-      if (!res.ok) throw new Error("Failed to fetch subgroup students");
-      return res.json();
-    },
-    enabled: !!selectedSubgroup
-  });
-  
-  // Create subgroup mutation
-  const createSubgroupMutation = useMutation({
-    mutationFn: async (data: { name: string; description?: string; schoolId: number }) => {
-      const res = await apiRequest("/api/subgroups", "POST", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Успешно",
-        description: "Подгруппа создана",
-        variant: "default",
-      });
-      setIsSubgroupDialogOpen(false);
-      refetchSubgroups();
-      subgroupForm.reset({ name: "", description: "" });
-    },
-    onError: (error) => {
-      toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось создать подгруппу",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Update subgroup mutation
-  const updateSubgroupMutation = useMutation({
-    mutationFn: async (data: { id: number; name: string; description: string }) => {
-      const { id, ...updateData } = data;
-      const res = await apiRequest(`/api/subgroups/${id}`, "PUT", updateData);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Успешно",
-        description: "Подгруппа обновлена",
-        variant: "default",
-      });
-      setIsEditSubgroupDialogOpen(false);
-      refetchSubgroups();
-    },
-    onError: (error) => {
-      toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось обновить подгруппу",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Delete subgroup mutation
-  const deleteSubgroupMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest(`/api/subgroups/${id}`, "DELETE");
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Успешно",
-        description: "Подгруппа удалена",
-        variant: "default",
-      });
-      setIsDeleteSubgroupDialogOpen(false);
-      setSelectedSubgroup(null);
-      refetchSubgroups();
-    },
-    onError: (error) => {
-      toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось удалить подгруппу",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Add class to subgroup mutation
-  const addClassToSubgroupMutation = useMutation({
-    mutationFn: async (data: { subgroupId: number; classId: number }) => {
-      const res = await apiRequest("/api/subgroup-classes", "POST", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Успешно",
-        description: "Класс добавлен в подгруппу",
-        variant: "default",
-      });
-      setSelectedClassToAdd(null);
-      refetchSubgroupClasses();
-    },
-    onError: (error) => {
-      toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось добавить класс в подгруппу",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Remove class from subgroup mutation
-  const removeClassFromSubgroupMutation = useMutation({
-    mutationFn: async (data: { subgroupId: number; classId: number }) => {
-      const res = await apiRequest("/api/subgroup-classes", "DELETE", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Успешно",
-        description: "Класс удален из подгруппы",
-        variant: "default",
-      });
-      setRemoveClassIdToDelete(null);
-      refetchSubgroupClasses();
-    },
-    onError: (error) => {
-      toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось удалить класс из подгруппы",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Add student to subgroup mutation
-  const addStudentToSubgroupMutation = useMutation({
-    mutationFn: async (data: { subgroupId: number; studentId: number }) => {
-      const res = await apiRequest("/api/subgroup-students", "POST", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Успешно",
-        description: "Ученик добавлен в подгруппу",
-        variant: "default",
-      });
-      setSelectedStudentToAdd(null);
-      refetchSubgroupStudents();
-    },
-    onError: (error) => {
-      toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось добавить ученика в подгруппу",
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Remove student from subgroup mutation
-  const removeStudentFromSubgroupMutation = useMutation({
-    mutationFn: async (data: { subgroupId: number; studentId: number }) => {
-      const res = await apiRequest("/api/subgroup-students", "DELETE", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Успешно",
-        description: "Ученик удален из подгруппы",
-        variant: "default",
-      });
-      setRemoveStudentIdToDelete(null);
-      refetchSubgroupStudents();
-    },
-    onError: (error) => {
-      toast({
-        title: "Ошибка",
-        description: error.message || "Не удалось удалить ученика из подгруппы",
-        variant: "destructive",
-      });
-    },
-  });
-  
   // Функции для загрузки данных при редактировании
   const fetchStudentClassesForEdit = async (studentId: number) => {
     try {
@@ -652,7 +393,7 @@ export default function UsersPage() {
   // Fetch classes for student assignment
   const { data: classes = [] } = useQuery<Class[]>({
     queryKey: ["/api/classes"],
-    enabled: isAdmin
+    enabled: isAdmin()
   });
   
   // Fetch student classes for selected student
@@ -849,95 +590,6 @@ export default function UsersPage() {
       };
     });
   };
-  
-  // Handlers for subgroup management
-  const onCreateSubgroup = (values: { name: string; description?: string }) => {
-    // Проверим, что schoolId существует и не null
-    if (!user?.schoolId) {
-      toast({
-        title: "Ошибка",
-        description: "Для создания подгруппы необходимо, чтобы пользователь был привязан к школе",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    createSubgroupMutation.mutate({
-      ...values,
-      schoolId: user.schoolId
-    });
-  };
-  
-  const onUpdateSubgroup = (values: { name: string; description: string }) => {
-    if (selectedSubgroup) {
-      updateSubgroupMutation.mutate({
-        id: selectedSubgroup.id,
-        ...values,
-      });
-    }
-  };
-  
-  const handleEditSubgroup = (subgroup: Subgroup) => {
-    setSelectedSubgroup(subgroup);
-    subgroupForm.reset({
-      name: subgroup.name,
-      description: subgroup.description || "",
-    });
-    setIsEditSubgroupDialogOpen(true);
-  };
-  
-  const handleDeleteSubgroup = (subgroup: Subgroup) => {
-    setSelectedSubgroup(subgroup);
-    setIsDeleteSubgroupDialogOpen(true);
-  };
-  
-  const confirmDeleteSubgroup = () => {
-    if (selectedSubgroup) {
-      deleteSubgroupMutation.mutate(selectedSubgroup.id);
-    }
-  };
-  
-  const handleViewSubgroupDetails = (subgroup: Subgroup) => {
-    setSelectedSubgroup(subgroup);
-  };
-  
-  const handleAddClassToSubgroup = () => {
-    if (selectedSubgroup && selectedClassToAdd) {
-      addClassToSubgroupMutation.mutate({
-        subgroupId: selectedSubgroup.id,
-        classId: selectedClassToAdd
-      });
-    }
-  };
-  
-  const handleRemoveClassFromSubgroup = (classId: number) => {
-    setRemoveClassIdToDelete(classId);
-    if (selectedSubgroup) {
-      removeClassFromSubgroupMutation.mutate({
-        subgroupId: selectedSubgroup.id,
-        classId
-      });
-    }
-  };
-  
-  const handleAddStudentToSubgroup = () => {
-    if (selectedSubgroup && selectedStudentToAdd) {
-      addStudentToSubgroupMutation.mutate({
-        subgroupId: selectedSubgroup.id,
-        studentId: selectedStudentToAdd
-      });
-    }
-  };
-  
-  const handleRemoveStudentFromSubgroup = (studentId: number) => {
-    setRemoveStudentIdToDelete(studentId);
-    if (selectedSubgroup) {
-      removeStudentFromSubgroupMutation.mutate({
-        subgroupId: selectedSubgroup.id,
-        studentId
-      });
-    }
-  };
 
   return (
     <MainLayout>
@@ -989,10 +641,6 @@ export default function UsersPage() {
           <TabsTrigger value="parent-students" className="flex items-center">
             <UserPlusIcon className="mr-2 h-4 w-4" />
             Родители и дети
-          </TabsTrigger>
-          <TabsTrigger value="subgroups" className="flex items-center">
-            <UsersIcon className="mr-2 h-4 w-4" />
-            Подгруппы
           </TabsTrigger>
         </TabsList>
         
@@ -1263,429 +911,6 @@ export default function UsersPage() {
                   </div>
                 )}
               </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        {/* Subgroups Tab */}
-        <TabsContent value="subgroups">
-          <div className="mb-6">
-            <h2 className="text-2xl font-heading font-bold text-gray-800">Управление подгруппами</h2>
-            <p className="text-gray-600 mt-2">
-              Создание подгрупп для дифференцированного обучения в рамках классов
-            </p>
-          </div>
-          
-          {/* Форма создания подгруппы */}
-          <Dialog open={isSubgroupDialogOpen} onOpenChange={setIsSubgroupDialogOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Создать подгруппу</DialogTitle>
-                <DialogDescription>
-                  Подгруппы позволяют делить классы на более мелкие группы для занятий
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...subgroupForm}>
-                <form onSubmit={subgroupForm.handleSubmit(onCreateSubgroup)} className="space-y-4">
-                  <FormField
-                    control={subgroupForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Название подгруппы</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Например: Английский язык (группа 1)" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={subgroupForm.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Описание</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Краткое описание подгруппы" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <DialogFooter>
-                    <Button 
-                      type="submit" 
-                      disabled={createSubgroupMutation.isPending}
-                    >
-                      {createSubgroupMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Создать подгруппу
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-
-          {/* Диалог редактирования подгруппы */}
-          <Dialog open={isEditSubgroupDialogOpen} onOpenChange={setIsEditSubgroupDialogOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Редактировать подгруппу</DialogTitle>
-                <DialogDescription>
-                  Изменение названия и описания подгруппы
-                </DialogDescription>
-              </DialogHeader>
-              <Form {...subgroupForm}>
-                <form onSubmit={subgroupForm.handleSubmit(onUpdateSubgroup)} className="space-y-4">
-                  <FormField
-                    control={subgroupForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Название подгруппы</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={subgroupForm.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Описание</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <DialogFooter>
-                    <Button 
-                      type="submit" 
-                      disabled={updateSubgroupMutation.isPending}
-                    >
-                      {updateSubgroupMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Сохранить изменения
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-
-          {/* Диалог удаления подгруппы */}
-          <AlertDialog 
-            open={isDeleteSubgroupDialogOpen} 
-            onOpenChange={setIsDeleteSubgroupDialogOpen}
-          >
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Удалить подгруппу?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Вы уверены, что хотите удалить подгруппу "{selectedSubgroup?.name}"? 
-                  Это действие невозможно отменить.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Отмена</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={confirmDeleteSubgroup}
-                  disabled={deleteSubgroupMutation.isPending}
-                  className="bg-red-500 hover:bg-red-600"
-                >
-                  {deleteSubgroupMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Удалить
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Список подгрупп */}
-            <Card className="md:col-span-1">
-              <CardHeader>
-                <CardTitle>Подгруппы</CardTitle>
-                <CardDescription>Создание и управление подгруппами</CardDescription>
-                <Button 
-                  onClick={() => {
-                    subgroupForm.reset({
-                      name: "",
-                      description: "",
-                    });
-                    setIsSubgroupDialogOpen(true);
-                  }} 
-                  className="mt-2 w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" /> Создать подгруппу
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[400px] overflow-y-auto">
-                  {isSubgroupsLoading ? (
-                    <div className="flex items-center justify-center h-40">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    </div>
-                  ) : subgroups.length > 0 ? (
-                    <div className="space-y-2">
-                      {subgroups.map((subgroup) => (
-                        <div 
-                          key={subgroup.id}
-                          className={`p-3 rounded-md cursor-pointer transition-colors ${
-                            selectedSubgroup?.id === subgroup.id 
-                              ? 'bg-primary text-primary-foreground' 
-                              : 'hover:bg-muted'
-                          }`}
-                          onClick={() => handleSelectSubgroup(subgroup)}
-                        >
-                          <div className="font-medium">{subgroup.name}</div>
-                          {subgroup.description && (
-                            <div className="text-sm opacity-80 truncate">{subgroup.description}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-gray-500">
-                      Нет доступных подгрупп
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Управление подгруппой */}
-            <Card className="md:col-span-2">
-              {selectedSubgroup ? (
-                <>
-                  <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                    <div>
-                      <CardTitle>{selectedSubgroup.name}</CardTitle>
-                      <CardDescription>
-                        {selectedSubgroup.description || "Нет описания"}
-                      </CardDescription>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          subgroupForm.reset({
-                            name: selectedSubgroup.name,
-                            description: selectedSubgroup.description || "",
-                          });
-                          setIsEditSubgroupDialogOpen(true);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4 mr-1" /> 
-                        Изменить
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setIsDeleteSubgroupDialogOpen(true)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" /> 
-                        Удалить
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <Tabs defaultValue="classes">
-                      <TabsList className="mb-4">
-                        <TabsTrigger value="classes">Классы</TabsTrigger>
-                        <TabsTrigger value="students">Ученики</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="classes">
-                        {isSubgroupClassesLoading ? (
-                          <div className="flex items-center justify-center h-40">
-                            <Loader2 className="h-6 w-6 animate-spin" />
-                          </div>
-                        ) : (
-                          <>
-                            <div className="mb-4">
-                              <div className="flex items-center mb-2">
-                                <h3 className="text-sm font-medium flex-1">Добавить класс в подгруппу</h3>
-                              </div>
-                              <div className="flex space-x-2">
-                                <Select
-                                  value={selectedClassToAdd?.toString() || ""}
-                                  onValueChange={(value) => setSelectedClassToAdd(Number(value) || null)}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Выберите класс" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {availableClasses.map((cls) => (
-                                      <SelectItem key={cls.id} value={cls.id.toString()}>
-                                        {cls.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={!selectedClassToAdd || addClassToSubgroupMutation.isPending}
-                                  onClick={handleAddClassToSubgroup}
-                                >
-                                  {addClassToSubgroupMutation.isPending && (
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  )}
-                                  Добавить
-                                </Button>
-                              </div>
-                            </div>
-                            
-                            <div className="border rounded-md">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Название класса</TableHead>
-                                    <TableHead className="w-24">Действия</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {subgroupClasses.length > 0 ? (
-                                    subgroupClasses.map((cls) => (
-                                      <TableRow key={cls.id}>
-                                        <TableCell>{cls.name}</TableCell>
-                                        <TableCell>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                                            onClick={() => handleRemoveClassFromSubgroup(cls.id)}
-                                            disabled={removeClassFromSubgroupMutation.isPending}
-                                          >
-                                            {removeClassFromSubgroupMutation.isPending && 
-                                             removeClassIdToDelete === cls.id ? (
-                                              <Loader2 className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                              <Trash2 className="h-4 w-4" />
-                                            )}
-                                          </Button>
-                                        </TableCell>
-                                      </TableRow>
-                                    ))
-                                  ) : (
-                                    <TableRow>
-                                      <TableCell colSpan={2} className="text-center py-4 text-muted-foreground">
-                                        Нет классов, связанных с этой подгруппой
-                                      </TableCell>
-                                    </TableRow>
-                                  )}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </>
-                        )}
-                      </TabsContent>
-                      
-                      <TabsContent value="students">
-                        {isSubgroupStudentsLoading ? (
-                          <div className="flex items-center justify-center h-40">
-                            <Loader2 className="h-6 w-6 animate-spin" />
-                          </div>
-                        ) : (
-                          <>
-                            <div className="mb-4">
-                              <div className="flex items-center mb-2">
-                                <h3 className="text-sm font-medium flex-1">Добавить ученика в подгруппу</h3>
-                              </div>
-                              <div className="flex space-x-2">
-                                <Select
-                                  value={selectedStudentToAdd?.toString() || ""}
-                                  onValueChange={(value) => setSelectedStudentToAdd(Number(value) || null)}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Выберите ученика" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {availableStudents.map((student) => (
-                                      <SelectItem key={student.id} value={student.id.toString()}>
-                                        {student.lastName} {student.firstName}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  disabled={!selectedStudentToAdd || addStudentToSubgroupMutation.isPending}
-                                  onClick={handleAddStudentToSubgroup}
-                                >
-                                  {addStudentToSubgroupMutation.isPending && (
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  )}
-                                  Добавить
-                                </Button>
-                              </div>
-                            </div>
-                            
-                            <div className="border rounded-md">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Ученик</TableHead>
-                                    <TableHead className="w-24">Действия</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {subgroupStudents.length > 0 ? (
-                                    subgroupStudents.map((student) => (
-                                      <TableRow key={student.id}>
-                                        <TableCell>
-                                          {student.lastName} {student.firstName}
-                                        </TableCell>
-                                        <TableCell>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                                            onClick={() => handleRemoveStudentFromSubgroup(student.id)}
-                                            disabled={removeStudentFromSubgroupMutation.isPending}
-                                          >
-                                            {removeStudentFromSubgroupMutation.isPending && 
-                                             removeStudentIdToDelete === student.id ? (
-                                              <Loader2 className="h-4 w-4 animate-spin" />
-                                            ) : (
-                                              <Trash2 className="h-4 w-4" />
-                                            )}
-                                          </Button>
-                                        </TableCell>
-                                      </TableRow>
-                                    ))
-                                  ) : (
-                                    <TableRow>
-                                      <TableCell colSpan={2} className="text-center py-4 text-muted-foreground">
-                                        Нет учеников, связанных с этой подгруппой
-                                      </TableCell>
-                                    </TableRow>
-                                  )}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </>
-                        )}
-                      </TabsContent>
-                    </Tabs>
-                  </CardContent>
-                </>
-              ) : (
-                <CardContent>
-                  <div className="text-center py-8 text-gray-500">
-                    <UsersIcon className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-                    <p>Выберите подгруппу для просмотра подробностей</p>
-                    <p className="text-sm mt-2">или создайте новую подгруппу</p>
-                  </div>
-                </CardContent>
-              )}
             </Card>
           </div>
         </TabsContent>

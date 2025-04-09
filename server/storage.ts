@@ -14,10 +14,7 @@ import {
   ParentStudent, InsertParentStudent,
   SystemLog, InsertSystemLog,
   UserRoleEnum,
-  UserRoleModel, InsertUserRole,
-  Subgroup, InsertSubgroup,
-  SubgroupClass, InsertSubgroupClass,
-  StudentSubgroup, InsertStudentSubgroup
+  UserRoleModel, InsertUserRole
 } from "@shared/schema";
 
 import session from "express-session";
@@ -142,25 +139,6 @@ export interface IStorage {
   getUserRoles(userId: number): Promise<UserRoleModel[]>;
   addUserRole(userRole: InsertUserRole): Promise<UserRoleModel>;
   removeUserRole(id: number): Promise<void>;
-  
-  // Subgroup operations
-  getSubgroup(id: number): Promise<Subgroup | undefined>;
-  getSubgroups(schoolId: number): Promise<Subgroup[]>;
-  createSubgroup(subgroup: InsertSubgroup): Promise<Subgroup>;
-  updateSubgroup(id: number, subgroup: Partial<InsertSubgroup>): Promise<Subgroup | undefined>;
-  deleteSubgroup(id: number): Promise<Subgroup | undefined>;
-  
-  // Subgroup-Class operations
-  getSubgroupClasses(subgroupId: number): Promise<Class[]>;
-  getClassSubgroups(classId: number): Promise<Subgroup[]>;
-  addSubgroupToClass(subgroupId: number, classId: number): Promise<SubgroupClass>;
-  removeSubgroupFromClass(subgroupId: number, classId: number): Promise<void>;
-  
-  // Student-Subgroup operations
-  getStudentSubgroups(studentId: number): Promise<Subgroup[]>;
-  getSubgroupStudents(subgroupId: number): Promise<User[]>;
-  addStudentToSubgroup(studentId: number, subgroupId: number): Promise<StudentSubgroup>;
-  removeStudentFromSubgroup(studentId: number, subgroupId: number): Promise<void>;
 }
 
 // In-memory storage implementation
@@ -182,9 +160,6 @@ export class MemStorage implements IStorage {
   private userRoles: Map<number, UserRoleModel>;
   private studentClasses: Map<string, boolean>; // composite key "studentId-classId"
   private teacherSubjects: Map<string, boolean>; // composite key "teacherId-subjectId"
-  private subgroups: Map<number, Subgroup>; 
-  private subgroupClasses: Map<number, SubgroupClass>;
-  private studentSubgroups: Map<string, boolean>; // composite key "studentId-subgroupId"
   
   // IDs for auto-increment
   private userId = 1;
@@ -202,9 +177,6 @@ export class MemStorage implements IStorage {
   private parentStudentId = 1;
   private systemLogId = 1;
   private userRoleId = 1;
-  private subgroupId = 1;
-  private subgroupClassId = 1;
-  private studentSubgroupId = 1;
 
   sessionStore: session.Store;
   
@@ -226,9 +198,6 @@ export class MemStorage implements IStorage {
     this.userRoles = new Map();
     this.studentClasses = new Map();
     this.teacherSubjects = new Map();
-    this.subgroups = new Map();
-    this.subgroupClasses = new Map();
-    this.studentSubgroups = new Map();
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
@@ -751,125 +720,6 @@ export class MemStorage implements IStorage {
 
   async removeUserRole(id: number): Promise<void> {
     this.userRoles.delete(id);
-  }
-
-  // Subgroup operations
-  async getSubgroup(id: number): Promise<Subgroup | undefined> {
-    return this.subgroups.get(id);
-  }
-
-  async getSubgroups(schoolId: number): Promise<Subgroup[]> {
-    return Array.from(this.subgroups.values()).filter(
-      subgroup => subgroup.schoolId === schoolId
-    );
-  }
-
-  async createSubgroup(subgroup: InsertSubgroup): Promise<Subgroup> {
-    const id = this.subgroupId++;
-    const newSubgroup: Subgroup = { 
-      ...subgroup, 
-      id, 
-      description: subgroup.description || null,
-      createdAt: new Date() 
-    };
-    this.subgroups.set(id, newSubgroup);
-    return newSubgroup;
-  }
-
-  async updateSubgroup(id: number, subgroup: Partial<InsertSubgroup>): Promise<Subgroup | undefined> {
-    const existingSubgroup = this.subgroups.get(id);
-    if (!existingSubgroup) return undefined;
-    
-    const updatedSubgroup: Subgroup = { ...existingSubgroup, ...subgroup };
-    this.subgroups.set(id, updatedSubgroup);
-    return updatedSubgroup;
-  }
-
-  async deleteSubgroup(id: number): Promise<Subgroup | undefined> {
-    const subgroup = this.subgroups.get(id);
-    if (!subgroup) return undefined;
-    
-    this.subgroups.delete(id);
-    return subgroup;
-  }
-
-  // Subgroup-Class operations
-  async getSubgroupClasses(subgroupId: number): Promise<Class[]> {
-    const subgroupClassRelations = Array.from(this.subgroupClasses.values())
-      .filter(relation => relation.subgroupId === subgroupId);
-    
-    const classIds = subgroupClassRelations.map(relation => relation.classId);
-    return Array.from(this.classes.values())
-      .filter(cls => classIds.includes(cls.id));
-  }
-
-  async getClassSubgroups(classId: number): Promise<Subgroup[]> {
-    const classSubgroupRelations = Array.from(this.subgroupClasses.values())
-      .filter(relation => relation.classId === classId);
-    
-    const subgroupIds = classSubgroupRelations.map(relation => relation.subgroupId);
-    return Array.from(this.subgroups.values())
-      .filter(subgroup => subgroupIds.includes(subgroup.id));
-  }
-
-  async addSubgroupToClass(subgroupId: number, classId: number): Promise<SubgroupClass> {
-    const id = this.subgroupClassId++;
-    const newRelation: SubgroupClass = { id, subgroupId, classId };
-    this.subgroupClasses.set(id, newRelation);
-    return newRelation;
-  }
-
-  async removeSubgroupFromClass(subgroupId: number, classId: number): Promise<void> {
-    const relation = Array.from(this.subgroupClasses.values())
-      .find(rel => rel.subgroupId === subgroupId && rel.classId === classId);
-    
-    if (relation) {
-      this.subgroupClasses.delete(relation.id);
-    }
-  }
-
-  // Student-Subgroup operations
-  async getStudentSubgroups(studentId: number): Promise<Subgroup[]> {
-    // Получаем все связи студент-подгруппа для данного студента
-    const studentSubgroupKeys = Array.from(this.studentSubgroups.keys())
-      .filter(key => key.startsWith(`${studentId}-`));
-    
-    // Извлекаем ID подгрупп из ключей
-    const subgroupIds = studentSubgroupKeys.map(key => 
-      parseInt(key.split('-')[1], 10)
-    );
-    
-    // Возвращаем все подгруппы, соответствующие найденным ID
-    return Array.from(this.subgroups.values())
-      .filter(subgroup => subgroupIds.includes(subgroup.id));
-  }
-
-  async getSubgroupStudents(subgroupId: number): Promise<User[]> {
-    // Получаем все связи студент-подгруппа для данной подгруппы
-    const subgroupStudentKeys = Array.from(this.studentSubgroups.keys())
-      .filter(key => key.endsWith(`-${subgroupId}`));
-    
-    // Извлекаем ID студентов из ключей
-    const studentIds = subgroupStudentKeys.map(key => 
-      parseInt(key.split('-')[0], 10)
-    );
-    
-    // Возвращаем всех студентов, соответствующих найденным ID
-    return Array.from(this.users.values())
-      .filter(user => studentIds.includes(user.id) && user.role === UserRoleEnum.STUDENT);
-  }
-
-  async addStudentToSubgroup(studentId: number, subgroupId: number): Promise<StudentSubgroup> {
-    const key = `${studentId}-${subgroupId}`;
-    this.studentSubgroups.set(key, true);
-    
-    const id = this.studentSubgroupId++;
-    return { id, studentId, subgroupId };
-  }
-
-  async removeStudentFromSubgroup(studentId: number, subgroupId: number): Promise<void> {
-    const key = `${studentId}-${subgroupId}`;
-    this.studentSubgroups.delete(key);
   }
 }
 
