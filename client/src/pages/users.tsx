@@ -431,7 +431,7 @@ export default function UsersPage() {
   
   // Create subgroup mutation
   const createSubgroupMutation = useMutation({
-    mutationFn: async (data: { name: string; description?: string }) => {
+    mutationFn: async (data: { name: string; description?: string; schoolId: number }) => {
       const res = await apiRequest("/api/subgroups", "POST", data);
       return res.json();
     },
@@ -852,7 +852,11 @@ export default function UsersPage() {
   
   // Handlers for subgroup management
   const onCreateSubgroup = (values: { name: string; description?: string }) => {
-    createSubgroupMutation.mutate(values);
+    // Include the user's schoolId
+    createSubgroupMutation.mutate({
+      ...values,
+      schoolId: user?.schoolId as number
+    });
   };
   
   const onUpdateSubgroup = (values: { name: string; description: string }) => {
