@@ -205,7 +205,7 @@ export default function SubgroupsPage() {
       
       return studentsResponse.json();
     },
-    enabled: !!selectedSubgroup && activeTab === "students"
+    enabled: !!selectedSubgroup && (activeTab === "students" || isStudentAssignDialogOpen)
   });
   
   // Filter subgroups by search query

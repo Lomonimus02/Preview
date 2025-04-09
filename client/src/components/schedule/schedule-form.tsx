@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -9,7 +9,8 @@ import {
   FormField, 
   FormItem, 
   FormLabel, 
-  FormMessage 
+  FormMessage,
+  FormDescription
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,8 @@ import {
 } from "@/components/ui/popover";
 import { CalendarIcon, ClockIcon } from "lucide-react";
 import { ru } from "date-fns/locale";
-import { Schedule, User, Subject, Class } from "@shared/schema";
+import { Schedule, User, Subject, Class, Subgroup } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
 
 // Схема для добавления расписания
 const scheduleFormSchema = z.object({
@@ -58,6 +60,7 @@ const scheduleFormSchema = z.object({
   startTime: z.string().min(1, "Укажите время начала"),
   endTime: z.string().min(1, "Укажите время окончания"),
   room: z.string().optional(),
+  subgroupId: z.number().optional(), // Опциональная привязка к подгруппе
 });
 
 type ScheduleFormValues = z.infer<typeof scheduleFormSchema>;
@@ -85,6 +88,29 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
   isSubmitting,
   scheduleToEdit
 }) => {
+  // State для хранения подгрупп выбранного класса
+  const [subgroups, setSubgroups] = useState<Subgroup[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<number | undefined>(scheduleToEdit?.classId);
+  
+  // Запрос на получение подгрупп для выбранного класса
+  const { data: subgroupsData } = useQuery({
+    queryKey: ['subgroups', selectedClassId],
+    queryFn: async () => {
+      if (!selectedClassId) return [];
+      const response = await fetch(`/api/subgroups/class/${selectedClassId}`);
+      if (!response.ok) throw new Error('Не удалось загрузить подгруппы');
+      return response.json();
+    },
+    enabled: !!selectedClassId, // Запрос выполняется только если выбран класс
+  });
+  
+  // Обновляем список подгрупп при получении данных
+  useEffect(() => {
+    if (subgroupsData) {
+      setSubgroups(subgroupsData);
+    }
+  }, [subgroupsData]);
+
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
     defaultValues: {
@@ -96,6 +122,7 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
       startTime: scheduleToEdit?.startTime || "",
       endTime: scheduleToEdit?.endTime || "",
       room: scheduleToEdit?.room || "",
+      subgroupId: scheduleToEdit?.subgroupId || undefined,
     },
   });
 
@@ -251,7 +278,14 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
                 <FormItem>
                   <FormLabel>Класс</FormLabel>
                   <Select
-                    onValueChange={(value) => field.onChange(parseInt(value))}
+                    onValueChange={(value) => {
+                      const valueNum = parseInt(value);
+                      field.onChange(valueNum);
+                      // Обновляем выбранный класс, чтобы загрузить его подгруппы
+                      setSelectedClassId(valueNum);
+                      // Сбрасываем выбранную подгруппу при смене класса
+                      form.setValue("subgroupId", undefined);
+                    }}
                     value={field.value?.toString()}
                   >
                     <FormControl>
@@ -341,6 +375,41 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
                 </FormItem>
               )}
             />
+            
+            {/* Выбор подгруппы (опционально) */}
+            {selectedClassId && subgroups.length > 0 && (
+              <FormField
+                control={form.control}
+                name="subgroupId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Подгруппа (необязательно)</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                      value={field.value?.toString() || ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите подгруппу (если требуется)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Весь класс (без подгруппы)</SelectItem>
+                        {subgroups.map((subgroup) => (
+                          <SelectItem key={subgroup.id} value={subgroup.id.toString()}>
+                            {subgroup.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Оставьте пустым, если урок предназначен для всего класса
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleClose}>

@@ -156,6 +156,7 @@ export default function SchedulePage() {
     startTime: z.string(),
     endTime: z.string(),
     room: z.string().optional(),
+    subgroupId: z.number().optional(), // Добавляем поле подгруппы как опциональное
   });
 
   // Type for the schedule form data
