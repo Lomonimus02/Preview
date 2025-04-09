@@ -40,6 +40,7 @@ import {
   FormLabel,
   FormMessage
 } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -100,7 +101,7 @@ export default function SubgroupsPage() {
     );
   }
   
-  // Fetch subgroups
+  // Fetch subgroups - for school admins, we automatically show their school's subgroups
   const {
     data: subgroups = [],
     isLoading: isLoadingSubgroups,
@@ -109,9 +110,18 @@ export default function SubgroupsPage() {
     queryKey: ['/api/subgroups', selectedSchool, selectedClass],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (selectedSchool) params.append('schoolId', selectedSchool);
-      if (selectedClass) params.append('classId', selectedClass);
       
+      if (selectedClass) {
+        params.append('classId', selectedClass);
+      }
+      
+      // School admins will automatically see their school's subgroups from the server side
+      // Super admins need to filter by school if selected
+      if (isSuperAdmin() && selectedSchool) {
+        params.append('schoolId', selectedSchool);
+      }
+      
+      console.log(`Fetching subgroups with params: ${params.toString()}`);
       const response = await fetch(`/api/subgroups?${params.toString()}`);
       
       if (!response.ok) {
@@ -295,7 +305,7 @@ export default function SubgroupsPage() {
   // Remove student from subgroup mutation
   const removeStudentFromSubgroupMutation = useMutation({
     mutationFn: (data: { studentId: number, subgroupId: number }) => 
-      apiRequest('/api/student-subgroups', 'DELETE', data),
+      apiRequest(`/api/student-subgroups?studentId=${data.studentId}&subgroupId=${data.subgroupId}`, 'DELETE'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/student-subgroups', selectedSubgroup?.id] });
       toast({
@@ -447,27 +457,30 @@ export default function SubgroupsPage() {
               <CardTitle>Фильтры</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
-              <div className="flex-1">
-                <Select
-                  value={selectedSchool || "all"}
-                  onValueChange={(value) => {
-                    setSelectedSchool(value === "all" ? null : value);
-                    setSelectedClass(null);
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Выберите школу" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Все школы</SelectItem>
-                    {schools.map((school) => (
-                      <SelectItem key={school.id} value={school.id.toString()}>
-                        {school.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Выбор школы доступен только для суперадмина */}
+              {isSuperAdmin() && (
+                <div className="flex-1">
+                  <Select
+                    value={selectedSchool || "all"}
+                    onValueChange={(value) => {
+                      setSelectedSchool(value === "all" ? null : value);
+                      setSelectedClass(null);
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите школу" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Все школы</SelectItem>
+                      {schools.map((school) => (
+                        <SelectItem key={school.id} value={school.id.toString()}>
+                          {school.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               
               <div className="flex-1">
                 <Select
@@ -704,34 +717,45 @@ export default function SubgroupsPage() {
           
           <Form {...subgroupForm}>
             <form onSubmit={subgroupForm.handleSubmit(onCreateSubgroup)} className="space-y-4">
-              <FormField
-                control={subgroupForm.control}
-                name="schoolId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Школа</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={isLoadingSchools}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите школу" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {schools.map((school) => (
-                          <SelectItem key={school.id} value={school.id.toString()}>
-                            {school.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Выбор школы только для суперадмина, для школьного админа - автоматически */}
+              {isSuperAdmin() ? (
+                <FormField
+                  control={subgroupForm.control}
+                  name="schoolId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Школа</FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        disabled={isLoadingSchools}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите школу" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {schools.map((school) => (
+                            <SelectItem key={school.id} value={school.id.toString()}>
+                              {school.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                // Для школьных администраторов просто отображаем их школу без возможности изменения
+                <div className="flex flex-col space-y-2 mb-4">
+                  <Label>Школа</Label>
+                  <div className="p-2 border rounded-md bg-muted/50">
+                    {getSchoolName(parseInt(subgroupForm.watch("schoolId")))}
+                  </div>
+                </div>
+              )}
               
               <FormField
                 control={subgroupForm.control}
@@ -828,34 +852,45 @@ export default function SubgroupsPage() {
           
           <Form {...subgroupForm}>
             <form onSubmit={subgroupForm.handleSubmit(onEditSubgroup)} className="space-y-4">
-              <FormField
-                control={subgroupForm.control}
-                name="schoolId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Школа</FormLabel>
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={isLoadingSchools}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите школу" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {schools.map((school) => (
-                          <SelectItem key={school.id} value={school.id.toString()}>
-                            {school.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Выбор школы только для суперадмина, для школьного админа - автоматически */}
+              {isSuperAdmin() ? (
+                <FormField
+                  control={subgroupForm.control}
+                  name="schoolId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Школа</FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        disabled={isLoadingSchools}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите школу" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {schools.map((school) => (
+                            <SelectItem key={school.id} value={school.id.toString()}>
+                              {school.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                // Для школьных администраторов просто отображаем их школу без возможности изменения
+                <div className="flex flex-col space-y-2 mb-4">
+                  <Label>Школа</Label>
+                  <div className="p-2 border rounded-md bg-muted/50">
+                    {getSchoolName(parseInt(subgroupForm.watch("schoolId")))}
+                  </div>
+                </div>
+              )}
               
               <FormField
                 control={subgroupForm.control}

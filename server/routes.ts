@@ -20,6 +20,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(401).json({ message: "Unauthorized" });
   };
   
+  // Middleware to check if user has specific role
+  const hasRole = (roles: UserRoleEnum[]) => async (req, res, next) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    
+    // Проверяем активную роль пользователя, если она установлена
+    if (req.user.activeRole && roles.includes(req.user.activeRole)) {
+      return next();
+    }
+    
+    // Если активной роли нет или она не подходит, проверяем все роли пользователя
+    if (req.user.role === UserRoleEnum.SUPER_ADMIN) {
+      return next();
+    }
+    
+    if (roles.includes(req.user.role)) {
+      return next();
+    }
+    
+    // Проверка через базу данных (для многоролевых пользователей)
+    try {
+      const userRoles = await dataStorage.getUserRoles(req.user.id);
+      if (userRoles.some(r => roles.includes(r.role as UserRoleEnum))) {
+        return next();
+      }
+    } catch (error) {
+      console.error("Error checking user roles:", error);
+    }
+    
+    return res.status(403).json({ message: "Forbidden - Insufficient permissions" });
+  };
+  
   // Subgroups API
   app.get("/api/subgroups", isAuthenticated, async (req, res) => {
     try {
@@ -76,17 +109,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/subgroups", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
     try {
+      console.log("Создание подгруппы. Request body:", req.body);
+      
       // Ensure the user has access to the school
       if (req.user.role === UserRoleEnum.SCHOOL_ADMIN && req.body.schoolId !== req.user.schoolId) {
+        console.log("Доступ запрещен: школа в запросе не соответствует школе администратора");
         return res.status(403).json({ message: "You can only create subgroups in your own school" });
       }
       
-      const newSubgroup = await dataStorage.createSubgroup({
+      // Проверяем, что все необходимые поля присутствуют
+      if (!req.body.name || !req.body.classId || !req.body.schoolId) {
+        console.log("Отсутствуют обязательные поля:", { body: req.body });
+        return res.status(400).json({ 
+          message: "Missing required fields", 
+          received: req.body,
+          required: ["name", "classId", "schoolId"] 
+        });
+      }
+      
+      const subgroupData = {
         name: req.body.name,
         classId: req.body.classId,
         schoolId: req.body.schoolId,
         description: req.body.description || null
-      });
+      };
+      
+      console.log("Подготовленные данные для создания подгруппы:", subgroupData);
+      
+      const newSubgroup = await dataStorage.createSubgroup(subgroupData);
+      console.log("Созданная подгруппа:", newSubgroup);
       
       // Log the action
       await dataStorage.createSystemLog({
@@ -99,7 +150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(newSubgroup);
     } catch (error) {
       console.error("Error creating subgroup:", error);
-      res.status(500).json({ message: "Failed to create subgroup" });
+      res.status(500).json({ message: "Failed to create subgroup", error: error.message });
     }
   });
   
@@ -380,25 +431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Middleware to check if user has specific role
-  const hasRole = (roles: UserRoleEnum[]) => async (req, res, next) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    
-    // Проверяем активную роль пользователя, если она установлена
-    if (req.user.activeRole && roles.includes(req.user.activeRole)) {
-      return next();
-    }
-    
-    // Если активная роль не установлена, проверяем основную роль пользователя
-    if (!req.user.activeRole && roles.includes(req.user.role)) {
-      return next();
-    }
-    
-    // Доступ запрещен, если активная роль не соответствует требуемой
-    res.status(403).json({ message: "Forbidden. You don't have the required role permissions." });
-  };
+
 
   // Schools API
   app.get("/api/schools", isAuthenticated, async (req, res) => {
