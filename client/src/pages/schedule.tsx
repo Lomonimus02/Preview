@@ -142,6 +142,12 @@ export default function SchedulePage() {
     enabled: !!user
   });
   
+  // Получаем список подгрупп
+  const { data: subgroups = [] } = useQuery<Array<{id: number, name: string, classId: number}>>({
+    queryKey: ["/api/subgroups"],
+    enabled: !!user
+  });
+  
   // Get students for a specific class
   const getClassStudents = (classId: number, subgroupId?: number) => {
     // Если указана подгруппа, возвращаем только студентов из этой подгруппы
@@ -384,7 +390,19 @@ export default function SchedulePage() {
           </div>
         ) : (
           <ScheduleCarousel
-            schedules={isTeacher() ? teacherSchedules : schedules}
+            schedules={
+              // Добавляем названия подгрупп к расписанию
+              (isTeacher() ? teacherSchedules : schedules).map(schedule => {
+                if (schedule.subgroupId) {
+                  const subgroup = subgroups.find(sg => sg.id === schedule.subgroupId);
+                  return {
+                    ...schedule,
+                    subgroupName: subgroup?.name || 'Подгруппа'
+                  };
+                }
+                return schedule;
+              })
+            }
             subjects={subjects}
             teachers={teachers}
             classes={classes}

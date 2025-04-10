@@ -318,6 +318,12 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   <h4 className="text-gray-500 mb-1">Класс</h4>
                   <p className="font-medium">{getClassName(selectedSchedule.classId)}</p>
                 </div>
+                {selectedSchedule.subgroupId && (
+                  <div>
+                    <h4 className="text-gray-500 mb-1">Подгруппа</h4>
+                    <p className="font-medium text-emerald-700">{selectedSchedule.subgroupName || "Подгруппа"}</p>
+                  </div>
+                )}
                 <div>
                   <h4 className="text-gray-500 mb-1">Учитель</h4>
                   <p className="font-medium">{getTeacherName(selectedSchedule.teacherId)}</p>
