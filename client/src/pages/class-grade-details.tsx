@@ -118,6 +118,16 @@ export default function ClassGradeDetailsPage() {
     enabled: !!subjectId && !!user,
   });
   
+  // Fetch subgroup details if subgroupId is provided
+  const { data: subgroupData, isLoading: isSubgroupLoading } = useQuery<{id: number, name: string, classId: number}>({
+    queryKey: ["/api/subgroups", subgroupId],
+    queryFn: async () => {
+      const res = await apiRequest(`/api/subgroups/${subgroupId}`);
+      return res.json();
+    },
+    enabled: !!subgroupId && !!user,
+  });
+  
   // Fetch students in class
   const { data: students = [], isLoading: isStudentsLoading } = useQuery<User[]>({
     queryKey: ["/api/students-by-class", classId],
@@ -141,24 +151,15 @@ export default function ClassGradeDetailsPage() {
     enabled: !!subgroupId && !!user,
   });
   
-  // Если указана подгруппа, получаем информацию о ней
-  const { data: subgroupData } = useQuery<{id: number, name: string, classId: number}>({
-    queryKey: ["/api/subgroups", subgroupId],
-    queryFn: async () => {
-      if (subgroupId) {
-        const res = await apiRequest(`/api/subgroups/${subgroupId}`);
-        return res.json();
-      }
-      return null;
-    },
-    enabled: !!subgroupId && !!user,
-  });
+
   
   // Отфильтрованный список студентов, учитывая подгруппу, если она указана
   const filteredStudents = useMemo(() => {
     if (subgroupId && studentSubgroups.length > 0) {
-      // Получаем ID студентов из списка подгрупп
-      const subgroupStudentIds = studentSubgroups.map(sg => sg.studentId);
+      // Получаем ID студентов, которые принадлежат конкретной подгруппе
+      const subgroupStudentIds = studentSubgroups
+        .filter(sg => sg.subgroupId === subgroupId)
+        .map(sg => sg.studentId);
       
       // Возвращаем только студентов из этой подгруппы
       return students.filter(student => 
@@ -797,9 +798,18 @@ export default function ClassGradeDetailsPage() {
       <div className="container mx-auto py-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Журнал оценок</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Журнал оценок
+              {subgroupData ? (
+                <span className="text-emerald-600 ml-2">
+                  ({subgroupData.name})
+                </span>
+              ) : null}
+            </h1>
             <p className="text-muted-foreground">
-              Просмотр и редактирование оценок учеников
+              {subgroupData 
+                ? `Просмотр и редактирование оценок учеников подгруппы "${subgroupData.name}"`
+                : "Просмотр и редактирование оценок учеников класса"}
             </p>
           </div>
           <Button
