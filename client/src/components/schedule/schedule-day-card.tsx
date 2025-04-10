@@ -59,7 +59,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           {schedule.startTime} - {schedule.endTime}
           <span className="ml-3 text-emerald-900">
             {schedule.subgroupId
-              ? `${subject?.name || "Предмет"} (${schedule.subgroupName || "Подгруппа"})`
+              ? `${schedule.subgroupName || "Подгруппа"}`
               : subject?.name || "Предмет"}
           </span>
         </div>
@@ -298,7 +298,9 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
           <DialogHeader>
             <DialogTitle>Информация об уроке</DialogTitle>
             <DialogDescription>
-              {selectedSchedule && getSubject(selectedSchedule.subjectId)?.name}
+              {selectedSchedule && selectedSchedule.subgroupId
+                ? selectedSchedule.subgroupName
+                : getSubject(selectedSchedule?.subjectId || 0)?.name}
             </DialogDescription>
           </DialogHeader>
           
