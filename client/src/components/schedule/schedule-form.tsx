@@ -380,8 +380,8 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
                   <FormItem>
                     <FormLabel>Подгруппа (необязательно)</FormLabel>
                     <Select
-                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
-                      value={field.value?.toString() || ""}
+                      onValueChange={(value) => field.onChange(value === "0" ? undefined : parseInt(value))}
+                      value={field.value?.toString() || "0"}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -389,7 +389,7 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Весь класс (без подгруппы)</SelectItem>
+                        <SelectItem value="0">Весь класс (без подгруппы)</SelectItem>
                         {subgroups.map((subgroup) => (
                           <SelectItem key={subgroup.id} value={subgroup.id.toString()}>
                             {subgroup.name}
