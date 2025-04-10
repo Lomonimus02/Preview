@@ -136,11 +136,30 @@ export default function SchedulePage() {
   const teachers = users.filter(u => u.role === UserRoleEnum.TEACHER);
   const students = users.filter(u => u.role === UserRoleEnum.STUDENT);
   
+  // Получаем учеников подгруппы
+  const { data: studentSubgroups = [] } = useQuery<Array<{studentId: number, subgroupId: number}>>({
+    queryKey: ["/api/student-subgroups"],
+    enabled: !!user
+  });
+  
   // Get students for a specific class
-  const getClassStudents = (classId: number) => {
+  const getClassStudents = (classId: number, subgroupId?: number) => {
+    // Если указана подгруппа, возвращаем только студентов из этой подгруппы
+    if (subgroupId) {
+      // Находим ID студентов, которые относятся к этой подгруппе
+      const subgroupStudentIds = studentSubgroups
+        .filter(sg => sg.subgroupId === subgroupId)
+        .map(sg => sg.studentId);
+      
+      // Возвращаем только студентов из этой подгруппы
+      return students.filter(student => 
+        student.schoolId === user?.schoolId && 
+        subgroupStudentIds.includes(student.id)
+      );
+    }
+    
+    // Иначе возвращаем всех студентов класса
     return students.filter(student => {
-      // В реальном приложении здесь должна быть логика связи студентов с классами
-      // Для примера используем простую проверку по школе
       return student.schoolId === user?.schoolId;
     });
   };
@@ -411,7 +430,7 @@ export default function SchedulePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {getClassStudents(selectedClassId || 0).map((student) => {
+                  {getClassStudents(selectedClassId || 0, selectedSchedule?.subgroupId || undefined).map((student) => {
                     // Получаем оценки этого ученика по выбранному предмету
                     const studentGrades = grades.filter(
                       g => g.studentId === student.id && 
@@ -507,7 +526,7 @@ export default function SchedulePage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {getClassStudents(selectedSchedule?.classId || 0).map((student) => (
+                            {getClassStudents(selectedSchedule?.classId || 0, selectedSchedule?.subgroupId || undefined).map((student) => (
                               <SelectItem key={student.id} value={student.id.toString()}>
                                 {student.lastName} {student.firstName}
                               </SelectItem>
