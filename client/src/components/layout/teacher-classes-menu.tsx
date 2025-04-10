@@ -83,6 +83,25 @@ export function TeacherClassesMenu() {
     enabled: !!user && isTeacher()
   });
 
+  // Отладочная информация
+  console.log("Teacher data:", {
+    userId: user?.id,
+    classes: classes.length,
+    subjects: subjects.length,
+    subgroups: subgroups.length,
+    schedules: schedules.length,
+  });
+  
+  if (subgroups.length > 0) {
+    console.log("Available subgroups:", subgroups.map(sg => ({
+      id: sg.id,
+      name: sg.name,
+      classId: sg.classId
+    })));
+  } else {
+    console.log("No subgroups available in the system");
+  }
+
   // Создаем список уникальных комбинаций класс-предмет-подгруппа
   // Сначала добавляем комбинации из расписания
   let classSubjectCombinations: ClassSubjectCombination[] = schedules
@@ -166,13 +185,19 @@ export function TeacherClassesMenu() {
         .map(sch => sch.classId)
     )];
 
+    console.log(`Classes for subject ${subject.name}:`, teacherClassesForSubject);
+
     // Для каждого класса
     teacherClassesForSubject.forEach(classId => {
       const classInfo = classes.find(c => c.id === classId);
-      if (!classInfo) return;
+      if (!classInfo) {
+        console.log(`Class with ID ${classId} not found`);
+        return;
+      }
 
       // Получаем все подгруппы для этого класса
       const classSubgroups = subgroups.filter(sg => sg.classId === classId);
+      console.log(`Subgroups for class ${classInfo.name}:`, classSubgroups.map(sg => sg.name));
       
       // Добавляем подгруппы в меню
       classSubgroups.forEach(subgroup => {
