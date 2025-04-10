@@ -79,10 +79,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.user.schoolId) {
           subgroups = await dataStorage.getSubgroupsBySchool(req.user.schoolId);
         }
+      } else if (req.user.role === UserRoleEnum.TEACHER || 
+                req.user.role === UserRoleEnum.CLASS_TEACHER) {
+        // Учителя должны видеть подгруппы в своих занятиях
+        // Получаем все расписания преподавателя
+        const schedules = await dataStorage.getSchedulesByTeacher(req.user.id);
+        
+        // Собираем все subgroupId из расписаний
+        const subgroupIds = new Set<number>();
+        const classIds = new Set<number>();
+        
+        for (const schedule of schedules) {
+          // Если в расписании есть подгруппа, добавляем её идентификатор
+          if (schedule.subgroupId) {
+            subgroupIds.add(schedule.subgroupId);
+          }
+          // Также собираем все классы, в которых преподаёт учитель
+          if (schedule.classId) {
+            classIds.add(schedule.classId);
+          }
+        }
+        
+        // Если есть подгруппы в расписании, получаем их
+        if (subgroupIds.size > 0) {
+          for (const subgroupId of subgroupIds) {
+            const subgroup = await dataStorage.getSubgroup(subgroupId);
+            if (subgroup) {
+              subgroups.push(subgroup);
+            }
+          }
+        }
+        
+        // Если учитель преподаёт в классах, получаем все подгруппы для этих классов
+        if (subgroups.length === 0 && classIds.size > 0) {
+          for (const classId of classIds) {
+            const classSubgroups = await dataStorage.getSubgroupsByClass(classId);
+            subgroups.push(...classSubgroups);
+          }
+        }
       } else if (req.user.role === UserRoleEnum.STUDENT) {
         // Students can see their own subgroups
         subgroups = await dataStorage.getStudentSubgroups(req.user.id);
       }
+      
+      // Логируем количество найденных подгрупп для отладки
+      console.log(`Found ${subgroups.length} subgroups for ${req.user.role} with ID ${req.user.id}`);
       
       res.json(subgroups);
     } catch (error) {
