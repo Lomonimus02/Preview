@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, PencilIcon, BookOpen } from "lucide-react";
+import { PlusIcon, PencilIcon, BookOpen, Trash2 } from "lucide-react";
 import { Subject, insertSubjectSchema } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,17 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import {
   Dialog,
@@ -45,6 +56,8 @@ export function AdminSubjectList() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [subjectToDelete, setSubjectToDelete] = useState<Subject | null>(null);
   
   // Get subjects for the school admin's school
   const { data: subjects = [], isLoading } = useQuery<Subject[]>({
@@ -64,7 +77,7 @@ export function AdminSubjectList() {
   
   // Get school ID from user roles if not available directly
   // Query for user roles to get schoolId if it's not in the user object
-  const { data: userRoles = [] } = useQuery({
+  const { data: userRoles = [] } = useQuery<any[]>({
     queryKey: ["/api/my-roles"],
     enabled: !!user && user.role === "school_admin" && !user.schoolId
   });

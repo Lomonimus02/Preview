@@ -111,7 +111,7 @@ export function TeacherClassesMenu() {
 
   // Создаем список уникальных комбинаций класс-предмет-подгруппа на основе расписания
   const classSubjectCombinations: ClassSubjectCombination[] = schedules
-    .reduce((combinations, schedule) => {
+    .reduce((combinations, schedule: any) => {
       // Проверяем, что у расписания есть и класс, и предмет
       if (!schedule.classId || !schedule.subjectId) return combinations;
 
@@ -123,42 +123,42 @@ export function TeacherClassesMenu() {
       if (!classInfo || !subjectInfo) return combinations;
 
       // Проверяем, есть ли подгруппа для этого расписания
-      const subgroupId = schedule.subgroupId || undefined;
+      const subgroupId = schedule.subgroupId;
 
       // Находим информацию о подгруппе, если она указана
-      const subgroupInfo = subgroupId !== undefined
+      const subgroupInfo = subgroupId 
         ? subgroups.find(sg => sg.id === subgroupId) 
         : null;
       
       // Логируем информацию о поиске подгруппы
-      if (subgroupId !== undefined) {
+      if (subgroupId) {
         console.log(`Поиск подгруппы для subgroupId=${subgroupId}:`, {
           foundSubgroup: !!subgroupInfo,
           availableSubgroups: subgroups.map(sg => ({ id: sg.id, name: sg.name }))
         });
       }
 
-      // Для всех уроков добавляем стандартную комбинацию класс-предмет без подгруппы,
-      // если её еще нет в списке
-      const existingCombination = combinations.find(
-        c => c.classId === schedule.classId && 
-             c.subjectId === schedule.subjectId && 
-             !c.isSubgroup
-      );
-
-      // Если комбинации нет в списке, добавляем
-      if (!existingCombination) {
-        combinations.push({
-          classId: schedule.classId,
-          className: classInfo.name,
-          subjectId: schedule.subjectId,
-          subjectName: subjectInfo.name,
-          isSubgroup: false
-        });
+      // Для уроков без подгрупп добавляем стандартную комбинацию класс-предмет без подгруппы
+      if (!subgroupId) {
+        const existingCombination = combinations.find(
+          c => c.classId === schedule.classId && 
+               c.subjectId === schedule.subjectId && 
+               !c.isSubgroup
+        );
+  
+        // Если комбинации нет в списке, добавляем
+        if (!existingCombination) {
+          combinations.push({
+            classId: schedule.classId,
+            className: classInfo.name,
+            subjectId: schedule.subjectId,
+            subjectName: subjectInfo.name,
+            isSubgroup: false
+          });
+        }
       }
-
-      // Если это расписание с подгруппой, дополнительно добавляем его как отдельный пункт
-      if (subgroupInfo) {
+      // Если это расписание с подгруппой, добавляем его как отдельный пункт
+      else if (subgroupInfo) {
         console.log("Найдена подгруппа в расписании:", {
           scheduleId: schedule.id,
           subgroupId,
