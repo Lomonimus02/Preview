@@ -83,28 +83,8 @@ export function TeacherClassesMenu() {
     enabled: !!user && isTeacher()
   });
 
-  // Отладочная информация
-  console.log("Teacher data:", {
-    userId: user?.id,
-    classes: classes.length,
-    subjects: subjects.length,
-    subgroups: subgroups.length,
-    schedules: schedules.length,
-  });
-  
-  if (subgroups.length > 0) {
-    console.log("Available subgroups:", subgroups.map(sg => ({
-      id: sg.id,
-      name: sg.name,
-      classId: sg.classId
-    })));
-  } else {
-    console.log("No subgroups available in the system");
-  }
-
-  // Создаем список уникальных комбинаций класс-предмет-подгруппа
-  // Сначала добавляем комбинации из расписания
-  let classSubjectCombinations: ClassSubjectCombination[] = schedules
+  // Создаем список уникальных комбинаций класс-предмет-подгруппа на основе расписания
+  const classSubjectCombinations: ClassSubjectCombination[] = schedules
     .reduce((combinations, schedule) => {
       // Проверяем, что у расписания есть и класс, и предмет
       if (!schedule.classId || !schedule.subjectId) return combinations;
@@ -174,61 +154,6 @@ export function TeacherClassesMenu() {
 
       return combinations;
     }, [] as ClassSubjectCombination[]);
-
-  // Теперь добавляем все подгруппы, к которым имеет отношение преподаватель
-  // Для каждого предмета, который преподает учитель
-  subjects.forEach(subject => {
-    // Для каждого класса, в котором есть расписание с этим учителем и предметом
-    const teacherClassesForSubject = [...new Set(
-      schedules
-        .filter(sch => sch.subjectId === subject.id)
-        .map(sch => sch.classId)
-    )];
-
-    console.log(`Classes for subject ${subject.name}:`, teacherClassesForSubject);
-
-    // Для каждого класса
-    teacherClassesForSubject.forEach(classId => {
-      const classInfo = classes.find(c => c.id === classId);
-      if (!classInfo) {
-        console.log(`Class with ID ${classId} not found`);
-        return;
-      }
-
-      // Получаем все подгруппы для этого класса
-      const classSubgroups = subgroups.filter(sg => sg.classId === classId);
-      console.log(`Subgroups for class ${classInfo.name}:`, classSubgroups.map(sg => sg.name));
-      
-      // Добавляем подгруппы в меню
-      classSubgroups.forEach(subgroup => {
-        // Проверяем, есть ли уже такая комбинация с подгруппой в списке
-        const existingSubgroupCombination = classSubjectCombinations.find(
-          c => c.classId === classId && 
-               c.subjectId === subject.id && 
-               c.subgroupId === subgroup.id
-        );
-
-        // Если комбинации с подгруппой нет в списке, добавляем
-        if (!existingSubgroupCombination) {
-          console.log("Добавление подгруппы в меню:", {
-            className: classInfo.name,
-            subjectName: subject.name,
-            subgroupName: subgroup.name
-          });
-          
-          classSubjectCombinations.push({
-            classId: classId,
-            className: classInfo.name,
-            subjectId: subject.id,
-            subjectName: subject.name,
-            subgroupId: subgroup.id,
-            subgroupName: subgroup.name,
-            isSubgroup: true
-          });
-        }
-      });
-    });
-  });
     
   // Сортируем комбинации сначала по имени класса, затем по имени предмета, затем подгруппы вместе с их предметами
   classSubjectCombinations.sort((a, b) => {
