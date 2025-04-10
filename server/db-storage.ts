@@ -124,7 +124,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUsersBySchool(schoolId: number): Promise<User[]> {
-    return await db.select().from(users).where(eq(users.schoolId, schoolId));
+    // Get users who have this school directly in their profile
+    const usersWithSchoolId = await db.select().from(users).where(eq(users.schoolId, schoolId));
+    
+    // Get users with this school in their user roles
+    const userRolesWithSchool = await db.select().from(userRoles)
+      .where(eq(userRoles.schoolId, schoolId));
+    
+    const userIdsWithRoles = new Set(userRolesWithSchool.map(role => role.userId));
+    
+    // For users who have roles but no direct school, fetch their full profiles
+    const usersWithRolesOnly = [];
+    for (const userId of userIdsWithRoles) {
+      // Skip users we've already fetched directly
+      if (usersWithSchoolId.some(u => u.id === userId)) continue;
+      
+      const user = await this.getUser(userId);
+      if (user) usersWithRolesOnly.push(user);
+    }
+    
+    // Combine both sets of users
+    return [...usersWithSchoolId, ...usersWithRolesOnly];
   }
 
   // ===== School operations =====
