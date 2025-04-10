@@ -152,7 +152,7 @@ export default function SubgroupsPage() {
   });
   
   // Fetch schools for dropdown
-  const { data: schools = [], isLoading: isLoadingSchools } = useQuery({
+  const { data: schools = [], isLoading: isLoadingSchools } = useQuery<School[]>({
     queryKey: ['/api/schools'],
   });
   
@@ -452,7 +452,7 @@ export default function SubgroupsPage() {
   
   // Get school name by ID
   const getSchoolName = (schoolId: number) => {
-    const school = schools.find(s => s.id === schoolId);
+    const school = schools.find((s: School) => s.id === schoolId);
     return school ? school.name : `Школа ${schoolId}`;
   };
   
