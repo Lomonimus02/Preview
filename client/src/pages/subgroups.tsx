@@ -158,17 +158,18 @@ export default function SubgroupsPage() {
   
   // Fetch students for the student assignment dialog
   const { data: students = [], isLoading: isLoadingStudents } = useQuery<UserType[]>({
-    queryKey: ['/api/classes', selectedClass, 'students'],
+    queryKey: ['/api/students-by-class', selectedClass],
     queryFn: async () => {
       if (!selectedClass) return [];
       
       // Используем специальный endpoint для получения только учеников данного класса
-      const response = await fetch(`/api/classes/${selectedClass}/students`);
+      const response = await fetch(`/api/students-by-class/${selectedClass}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch students');
       }
       
+      console.log('Received students for class:', await response.clone().json());
       return response.json();
     },
     enabled: !!selectedClass && isStudentAssignDialogOpen
@@ -176,10 +177,9 @@ export default function SubgroupsPage() {
   
   // Fetch students already in the selected subgroup
   const {
-    data: subgroupStudents = [],
-    isLoading: isLoadingSubgroupStudents,
-    refetch: refetchSubgroupStudents
-  } = useQuery<UserType[]>({
+    data: studentSubgroupsRelations = [],
+    isLoading: isLoadingStudentSubgroupsRelations,
+  } = useQuery<{studentId: number, subgroupId: number}[]>({
     queryKey: ['/api/student-subgroups', selectedSubgroup?.id],
     queryFn: async () => {
       if (!selectedSubgroup) return [];
@@ -190,24 +190,20 @@ export default function SubgroupsPage() {
         throw new Error('Failed to fetch subgroup students');
       }
       
-      // Extract student IDs from the response
-      const studentSubgroups = await response.json();
-      const studentIds = studentSubgroups.map((item: any) => item.studentId);
-      
-      // If there are no students, return empty array
-      if (studentIds.length === 0) return [];
-      
-      // Fetch the actual student objects
-      const studentsResponse = await fetch(`/api/users?ids=${studentIds.join(',')}`);
-      
-      if (!studentsResponse.ok) {
-        throw new Error('Failed to fetch student details');
-      }
-      
-      return studentsResponse.json();
+      return response.json();
     },
     enabled: !!selectedSubgroup && (activeTab === "students" || isStudentAssignDialogOpen)
   });
+  
+  // Извлекаем ID студентов из таблицы связей
+  const studentIdsInSubgroup = studentSubgroupsRelations.map(item => item.studentId);
+  
+  // Отфильтровываем студентов, которые есть в подгруппе, из общего списка студентов
+  const subgroupStudents = studentIdsInSubgroup.length > 0 
+    ? students.filter(student => studentIdsInSubgroup.includes(student.id)) 
+    : [];
+    
+  const isLoadingSubgroupStudents = isLoadingStudentSubgroupsRelations || isLoadingStudents;
   
   // Filter subgroups by search query
   const filteredSubgroups = subgroups.filter(subgroup => {
@@ -462,8 +458,16 @@ export default function SubgroupsPage() {
   
   // Check if a student is already in the selected subgroup
   const isStudentInSubgroup = (studentId: number) => {
+    if (!subgroupStudents || subgroupStudents.length === 0) return false;
     return subgroupStudents.some(student => student.id === studentId);
   };
+  
+  // Логгируем для отладки
+  console.log('Student assignment dialog data:', {
+    students: students?.length,
+    subgroupStudents: subgroupStudents?.length,
+    filtersCount: students?.filter(student => !isStudentInSubgroup(student.id))?.length || 0
+  });
 
   return (
     <MainLayout>
