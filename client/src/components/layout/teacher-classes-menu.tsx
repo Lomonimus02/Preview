@@ -82,7 +82,9 @@ export function TeacherClassesMenu() {
     queryFn: async () => {
       const res = await apiRequest(`/api/teacher-subjects/${user?.id}`, "GET");
       if (!res.ok) throw new Error("Не удалось загрузить предметы");
-      return res.json();
+      const data = await res.json();
+      console.log("Предметы учителя:", data);
+      return data;
     },
     enabled: !!user && isTeacher()
   });
@@ -127,6 +129,14 @@ export function TeacherClassesMenu() {
       const subgroupInfo = subgroupId !== undefined
         ? subgroups.find(sg => sg.id === subgroupId) 
         : null;
+      
+      // Логируем информацию о поиске подгруппы
+      if (subgroupId !== undefined) {
+        console.log(`Поиск подгруппы для subgroupId=${subgroupId}:`, {
+          foundSubgroup: !!subgroupInfo,
+          availableSubgroups: subgroups.map(sg => ({ id: sg.id, name: sg.name }))
+        });
+      }
 
       // Для всех уроков добавляем стандартную комбинацию класс-предмет без подгруппы,
       // если её еще нет в списке
@@ -164,7 +174,7 @@ export function TeacherClassesMenu() {
 
         // Если комбинации с подгруппой нет в списке, добавляем
         if (!existingSubgroupCombination) {
-          combinations.push({
+          const newCombination = {
             classId: schedule.classId,
             className: classInfo.name,
             subjectId: schedule.subjectId,
@@ -172,12 +182,18 @@ export function TeacherClassesMenu() {
             subgroupId: subgroupId,
             subgroupName: subgroupInfo.name,
             isSubgroup: true
-          });
+          };
+          
+          console.log("Добавление подгруппы в комбинации:", newCombination);
+          combinations.push(newCombination);
         }
       }
 
       return combinations;
     }, [] as ClassSubjectCombination[]);
+  
+  // Вывод окончательного списка комбинаций
+  console.log("Итоговые комбинации для меню:", classSubjectCombinations);
     
   // Сортируем комбинации сначала по имени класса, затем по имени предмета, затем подгруппы вместе с их предметами
   classSubjectCombinations.sort((a, b) => {
