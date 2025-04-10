@@ -37,7 +37,7 @@ function Router() {
       <ProtectedRoute path="/users" component={Users} />
       <ProtectedRoute path="/user-roles" component={UserRoles} />
       <ProtectedRoute path="/schedule" component={SchedulePage} />
-      <ProtectedRoute path="/class-grade-details/:classId/:subjectId" component={ClassGradeDetailsPage} />
+      <ProtectedRoute path="/class-grade-details/:classId/:subjectId/:subgroupId?" component={ClassGradeDetailsPage} />
       <ProtectedRoute path="/grades" component={Grades} />
       <ProtectedRoute path="/homework" component={Homework} />
       <ProtectedRoute path="/messages" component={Messages} />

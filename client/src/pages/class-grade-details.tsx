@@ -81,10 +81,20 @@ export default function ClassGradeDetailsPage() {
   const subjectId = parseInt(params.subjectId || "0");
   const [location, navigate] = useLocation();
   
-  // Извлекаем subgroupId из URL если он есть
-  const urlParams = new URLSearchParams(location.split('?')[1] || '');
-  const subgroupIdParam = urlParams.get('subgroupId');
-  const subgroupId = subgroupIdParam ? parseInt(subgroupIdParam) : undefined;
+  // Извлекаем subgroupId из параметров URL или из query параметров (для обратной совместимости)
+  let subgroupId: number | undefined;
+  
+  // Сначала проверяем, есть ли subgroupId в пути URL
+  if (params.subgroupId) {
+    subgroupId = parseInt(params.subgroupId);
+  } else {
+    // Если нет в пути, пробуем извлечь из query параметров (старый способ)
+    const urlParams = new URLSearchParams(location.split('?')[1] || '');
+    const subgroupIdParam = urlParams.get('subgroupId');
+    if (subgroupIdParam) {
+      subgroupId = parseInt(subgroupIdParam);
+    }
+  }
   
   const { user } = useAuth();
   const { toast } = useToast();
@@ -172,11 +182,18 @@ export default function ClassGradeDetailsPage() {
     return students;
   }, [students, subgroupId, studentSubgroups]);
   
-  // Fetch schedules for this class and subject
+  // Fetch schedules for this class and subject, filtered by subgroup if specified
   const { data: schedules = [], isLoading: isSchedulesLoading } = useQuery<Schedule[]>({
-    queryKey: ["/api/schedules", { classId, subjectId }],
+    queryKey: ["/api/schedules", { classId, subjectId, subgroupId }],
     queryFn: async () => {
-      const res = await apiRequest(`/api/schedules?classId=${classId}&subjectId=${subjectId}`);
+      let url = `/api/schedules?classId=${classId}&subjectId=${subjectId}`;
+      
+      // Если указана подгруппа, добавляем параметр для фильтрации расписаний только для этой подгруппы
+      if (subgroupId) {
+        url += `&subgroupId=${subgroupId}`;
+      }
+      
+      const res = await apiRequest(url);
       return res.json();
     },
     enabled: !!classId && !!subjectId && !!user,
