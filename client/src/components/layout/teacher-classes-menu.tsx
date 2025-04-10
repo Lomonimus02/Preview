@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
-import { Schedule, Class, Subject } from "@shared/schema";
+import { Schedule, Class, Subject, Subgroup } from "@shared/schema";
 import { ChevronDown, ChevronRight, BookOpen } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,10 @@ interface ClassSubjectCombination {
   className: string;
   subjectId: number;
   subjectName: string;
+  // Добавляем поля для подгрупп
+  subgroupId?: number;
+  subgroupName?: string;
+  isSubgroup?: boolean;
 }
 
 export function TeacherClassesMenu() {
@@ -64,6 +68,17 @@ export function TeacherClassesMenu() {
     queryKey: ["/api/classes"],
     enabled: !!user && isTeacher()
   });
+  
+  // Получаем список всех подгрупп
+  const { data: subgroups = [], isLoading: subgroupsLoading } = useQuery<Subgroup[]>({
+    queryKey: ["/api/subgroups"],
+    queryFn: async () => {
+      const res = await apiRequest("/api/subgroups", "GET");
+      if (!res.ok) throw new Error("Не удалось загрузить подгруппы");
+      return res.json();
+    },
+    enabled: !!user && isTeacher()
+  });
 
   // Создаем список уникальных комбинаций класс-предмет на основе расписания
   const classSubjectCombinations: ClassSubjectCombination[] = schedules
@@ -78,19 +93,51 @@ export function TeacherClassesMenu() {
       // Если информация о классе или предмете не найдена, пропускаем
       if (!classInfo || !subjectInfo) return combinations;
 
-      // Проверяем, есть ли уже такая комбинация в списке
-      const existingCombination = combinations.find(
-        c => c.classId === schedule.classId && c.subjectId === schedule.subjectId
-      );
+      // Проверяем, есть ли подгруппа для этого расписания
+      const subgroupInfo = schedule.subgroupId 
+        ? subgroups.find(sg => sg.id === schedule.subgroupId) 
+        : null;
 
-      // Если комбинации нет в списке, добавляем
-      if (!existingCombination) {
-        combinations.push({
-          classId: schedule.classId,
-          className: classInfo.name,
-          subjectId: schedule.subjectId,
-          subjectName: subjectInfo.name
-        });
+      // Если это расписание с подгруппой
+      if (subgroupInfo) {
+        // Проверяем, есть ли уже такая комбинация с подгруппой в списке
+        const existingSubgroupCombination = combinations.find(
+          c => c.classId === schedule.classId && 
+               c.subjectId === schedule.subjectId && 
+               c.subgroupId === schedule.subgroupId
+        );
+
+        // Если комбинации с подгруппой нет в списке, добавляем
+        if (!existingSubgroupCombination) {
+          combinations.push({
+            classId: schedule.classId,
+            className: classInfo.name,
+            subjectId: schedule.subjectId,
+            subjectName: subjectInfo.name,
+            subgroupId: schedule.subgroupId ? schedule.subgroupId : undefined,
+            subgroupName: subgroupInfo.name,
+            isSubgroup: true
+          });
+        }
+      } else {
+        // Это обычное расписание без подгруппы
+        // Проверяем, есть ли уже такая стандартная комбинация в списке
+        const existingCombination = combinations.find(
+          c => c.classId === schedule.classId && 
+               c.subjectId === schedule.subjectId && 
+               !c.isSubgroup
+        );
+
+        // Если комбинации нет в списке, добавляем
+        if (!existingCombination) {
+          combinations.push({
+            classId: schedule.classId,
+            className: classInfo.name,
+            subjectId: schedule.subjectId,
+            subjectName: subjectInfo.name,
+            isSubgroup: false
+          });
+        }
       }
 
       return combinations;
@@ -104,10 +151,13 @@ export function TeacherClassesMenu() {
     return a.subjectName.localeCompare(b.subjectName);
   });
 
-  const isLoading = schedulesLoading || subjectsLoading || classesLoading;
+  const isLoading = schedulesLoading || subjectsLoading || classesLoading || subgroupsLoading;
   
-  // Проверяем, активна ли текущая комбинация класс/предмет
-  const isItemActive = (classId: number, subjectId: number) => {
+  // Проверяем, активна ли текущая комбинация класс/предмет/подгруппа
+  const isItemActive = (classId: number, subjectId: number, subgroupId?: number) => {
+    if (subgroupId) {
+      return location === `/class-grade-details/${classId}/${subjectId}/${subgroupId}`;
+    }
     return location === `/class-grade-details/${classId}/${subjectId}`;
   };
 
@@ -148,19 +198,26 @@ export function TeacherClassesMenu() {
           ) : (
             classSubjectCombinations.map((item) => (
               <Link 
-                key={`${item.classId}-${item.subjectId}`} 
-                href={`/class-grade-details/${item.classId}/${item.subjectId}`}
+                key={`${item.classId}-${item.subjectId}${item.subgroupId ? `-${item.subgroupId}` : ''}`}
+                href={item.isSubgroup && item.subgroupId 
+                  ? `/class-grade-details/${item.classId}/${item.subjectId}/${item.subgroupId}`
+                  : `/class-grade-details/${item.classId}/${item.subjectId}`
+                }
               >
                 <a 
                   className={cn(
                     "flex items-center text-sm py-1.5 px-3 rounded-md w-full",
-                    isItemActive(item.classId, item.subjectId) 
+                    isItemActive(item.classId, item.subjectId, item.subgroupId) 
                       ? "bg-accent/50 text-accent-foreground" 
-                      : "hover:bg-muted text-foreground/80"
+                      : "hover:bg-muted text-foreground/80",
+                    item.isSubgroup ? "ml-2 text-sm" : "" // Немного отступа для подгрупп 
                   )}
                 >
                   <span className="truncate">
-                    {item.subjectName} - {item.className}
+                    {item.isSubgroup && item.subgroupName 
+                      ? `${item.subgroupName} - ${item.className}`
+                      : `${item.subjectName} - ${item.className}`
+                    }
                   </span>
                 </a>
               </Link>
