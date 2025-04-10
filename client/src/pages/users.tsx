@@ -239,7 +239,12 @@ export default function UsersPage() {
       return res.json();
     },
     onSuccess: () => {
+      // Сначала обновим данные, затем закроем диалог
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      
+      // Запускаем принудительное обновление списка пользователей
+      refetch();
+      
       setIsAddDialogOpen(false);
       resetForm();
       toast({
@@ -265,6 +270,10 @@ export default function UsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      
+      // Принудительное обновление данных
+      refetch();
+      
       setIsEditDialogOpen(false);
       setSelectedUser(null);
       resetForm();
@@ -290,6 +299,10 @@ export default function UsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      
+      // Принудительное обновление после удаления
+      refetch();
+      
       setIsDeleteDialogOpen(false);
       setSelectedUser(null);
       toast({
