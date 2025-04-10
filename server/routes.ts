@@ -1096,6 +1096,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
     
+    // Добавляем имена подгрупп к расписаниям
+    for (let i = 0; i < schedules.length; i++) {
+      if (schedules[i].subgroupId) {
+        try {
+          const subgroup = await dataStorage.getSubgroup(schedules[i].subgroupId);
+          if (subgroup) {
+            schedules[i].subgroupName = subgroup.name;
+          }
+        } catch (error) {
+          console.error(`Error fetching subgroup info for schedule ${schedules[i].id}:`, error);
+        }
+      }
+    }
+    
     res.json(schedules);
   });
 

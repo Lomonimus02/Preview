@@ -169,7 +169,8 @@ export function TeacherClassesMenu() {
         const existingSubgroupCombination = combinations.find(
           c => c.classId === schedule.classId && 
                c.subjectId === schedule.subjectId && 
-               c.subgroupId === subgroupId
+               c.subgroupId === subgroupId &&
+               c.isSubgroup === true  // Явно проверяем, что это подгруппа
         );
 
         // Если комбинации с подгруппой нет в списке, добавляем
