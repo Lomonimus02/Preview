@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Pencil, Trash2, User, Search } from 'lucide-react';
 import { useRoleCheck } from '@/hooks/use-role-check';
 import { useAuth } from '@/hooks/use-auth';
-import { Subgroup, Class, User as UserType, InsertSubgroup } from '@shared/schema';
+import { Subgroup, Class, User as UserType, InsertSubgroup, School } from '@shared/schema';
 import { apiRequest } from '@/lib/queryClient';
 import {
   Dialog,
@@ -498,7 +498,7 @@ export default function SubgroupsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Все школы</SelectItem>
-                      {schools.map((school) => (
+                      {schools.map((school: School) => (
                         <SelectItem key={school.id} value={school.id.toString()}>
                           {school.name}
                         </SelectItem>
