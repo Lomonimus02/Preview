@@ -391,11 +391,11 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                       size="sm"
                       variant="default"
                       onClick={() => {
-                        // Если урок привязан к подгруппе, передаем её ID в URL
-                        const subgroupParam = selectedSchedule.subgroupId 
-                          ? `?subgroupId=${selectedSchedule.subgroupId}` 
-                          : '';
-                        navigate(`/class-grade-details/${selectedSchedule.classId}/${selectedSchedule.subjectId}${subgroupParam}`);
+                        // Если урок привязан к подгруппе, добавляем ID подгруппы в путь URL
+                        const url = selectedSchedule.subgroupId 
+                          ? `/class-grade-details/${selectedSchedule.classId}/${selectedSchedule.subjectId}/${selectedSchedule.subgroupId}` 
+                          : `/class-grade-details/${selectedSchedule.classId}/${selectedSchedule.subjectId}`;
+                        navigate(url);
                         setIsDetailsOpen(false);
                       }}
                     >
