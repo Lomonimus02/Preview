@@ -133,7 +133,12 @@ export default function UsersPage() {
     // Add staleTime to prevent unnecessary refetches
     staleTime: 10 * 1000, // 10 seconds
     // Make sure data is refetched when tab regains focus
-    refetchOnWindowFocus: true
+    refetchOnWindowFocus: true,
+    // Log data when it's loaded
+    onSuccess: (data) => {
+      console.log("Получены данные пользователей:", data);
+      console.log("Количество пользователей:", data.length);
+    }
   });
   
   // Fetch schools for dropdown
