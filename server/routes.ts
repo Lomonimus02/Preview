@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { dbStorage } from "./db-storage";
+import { db } from "./db";
 
 // Используем хранилище БД для всех операций
 const dataStorage = dbStorage;

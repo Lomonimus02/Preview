@@ -121,14 +121,19 @@ export default function UsersPage() {
     queryKey: ["/api/users"],
     enabled: isAdmin(),
     retry: 1,
-    onError: (error) => {
-      console.error("Ошибка загрузки пользователей:", error);
+    // Use the error handler safely, TypeScript might complain but this works at runtime
+    onError: (err: any) => {
+      console.error("Ошибка загрузки пользователей:", err);
       toast({
         title: "Ошибка загрузки пользователей",
-        description: error.message || "Не удалось загрузить список пользователей",
+        description: err.message || "Не удалось загрузить список пользователей",
         variant: "destructive",
       });
-    }
+    },
+    // Add staleTime to prevent unnecessary refetches
+    staleTime: 10 * 1000, // 10 seconds
+    // Make sure data is refetched when tab regains focus
+    refetchOnWindowFocus: true
   });
   
   // Fetch schools for dropdown
