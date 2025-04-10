@@ -117,9 +117,18 @@ export default function UsersPage() {
   }
   
   // Fetch users
-  const { data: users = [], isLoading } = useQuery<User[]>({
+  const { data: users = [], isLoading, error, refetch } = useQuery<User[]>({
     queryKey: ["/api/users"],
-    enabled: isAdmin()
+    enabled: isAdmin(),
+    retry: 1,
+    onError: (error) => {
+      console.error("Ошибка загрузки пользователей:", error);
+      toast({
+        title: "Ошибка загрузки пользователей",
+        description: error.message || "Не удалось загрузить список пользователей",
+        variant: "destructive",
+      });
+    }
   });
   
   // Fetch schools for dropdown
