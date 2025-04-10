@@ -77,9 +77,15 @@ const gradeFormSchema = z.object({
 
 export default function ClassGradeDetailsPage() {
   const params = useParams();
-  const classId = parseInt(params.classId);
-  const subjectId = parseInt(params.subjectId);
-  const [, navigate] = useLocation();
+  const classId = parseInt(params.classId || "0");
+  const subjectId = parseInt(params.subjectId || "0");
+  const [location, navigate] = useLocation();
+  
+  // Извлекаем subgroupId из URL если он есть
+  const urlParams = new URLSearchParams(location.split('?')[1] || '');
+  const subgroupIdParam = urlParams.get('subgroupId');
+  const subgroupId = subgroupIdParam ? parseInt(subgroupIdParam) : undefined;
+  
   const { user } = useAuth();
   const { toast } = useToast();
   const { isTeacher, isSchoolAdmin, isSuperAdmin, isClassTeacher } = useRoleCheck();
@@ -121,6 +127,30 @@ export default function ClassGradeDetailsPage() {
     },
     enabled: !!classId && !!user,
   });
+  
+  // Получаем студентов, связанных с подгруппой, если указан ID подгруппы
+  const { data: studentSubgroups = [], isLoading: isStudentSubgroupsLoading } = useQuery<Array<{studentId: number, subgroupId: number}>>({
+    queryKey: ["/api/student-subgroups"],
+    enabled: !!subgroupId && !!user,
+  });
+  
+  // Отфильтрованный список студентов, учитывая подгруппу, если она указана
+  const filteredStudents = useMemo(() => {
+    if (subgroupId) {
+      // Находим ID студентов, которые относятся к выбранной подгруппе
+      const subgroupStudentIds = studentSubgroups
+        .filter(sg => sg.subgroupId === subgroupId)
+        .map(sg => sg.studentId);
+      
+      // Возвращаем только студентов из этой подгруппы
+      return students.filter(student => 
+        subgroupStudentIds.includes(student.id)
+      );
+    }
+    
+    // Если подгруппа не указана, возвращаем всех студентов класса
+    return students;
+  }, [students, subgroupId, studentSubgroups]);
   
   // Fetch schedules for this class and subject
   const { data: schedules = [], isLoading: isSchedulesLoading } = useQuery<Schedule[]>({
@@ -864,7 +894,7 @@ export default function ClassGradeDetailsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {students.map((student) => (
+                      {filteredStudents.map((student) => (
                         <TableRow key={student.id}>
                           <TableCell className="font-medium bg-muted/20">
                             {student.lastName} {student.firstName}
@@ -1057,9 +1087,9 @@ export default function ClassGradeDetailsPage() {
               <DialogDescription>
                 {selectedStudentId ? 
                   `${editingGradeId ? "Редактирование" : "Добавление"} оценки для ученика: ${
-                    students.find(s => s.id === selectedStudentId)?.lastName || ""
+                    filteredStudents.find(s => s.id === selectedStudentId)?.lastName || ""
                   } ${
-                    students.find(s => s.id === selectedStudentId)?.firstName || ""
+                    filteredStudents.find(s => s.id === selectedStudentId)?.firstName || ""
                   }${selectedDate ? ` (${selectedDate})` : ""}` : 
                   `${editingGradeId ? "Редактирование" : "Добавление"} оценки`
                 }
@@ -1085,7 +1115,7 @@ export default function ClassGradeDetailsPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {students.map((student) => (
+                            {filteredStudents.map((student) => (
                               <SelectItem key={student.id} value={student.id.toString()}>
                                 {student.lastName} {student.firstName}
                               </SelectItem>
