@@ -1,7 +1,7 @@
 import { ClockIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
-import { Schedule, Subject } from "@shared/schema";
+import { Schedule, Subject, Subgroup } from "@shared/schema";
 
 export function StudentSchedule() {
   const { user } = useAuth();
@@ -13,6 +13,11 @@ export function StudentSchedule() {
   
   const { data: subjects = [] } = useQuery<Subject[]>({
     queryKey: ["/api/subjects"],
+    enabled: !!user
+  });
+  
+  const { data: subgroups = [] } = useQuery<Subgroup[]>({
+    queryKey: ["/api/subgroups"],
     enabled: !!user
   });
   
@@ -31,10 +36,17 @@ export function StudentSchedule() {
       return timeA[1] - timeB[1];
     });
   
-  // Function to get subject name by ID
-  const getSubjectName = (subjectId: number) => {
-    const subject = subjects.find(s => s.id === subjectId);
-    return subject?.name || 'Предмет';
+  // Function to get lesson name (either subject or subgroup name)
+  const getLessonName = (schedule: Schedule) => {
+    // If the lesson is for a subgroup, display the subgroup name instead
+    if (schedule.subgroupId) {
+      const subgroup = subgroups.find(sg => sg.id === schedule.subgroupId);
+      return subgroup?.name || 'Подгруппа';
+    } else {
+      // Otherwise display the subject name
+      const subject = subjects.find(s => s.id === schedule.subjectId);
+      return subject?.name || 'Предмет';
+    }
   };
   
   return (
@@ -54,7 +66,7 @@ export function StudentSchedule() {
                   {schedule.startTime} - {schedule.endTime}
                 </p>
                 <p className="text-sm text-gray-700">
-                  {getSubjectName(schedule.subjectId)}
+                  {getLessonName(schedule)}
                 </p>
                 {schedule.room && (
                   <p className="text-xs text-gray-500">

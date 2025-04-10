@@ -1118,17 +1118,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all classes for the student
       const classes = await dataStorage.getStudentClasses(req.user.id);
       
+      // Get student's subgroups
+      const studentSubgroups = await dataStorage.getStudentSubgroups(req.user.id);
+      const studentSubgroupIds = studentSubgroups.map(sg => sg.id);
+      
       // Get schedules for each class
       for (const cls of classes) {
         const classSchedules = await dataStorage.getSchedulesByClass(cls.id);
-        schedules.push(...classSchedules);
-      }
-      
-      // Also get subgroups for this student
-      const studentSubgroups = await dataStorage.getStudentSubgroups(req.user.id);
-      for (const subgroup of studentSubgroups) {
-        const subgroupSchedules = await dataStorage.getSchedulesBySubgroup(subgroup.id);
-        schedules.push(...subgroupSchedules);
+        
+        // Filter the schedules:
+        // 1. Include if no subgroup is specified (whole class lesson)
+        // 2. Include if subgroup is specified AND student is in that subgroup
+        const filteredSchedules = classSchedules.filter(schedule => 
+          !schedule.subgroupId || (schedule.subgroupId && studentSubgroupIds.includes(schedule.subgroupId))
+        );
+        
+        schedules.push(...filteredSchedules);
       }
     } else if (req.user.role === UserRoleEnum.PARENT) {
       // Родители могут видеть расписание своих детей
