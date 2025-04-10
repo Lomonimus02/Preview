@@ -801,7 +801,7 @@ export default function ClassGradeDetailsPage() {
   
   // Функция экспорта данных таблицы в CSV
   const exportToCSV = () => {
-    if (!classData || !subjectData || !students.length) return;
+    if (!classData || !subjectData || !filteredStudents.length) return;
     
     // Создаем заголовок таблицы
     let csvContent = "Ученик,";
@@ -814,13 +814,13 @@ export default function ClassGradeDetailsPage() {
     csvContent += "Средний балл\n";
     
     // Добавляем данные по каждому ученику
-    students.forEach(student => {
+    filteredStudents.forEach(student => {
       const studentName = `${student.lastName} ${student.firstName}`;
       csvContent += `${studentName},`;
       
       // Добавляем оценки по каждому уроку
       lessonSlots.forEach(slot => {
-        const grades = getStudentGradeForSlot(student.id, slot);
+        const grades = getStudentGradeForSlot(student.id, slot, filteredGrades);
         if (grades.length > 0) {
           // Если есть несколько оценок для одного урока, разделяем их точкой с запятой
           csvContent += grades.map(g => g.grade).join(";");
@@ -872,7 +872,7 @@ export default function ClassGradeDetailsPage() {
             variant="outline"
             className="gap-2"
             onClick={exportToCSV}
-            disabled={isLoading || !students.length}
+            disabled={isLoading || !filteredStudents.length}
           >
             <Download className="h-4 w-4" />
             Экспорт
@@ -902,7 +902,11 @@ export default function ClassGradeDetailsPage() {
                       </div>
                       <div>
                         <h3 className="font-medium">Всего учеников:</h3>
-                        <p className="text-lg text-muted-foreground">{students.length}</p>
+                        <p className="text-lg text-muted-foreground">
+                          {subgroupId 
+                            ? `${filteredStudents.length} (из подгруппы)`
+                            : students.length}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -993,7 +997,7 @@ export default function ClassGradeDetailsPage() {
                             {student.lastName} {student.firstName}
                           </TableCell>
                           {lessonSlots.map((slot) => {
-                            const studentGrades = getStudentGradeForSlot(student.id, slot);
+                            const studentGrades = getStudentGradeForSlot(student.id, slot, filteredGrades);
                             return (
                               <TableCell key={`${slot.date}-${slot.scheduleId}`} className="text-center">
                                 {studentGrades.length > 0 ? (
