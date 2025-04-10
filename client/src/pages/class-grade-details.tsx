@@ -182,6 +182,8 @@ export default function ClassGradeDetailsPage() {
     return students;
   }, [students, subgroupId, studentSubgroups]);
   
+
+  
   // Fetch schedules for this class and subject, filtered by subgroup if specified
   const { data: schedules = [], isLoading: isSchedulesLoading } = useQuery<Schedule[]>({
     queryKey: ["/api/schedules", { classId, subjectId, subgroupId }],
@@ -209,11 +211,16 @@ export default function ClassGradeDetailsPage() {
     enabled: !!user?.id,
   });
   
-  // Fetch grades for this class and subject
+  // Fetch grades for this class, subject, and optionally subgroup
   const { data: grades = [], isLoading: isGradesLoading } = useQuery<Grade[]>({
-    queryKey: ["/api/grades", { classId, subjectId }],
+    queryKey: ["/api/grades", { classId, subjectId, subgroupId }],
     queryFn: async () => {
-      const res = await apiRequest(`/api/grades?classId=${classId}&subjectId=${subjectId}`);
+      let url = `/api/grades?classId=${classId}&subjectId=${subjectId}`;
+      
+      // Если указана подгруппа, получаем только оценки из уроков этой подгруппы
+      // Оценки фильтруются на клиенте после получения
+      
+      const res = await apiRequest(url);
       return res.json();
     },
     enabled: !!classId && !!subjectId && !!user,
@@ -680,9 +687,9 @@ export default function ClassGradeDetailsPage() {
   };
   
   // Get all grades for a specific student and schedule slot
-  const getStudentGradeForSlot = (studentId: number, slot: { date: string, scheduleId: number }) => {
+  const getStudentGradeForSlot = (studentId: number, slot: { date: string, scheduleId: number }, allGrades: Grade[]) => {
     // Фильтруем оценки для конкретного ученика
-    const studentGrades = grades.filter(g => g.studentId === studentId);
+    const studentGrades = allGrades.filter(g => g.studentId === studentId);
     
     // Проверяем оценки - теперь только те, которые привязаны к конкретному scheduleId
     return studentGrades.filter(g => 
@@ -709,9 +716,41 @@ export default function ClassGradeDetailsPage() {
     return gradeTypes[gradeType] || gradeType;
   };
 
+  // Фильтрация оценок в зависимости от подгруппы
+  const filteredGrades = useMemo(() => {
+    if (!subgroupId) {
+      // Если подгруппа не указана, возвращаем все оценки
+      return grades;
+    }
+    
+    // Если подгруппа указана:
+    // 1. Получаем все расписания для этой подгруппы
+    const subgroupScheduleIds = schedules
+      .filter(schedule => schedule.subgroupId === subgroupId)
+      .map(schedule => schedule.id);
+    
+    // 2. Фильтруем оценки, чтобы показать только те, которые:
+    // - относятся к урокам этой подгруппы (по scheduleId)
+    // - или не привязаны к расписанию, но принадлежат студентам из подгруппы
+    return grades.filter(grade => {
+      // Если оценка привязана к уроку подгруппы, показываем её
+      if (grade.scheduleId && subgroupScheduleIds.includes(grade.scheduleId)) {
+        return true;
+      }
+      
+      // Если оценка не привязана к уроку, проверяем, принадлежит ли студент к подгруппе
+      if (!grade.scheduleId && filteredStudents.some(student => student.id === grade.studentId)) {
+        return true;
+      }
+      
+      return false;
+    });
+    
+  }, [grades, subgroupId, schedules, filteredStudents]);
+
   // Calculate average grade for a student with weight based on grade type
   const calculateAverageGrade = (studentId: number) => {
-    const studentGrades = grades.filter(g => g.studentId === studentId);
+    const studentGrades = filteredGrades.filter(g => g.studentId === studentId);
     if (studentGrades.length === 0) return "-";
     
     // Весовые коэффициенты для разных типов оценок

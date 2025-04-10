@@ -197,30 +197,33 @@ export function TeacherClassesMenu() {
             <div className="text-sm text-muted-foreground py-1 px-3">Нет назначенных классов</div>
           ) : (
             classSubjectCombinations.map((item) => (
-              <Link 
+              <div
                 key={`${item.classId}-${item.subjectId}${item.subgroupId ? `-${item.subgroupId}` : ''}`}
-                href={item.isSubgroup && item.subgroupId 
-                  ? `/class-grade-details/${item.classId}/${item.subjectId}/${item.subgroupId}`
-                  : `/class-grade-details/${item.classId}/${item.subjectId}`
-                }
               >
-                <a 
-                  className={cn(
-                    "flex items-center text-sm py-1.5 px-3 rounded-md w-full",
-                    isItemActive(item.classId, item.subjectId, item.subgroupId) 
-                      ? "bg-accent/50 text-accent-foreground" 
-                      : "hover:bg-muted text-foreground/80",
-                    item.isSubgroup ? "ml-2 text-sm" : "" // Немного отступа для подгрупп 
-                  )}
+                <Link 
+                  href={item.isSubgroup && item.subgroupId 
+                    ? `/class-grade-details/${item.classId}/${item.subjectId}/${item.subgroupId}`
+                    : `/class-grade-details/${item.classId}/${item.subjectId}`
+                  }
                 >
-                  <span className="truncate">
-                    {item.isSubgroup && item.subgroupName 
-                      ? `${item.subgroupName} - ${item.className}`
-                      : `${item.subjectName} - ${item.className}`
-                    }
-                  </span>
-                </a>
-              </Link>
+                  <div 
+                    className={cn(
+                      "flex items-center text-sm py-1.5 px-3 rounded-md w-full cursor-pointer",
+                      isItemActive(item.classId, item.subjectId, item.subgroupId) 
+                        ? "bg-accent/50 text-accent-foreground" 
+                        : "hover:bg-muted text-foreground/80",
+                      item.isSubgroup ? "ml-2 text-sm" : "" // Немного отступа для подгрупп 
+                    )}
+                  >
+                    <span className="truncate">
+                      {item.isSubgroup && item.subgroupName 
+                        ? `${item.subgroupName} - ${item.className}`
+                        : `${item.subjectName} - ${item.className}`
+                      }
+                    </span>
+                  </div>
+                </Link>
+              </div>
             ))
           )}
         </div>
