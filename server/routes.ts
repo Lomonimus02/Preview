@@ -282,10 +282,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const studentId = parseInt(req.query.studentId as string);
         const subgroups = await dataStorage.getStudentSubgroups(studentId);
         
+        console.log(`Found ${subgroups.length} subgroups for student with ID ${studentId}`);
+        
         result = subgroups.map(subgroup => ({
           studentId,
           subgroupId: subgroup.id
         }));
+      } else {
+        // If no specific filters provided, directly query the database for all student-subgroup associations
+        // This is more efficient than looping through all schools and subgroups
+        
+        try {
+          // Direct query to get all student-subgroup associations
+          const { rows } = await db.execute(
+            `SELECT student_id AS "studentId", subgroup_id AS "subgroupId" FROM student_subgroups`
+          );
+          
+          result = rows;
+        } catch (dbError) {
+          console.error("Error querying student_subgroups table:", dbError);
+          // Fallback to the old method if direct query fails
+          const schools = await dataStorage.getSchools();
+          for (const school of schools) {
+            const schoolSubgroups = await dataStorage.getSubgroupsBySchool(school.id);
+            
+            // For each subgroup, get all students
+            for (const subgroup of schoolSubgroups) {
+              const students = await dataStorage.getSubgroupStudents(subgroup.id);
+              
+              // Add student-subgroup associations to result
+              students.forEach(student => {
+                result.push({
+                  studentId: student.id,
+                  subgroupId: subgroup.id
+                });
+              });
+            }
+          }
+        }
       }
       
       res.json(result);
