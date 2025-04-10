@@ -82,9 +82,7 @@ export function TeacherClassesMenu() {
     queryFn: async () => {
       const res = await apiRequest(`/api/teacher-subjects/${user?.id}`, "GET");
       if (!res.ok) throw new Error("Не удалось загрузить предметы");
-      const data = await res.json();
-      console.log("Предметы учителя:", data);
-      return data;
+      return res.json();
     },
     enabled: !!user && isTeacher()
   });
@@ -111,7 +109,7 @@ export function TeacherClassesMenu() {
 
   // Создаем список уникальных комбинаций класс-предмет-подгруппа на основе расписания
   const classSubjectCombinations: ClassSubjectCombination[] = schedules
-    .reduce((combinations, schedule: any) => {
+    .reduce((combinations, schedule) => {
       // Проверяем, что у расписания есть и класс, и предмет
       if (!schedule.classId || !schedule.subjectId) return combinations;
 
@@ -123,42 +121,34 @@ export function TeacherClassesMenu() {
       if (!classInfo || !subjectInfo) return combinations;
 
       // Проверяем, есть ли подгруппа для этого расписания
-      const subgroupId = schedule.subgroupId;
+      const subgroupId = schedule.subgroupId || undefined;
 
       // Находим информацию о подгруппе, если она указана
-      const subgroupInfo = subgroupId 
+      const subgroupInfo = subgroupId !== undefined
         ? subgroups.find(sg => sg.id === subgroupId) 
         : null;
-      
-      // Логируем информацию о поиске подгруппы
-      if (subgroupId) {
-        console.log(`Поиск подгруппы для subgroupId=${subgroupId}:`, {
-          foundSubgroup: !!subgroupInfo,
-          availableSubgroups: subgroups.map(sg => ({ id: sg.id, name: sg.name }))
+
+      // Для всех уроков добавляем стандартную комбинацию класс-предмет без подгруппы,
+      // если её еще нет в списке
+      const existingCombination = combinations.find(
+        c => c.classId === schedule.classId && 
+             c.subjectId === schedule.subjectId && 
+             !c.isSubgroup
+      );
+
+      // Если комбинации нет в списке, добавляем
+      if (!existingCombination) {
+        combinations.push({
+          classId: schedule.classId,
+          className: classInfo.name,
+          subjectId: schedule.subjectId,
+          subjectName: subjectInfo.name,
+          isSubgroup: false
         });
       }
 
-      // Для уроков без подгрупп добавляем стандартную комбинацию класс-предмет без подгруппы
-      if (!subgroupId) {
-        const existingCombination = combinations.find(
-          c => c.classId === schedule.classId && 
-               c.subjectId === schedule.subjectId && 
-               !c.isSubgroup
-        );
-  
-        // Если комбинации нет в списке, добавляем
-        if (!existingCombination) {
-          combinations.push({
-            classId: schedule.classId,
-            className: classInfo.name,
-            subjectId: schedule.subjectId,
-            subjectName: subjectInfo.name,
-            isSubgroup: false
-          });
-        }
-      }
-      // Если это расписание с подгруппой, добавляем его как отдельный пункт
-      else if (subgroupInfo) {
+      // Если это расписание с подгруппой, дополнительно добавляем его как отдельный пункт
+      if (subgroupInfo) {
         console.log("Найдена подгруппа в расписании:", {
           scheduleId: schedule.id,
           subgroupId,
@@ -169,13 +159,12 @@ export function TeacherClassesMenu() {
         const existingSubgroupCombination = combinations.find(
           c => c.classId === schedule.classId && 
                c.subjectId === schedule.subjectId && 
-               c.subgroupId === subgroupId &&
-               c.isSubgroup === true  // Явно проверяем, что это подгруппа
+               c.subgroupId === subgroupId
         );
 
         // Если комбинации с подгруппой нет в списке, добавляем
         if (!existingSubgroupCombination) {
-          const newCombination = {
+          combinations.push({
             classId: schedule.classId,
             className: classInfo.name,
             subjectId: schedule.subjectId,
@@ -183,18 +172,12 @@ export function TeacherClassesMenu() {
             subgroupId: subgroupId,
             subgroupName: subgroupInfo.name,
             isSubgroup: true
-          };
-          
-          console.log("Добавление подгруппы в комбинации:", newCombination);
-          combinations.push(newCombination);
+          });
         }
       }
 
       return combinations;
     }, [] as ClassSubjectCombination[]);
-  
-  // Вывод окончательного списка комбинаций
-  console.log("Итоговые комбинации для меню:", classSubjectCombinations);
     
   // Сортируем комбинации сначала по имени класса, затем по имени предмета, затем подгруппы вместе с их предметами
   classSubjectCombinations.sort((a, b) => {

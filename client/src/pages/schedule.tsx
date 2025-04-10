@@ -97,39 +97,10 @@ export default function SchedulePage() {
     enabled: !!user
   });
   
-  // Получаем ID подгрупп, к которым принадлежит студент
-  const { data: studentSubgroups = [] } = useQuery<Array<{studentId: number, subgroupId: number}>>({
-    queryKey: ["/api/student-subgroups"],
-    enabled: !!user
-  });
-
-  const userSubgroupIds = studentSubgroups
-    .filter(sg => sg.studentId === user?.id)
-    .map(sg => sg.subgroupId);
-    
-  console.log("User subgroup IDs:", userSubgroupIds);
-  
-  // Фильтруем расписание в зависимости от роли пользователя
-  const filteredSchedules = (() => {
-    // Для учителя показываем только его уроки
-    if (isTeacher()) {
-      return schedules.filter(s => s.teacherId === user?.id);
-    }
-    
-    // Для студента фильтруем уроки с подгруппами
-    if (user?.role === UserRoleEnum.STUDENT) {
-      return schedules.filter(s => {
-        // Если урок без подгруппы, показываем его
-        if (!s.subgroupId) return true;
-        
-        // Если урок с подгруппой, проверяем, принадлежит ли студент к этой подгруппе
-        return userSubgroupIds.includes(s.subgroupId);
-      });
-    }
-    
-    // Для остальных пользователей показываем все расписание
-    return schedules;
-  })();
+  // Filter schedules for teacher
+  const teacherSchedules = isTeacher() 
+    ? schedules.filter(s => s.teacherId === user?.id)
+    : schedules;
   
   // Fetch classes
   const { data: classes = [] } = useQuery<Class[]>({
@@ -165,7 +136,11 @@ export default function SchedulePage() {
   const teachers = users.filter(u => u.role === UserRoleEnum.TEACHER);
   const students = users.filter(u => u.role === UserRoleEnum.STUDENT);
   
-  // Эта переменная уже была объявлена выше
+  // Получаем учеников подгруппы
+  const { data: studentSubgroups = [] } = useQuery<Array<{studentId: number, subgroupId: number}>>({
+    queryKey: ["/api/student-subgroups"],
+    enabled: !!user
+  });
   
   // Получаем список подгрупп
   const { data: subgroups = [] } = useQuery<Array<{id: number, name: string, classId: number}>>({
@@ -417,7 +392,7 @@ export default function SchedulePage() {
           <ScheduleCarousel
             schedules={
               // Добавляем названия подгрупп к расписанию
-              filteredSchedules.map((schedule: any) => {
+              (isTeacher() ? teacherSchedules : schedules).map(schedule => {
                 if (schedule.subgroupId) {
                   const subgroup = subgroups.find(sg => sg.id === schedule.subgroupId);
                   return {
