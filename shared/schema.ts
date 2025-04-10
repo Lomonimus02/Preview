@@ -309,7 +309,10 @@ export type InsertSubject = z.infer<typeof insertSubjectSchema>;
 export type Subject = typeof subjects.$inferSelect;
 
 export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
-export type Schedule = typeof schedules.$inferSelect;
+export type Schedule = typeof schedules.$inferSelect & {
+  // Дополнительное поле для имени подгруппы, которое будет заполняться на клиенте
+  subgroupName?: string;
+};
 
 export type InsertHomework = z.infer<typeof insertHomeworkSchema>;
 export type Homework = typeof homework.$inferSelect;

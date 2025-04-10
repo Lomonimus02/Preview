@@ -57,7 +57,11 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
       <div className="flex justify-between mb-1">
         <div className="text-emerald-700 font-medium">
           {schedule.startTime} - {schedule.endTime}
-          <span className="ml-3 text-emerald-900">{subject?.name || "Предмет"}</span>
+          <span className="ml-3 text-emerald-900">
+            {schedule.subgroupId
+              ? `${subject?.name || "Предмет"} (${schedule.subgroupName || "Подгруппа"})`
+              : subject?.name || "Предмет"}
+          </span>
         </div>
         <div 
           className="cursor-pointer" 
