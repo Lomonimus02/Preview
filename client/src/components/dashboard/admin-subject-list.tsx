@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, PencilIcon, BookOpen } from "lucide-react";
+import { PlusIcon, PencilIcon, BookOpen, Trash2Icon, AlertCircleIcon } from "lucide-react";
 import { Subject, insertSubjectSchema } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,8 @@ export function AdminSubjectList() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   
   // Get subjects for the school admin's school
   const { data: subjects = [], isLoading } = useQuery<Subject[]>({
@@ -101,6 +103,36 @@ export function AdminSubjectList() {
     }
     
     return null;
+  };
+
+  // Удаление предмета
+  const deleteSubjectMutation = useMutation({
+    mutationFn: async (subjectId: number) => {
+      const res = await apiRequest(`/api/subjects/${subjectId}`, "DELETE");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
+      setIsDeleteDialogOpen(false);
+      setSelectedSubject(null);
+      toast({
+        title: "Предмет удален",
+        description: "Предмет был успешно удален из системы",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить предмет",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Функция для обработки удаления предмета
+  const handleDeleteSubject = (subject: Subject) => {
+    setSelectedSubject(subject);
+    setIsDeleteDialogOpen(true);
   };
 
   // Добавление предмета
@@ -197,9 +229,20 @@ export function AdminSubjectList() {
                     <div className="text-sm text-gray-500">{subject.description || "-"}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-primary hover:text-primary-dark">
-                      <PencilIcon className="h-4 w-4 inline" />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button className="text-primary hover:text-primary-dark">
+                        <PencilIcon className="h-4 w-4 inline" />
+                      </button>
+                      <button 
+                        className="text-red-500 hover:text-red-700"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleDeleteSubject(subject);
+                        }}
+                      >
+                        <Trash2Icon className="h-4 w-4 inline" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -207,6 +250,38 @@ export function AdminSubjectList() {
           </tbody>
         </table>
       </div>
+      
+      {/* Диалог для подтверждения удаления предмета */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Удаление предмета</DialogTitle>
+            <DialogDescription>
+              Вы уверены, что хотите удалить предмет "{selectedSubject?.name}"?
+              Это действие нельзя будет отменить.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-between mt-4">
+            <Button
+              variant="outline" 
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Отмена
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (selectedSubject) {
+                  deleteSubjectMutation.mutate(selectedSubject.id);
+                }
+              }}
+              disabled={deleteSubjectMutation.isPending}
+            >
+              {deleteSubjectMutation.isPending ? "Удаление..." : "Удалить"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       
       {/* Диалог для добавления предмета */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
