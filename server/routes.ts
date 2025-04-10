@@ -591,8 +591,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Доступ запрещен - отсутствует роль пользователя" });
       }
       
+      // Пользователь имеет роль SUPER_ADMIN среди своих ролей?
+      const userRoles = await dataStorage.getUserRoles(req.user.id);
+      const isSuperAdmin = userRoles.some(role => role.role === UserRoleEnum.SUPER_ADMIN) || 
+                          activeRole === UserRoleEnum.SUPER_ADMIN;
+      
       // Супер-админ получает всех пользователей
-      if (activeRole === UserRoleEnum.SUPER_ADMIN) {
+      if (isSuperAdmin) {
         console.log("Получение всех пользователей для SUPER_ADMIN");
         const users = await dataStorage.getUsers();
         return res.json(users);
