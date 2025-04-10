@@ -509,57 +509,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("Роль пользователя:", activeRole);
     console.log("ID школы пользователя:", req.user.schoolId);
     
-    if (activeRole === UserRoleEnum.SUPER_ADMIN) {
-      console.log("Получение всех пользователей для SUPER_ADMIN");
-      const users = await dataStorage.getUsers();
-      return res.json(users);
-    } else if (activeRole === UserRoleEnum.SCHOOL_ADMIN) {
-      // Get school ID from the user's roles if not present in the user object
-      const userRoles = await dataStorage.getUserRoles(req.user.id);
-      const schoolAdminRole = userRoles.find(role => 
-        role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
-      );
-      
-      const schoolId = req.user.schoolId || (schoolAdminRole ? schoolAdminRole.schoolId : null);
-      
-      console.log("Проверка роли администратора школы...");
-      console.log("schoolId из профиля:", req.user.schoolId);
-      console.log("schoolId из роли:", schoolAdminRole?.schoolId);
-      console.log("Используемый schoolId:", schoolId);
-      
-      if (schoolId) {
-        console.log("Получение пользователей школы для SCHOOL_ADMIN, ID школы:", schoolId);
-        const users = await dataStorage.getUsersBySchool(schoolId);
-        console.log("Найдено пользователей:", users.length);
+    // Фиксированный порядок работы со списком пользователей:
+    try {
+      if (activeRole === UserRoleEnum.SUPER_ADMIN) {
+        console.log("Получение всех пользователей для SUPER_ADMIN");
+        const users = await dataStorage.getUsers();
         return res.json(users);
-      } else {
-        console.log("Не найден ID школы для администратора");
+      } else if (activeRole === UserRoleEnum.SCHOOL_ADMIN) {
+        // Get school ID from the user's roles if not present in the user object
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const schoolAdminRole = userRoles.find(role => 
+          role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
+        );
         
-        // Проверим все роли пользователя и выведем информацию
-        console.log("Все роли пользователя:", JSON.stringify(userRoles));
+        // Используем ID школы из профиля пользователя или из роли
+        let schoolId = req.user.schoolId || (schoolAdminRole ? schoolAdminRole.schoolId : null);
         
-        // Если школа не найдена, но есть роли школьного администратора,
-        // пробуем найти первую школу и использовать её для этого администратора
-        if (userRoles.some(role => role.role === UserRoleEnum.SCHOOL_ADMIN)) {
+        // Логирование для отладки
+        console.log("Проверка роли администратора школы...");
+        console.log("schoolId из профиля:", req.user.schoolId);
+        console.log("schoolId из роли:", schoolAdminRole?.schoolId);
+        console.log("Используемый schoolId:", schoolId);
+        
+        // Если школа не найдена даже в роли, ищем любую доступную
+        if (!schoolId) {
+          console.log("Не найден ID школы для администратора");
+          console.log("Все роли пользователя:", JSON.stringify(userRoles));
+          
+          // Если есть роль школьного администратора, пробуем найти первую школу
           const schools = await dataStorage.getSchools();
           console.log("Доступные школы:", schools.map(s => `${s.id}: ${s.name}`).join(", "));
           
           if (schools.length > 0) {
-            const defaultSchool = schools[0];
-            console.log("Использование первой доступной школы:", defaultSchool.id, defaultSchool.name);
-            const users = await dataStorage.getUsersBySchool(defaultSchool.id);
-            console.log("Найдено пользователей в школе по умолчанию:", users.length);
-            return res.json(users);
+            schoolId = schools[0].id;
+            console.log("Использование первой доступной школы:", schools[0].id, schools[0].name);
           }
         }
+        
+        // Если нашли ID школы, получаем пользователей
+        if (schoolId) {
+          console.log("Получение пользователей школы для SCHOOL_ADMIN, ID школы:", schoolId);
+          const users = await dataStorage.getUsersBySchool(schoolId);
+          console.log("Найдено пользователей:", users.length);
+          return res.json(users);
+        }
       }
-    } else {
-      console.log("Не удовлетворены условия для получения пользователей");
-      console.log("Роль:", activeRole);
-      console.log("ID школы:", req.user.schoolId);
+      
+      // Если до сих пор не получили пользователей, возвращаем пустой массив
+      console.log("Не удалось получить пользователей для текущего пользователя");
+      return res.json([]);
+    } catch (error) {
+      console.error("Ошибка при получении пользователей:", error);
+      return res.status(500).json({ message: "Внутренняя ошибка сервера" });
     }
-    
-    res.json([]);
   });
 
   // Add user API endpoint

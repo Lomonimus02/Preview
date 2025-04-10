@@ -98,34 +98,39 @@ export function TeacherClassesMenu() {
 
       // Проверяем, есть ли подгруппа для этого расписания
       const subgroupId = schedule.subgroupId || undefined;
+
+      // Находим информацию о подгруппе, если она указана
       const subgroupInfo = subgroupId !== undefined
         ? subgroups.find(sg => sg.id === subgroupId) 
         : null;
 
-      // Сначала добавляем стандартную комбинацию класс-предмет без подгруппы,
-      // если её еще нет в списке (и только если это не подгруппа)
-      if (!subgroupId) {
-        // Проверяем, есть ли уже такая стандартная комбинация в списке
-        const existingCombination = combinations.find(
-          c => c.classId === schedule.classId && 
-               c.subjectId === schedule.subjectId && 
-               !c.isSubgroup
-        );
+      // Для всех уроков добавляем стандартную комбинацию класс-предмет без подгруппы,
+      // если её еще нет в списке
+      const existingCombination = combinations.find(
+        c => c.classId === schedule.classId && 
+             c.subjectId === schedule.subjectId && 
+             !c.isSubgroup
+      );
 
-        // Если комбинации нет в списке, добавляем
-        if (!existingCombination) {
-          combinations.push({
-            classId: schedule.classId,
-            className: classInfo.name,
-            subjectId: schedule.subjectId,
-            subjectName: subjectInfo.name,
-            isSubgroup: false
-          });
-        }
+      // Если комбинации нет в списке, добавляем
+      if (!existingCombination) {
+        combinations.push({
+          classId: schedule.classId,
+          className: classInfo.name,
+          subjectId: schedule.subjectId,
+          subjectName: subjectInfo.name,
+          isSubgroup: false
+        });
       }
 
-      // Если это расписание с подгруппой, обязательно добавляем его, чтобы было видно в меню
+      // Если это расписание с подгруппой, дополнительно добавляем его как отдельный пункт
       if (subgroupInfo) {
+        console.log("Найдена подгруппа в расписании:", {
+          scheduleId: schedule.id,
+          subgroupId,
+          subgroupName: subgroupInfo.name
+        });
+        
         // Проверяем, есть ли уже такая комбинация с подгруппой в списке
         const existingSubgroupCombination = combinations.find(
           c => c.classId === schedule.classId && 
@@ -140,7 +145,7 @@ export function TeacherClassesMenu() {
             className: classInfo.name,
             subjectId: schedule.subjectId,
             subjectName: subjectInfo.name,
-            subgroupId: subgroupId !== undefined ? subgroupId : undefined,
+            subgroupId: subgroupId,
             subgroupName: subgroupInfo.name,
             isSubgroup: true
           });
