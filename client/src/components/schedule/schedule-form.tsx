@@ -88,31 +88,23 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
   isSubmitting,
   scheduleToEdit
 }) => {
-  // State для хранения подгрупп выбранного класса
-  const [subgroups, setSubgroups] = useState<Subgroup[]>([]);
+  // State для хранения выбранного класса
   const [selectedClassId, setSelectedClassId] = useState<number | undefined>(scheduleToEdit?.classId);
   
   // Запрос на получение подгрупп для выбранного класса
-  const { data: subgroupsData = [] } = useQuery({
-    queryKey: ['subgroups/class', selectedClassId],
+  const { data: subgroups = [] } = useQuery<Subgroup[]>({
+    queryKey: ['/api/subgroups', selectedClassId],
     queryFn: async () => {
       if (!selectedClassId) return [];
       console.log(`Fetching subgroups with params: classId=${selectedClassId}`);
-      const response = await fetch(`/api/subgroups/class/${selectedClassId}`);
+      const response = await fetch(`/api/subgroups?classId=${selectedClassId}`);
       if (!response.ok) throw new Error('Не удалось загрузить подгруппы');
       const data = await response.json();
       console.log('Received subgroups:', data);
       return data;
     },
-    enabled: !!selectedClassId, // Запрос выполняется только если выбран класс
+    enabled: !!selectedClassId // Запрос выполняется только если выбран класс
   });
-  
-  // Обновляем список подгрупп при получении данных
-  useEffect(() => {
-    if (subgroupsData) {
-      setSubgroups(subgroupsData);
-    }
-  }, [subgroupsData]);
 
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
