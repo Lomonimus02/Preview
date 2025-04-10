@@ -59,7 +59,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           {schedule.startTime} - {schedule.endTime}
           <span className="ml-3 text-emerald-900">
             {schedule.subgroupId
-              ? `${subject?.name || "Предмет"} (${schedule.subgroupName || "Подгруппа"})`
+              ? (schedule.subgroupName || "Подгруппа") // Показываем название подгруппы вместо предмета
               : subject?.name || "Предмет"}
           </span>
         </div>

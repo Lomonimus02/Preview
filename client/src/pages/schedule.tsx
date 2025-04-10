@@ -391,17 +391,43 @@ export default function SchedulePage() {
         ) : (
           <ScheduleCarousel
             schedules={
-              // Добавляем названия подгрупп к расписанию
-              (isTeacher() ? teacherSchedules : schedules).map(schedule => {
-                if (schedule.subgroupId) {
-                  const subgroup = subgroups.find(sg => sg.id === schedule.subgroupId);
-                  return {
-                    ...schedule,
-                    subgroupName: subgroup?.name || 'Подгруппа'
-                  };
+              (() => {
+                // Базовое расписание (для учителей - только их уроки, для всех остальных - все уроки)
+                let filteredSchedules = isTeacher() ? teacherSchedules : schedules;
+                
+                // Фильтрация расписания для учеников по подгруппам
+                if (user?.role === UserRoleEnum.STUDENT) {
+                  // Получаем ID подгрупп, в которых состоит ученик
+                  const studentSubgroupIds = studentSubgroups
+                    .filter(sg => sg.studentId === user.id)
+                    .map(sg => sg.subgroupId);
+                  
+                  console.log(`Ученик ID=${user.id} состоит в подгруппах:`, studentSubgroupIds);
+                  
+                  // Фильтруем расписание: 
+                  // 1. Уроки без подгрупп (для всего класса)
+                  // 2. Уроки с подгруппами, в которых состоит ученик
+                  filteredSchedules = filteredSchedules.filter(schedule => {
+                    // Если у урока нет подгруппы, он виден всем ученикам класса
+                    if (!schedule.subgroupId) return true;
+                    
+                    // Если у урока есть подгруппа, проверяем, состоит ли ученик в этой подгруппе
+                    return studentSubgroupIds.includes(schedule.subgroupId);
+                  });
                 }
-                return schedule;
-              })
+                
+                // Добавляем названия подгрупп к расписанию
+                return filteredSchedules.map(schedule => {
+                  if (schedule.subgroupId) {
+                    const subgroup = subgroups.find(sg => sg.id === schedule.subgroupId);
+                    return {
+                      ...schedule,
+                      subgroupName: subgroup?.name || 'Подгруппа'
+                    };
+                  }
+                  return schedule;
+                });
+              })()
             }
             subjects={subjects}
             teachers={teachers}
