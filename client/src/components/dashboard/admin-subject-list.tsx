@@ -149,6 +149,46 @@ export function AdminSubjectList() {
     },
   });
   
+  // Мутация для удаления предмета
+  const deleteSubjectMutation = useMutation({
+    mutationFn: async (subjectId: number) => {
+      const res = await apiRequest(`/api/subjects/${subjectId}`, "DELETE");
+      if (!res.ok) {
+        throw new Error("Не удалось удалить предмет");
+      }
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subjects"] });
+      setIsDeleteDialogOpen(false);
+      setSubjectToDelete(null);
+      toast({
+        title: "Предмет удален",
+        description: "Предмет был успешно удален из системы",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить предмет",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Обработчик запроса на удаление предмета
+  const handleDeleteRequest = (subject: Subject) => {
+    setSubjectToDelete(subject);
+    setIsDeleteDialogOpen(true);
+  };
+  
+  // Подтверждение удаления предмета
+  const confirmDelete = () => {
+    if (subjectToDelete) {
+      deleteSubjectMutation.mutate(subjectToDelete.id);
+    }
+  };
+
   const onSubmit = (values: z.infer<typeof subjectFormSchema>) => {
     console.log("Форма предмета отправлена:", values);
     // Убедимся, что у нас есть schoolId
@@ -210,9 +250,21 @@ export function AdminSubjectList() {
                     <div className="text-sm text-gray-500">{subject.description || "-"}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-primary hover:text-primary-dark">
-                      <PencilIcon className="h-4 w-4 inline" />
-                    </button>
+                    <div className="flex items-center justify-end space-x-2">
+                      <button className="text-primary hover:text-primary-dark p-1" title="Редактировать">
+                        <PencilIcon className="h-4 w-4" />
+                      </button>
+                      <button 
+                        className="text-destructive hover:text-destructive/80 p-1" 
+                        title="Удалить"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleDeleteRequest(subject);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -311,6 +363,29 @@ export function AdminSubjectList() {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Диалог подтверждения удаления предмета */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Подтверждение удаления</AlertDialogTitle>
+            <AlertDialogDescription>
+              Вы действительно хотите удалить предмет "{subjectToDelete?.name}"?
+              Это действие невозможно отменить, и все связанные данные могут быть удалены.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-white"
+              onClick={confirmDelete}
+              disabled={deleteSubjectMutation.isPending}
+            >
+              {deleteSubjectMutation.isPending ? "Удаление..." : "Удалить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
