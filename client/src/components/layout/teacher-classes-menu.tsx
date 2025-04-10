@@ -43,9 +43,30 @@ export function TeacherClassesMenu() {
     queryFn: async () => {
       const res = await apiRequest(`/api/schedules?teacherId=${user?.id}`, "GET");
       if (!res.ok) throw new Error("Не удалось загрузить расписание");
+      
       // Добавляем console.log для отладки
       const data = await res.json();
+      
+      // Проверяем есть ли в расписаниях подгруппы
+      const schedulesWithSubgroups = data.filter((schedule: any) => schedule.subgroupId !== null);
       console.log("Teacher schedules:", data);
+      console.log("Schedules with subgroups:", schedulesWithSubgroups);
+      
+      if (schedulesWithSubgroups.length > 0) {
+        console.log("Found schedules with subgroups:", 
+          schedulesWithSubgroups.map((s: any) => ({
+            scheduleId: s.id,
+            subgroupId: s.subgroupId,
+            classId: s.classId,
+            subjectId: s.subjectId,
+            dayOfWeek: s.dayOfWeek,
+            startTime: s.startTime
+          }))
+        );
+      } else {
+        console.log("No schedules with subgroups found");
+      }
+      
       return data;
     },
     enabled: !!user && isTeacher(),
@@ -78,7 +99,10 @@ export function TeacherClassesMenu() {
     queryFn: async () => {
       const res = await apiRequest("/api/subgroups", "GET");
       if (!res.ok) throw new Error("Не удалось загрузить подгруппы");
-      return res.json();
+      const data = await res.json();
+      console.log("API response for subgroups:", data); 
+      console.log("User:", user?.id, user?.username, user?.role);
+      return data;
     },
     enabled: !!user && isTeacher()
   });
