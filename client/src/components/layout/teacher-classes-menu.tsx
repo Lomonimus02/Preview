@@ -43,11 +43,14 @@ export function TeacherClassesMenu() {
     queryFn: async () => {
       const res = await apiRequest(`/api/schedules?teacherId=${user?.id}`, "GET");
       if (!res.ok) throw new Error("Не удалось загрузить расписание");
-      return res.json();
+      // Добавляем console.log для отладки
+      const data = await res.json();
+      console.log("Teacher schedules:", data);
+      return data;
     },
     enabled: !!user && isTeacher(),
     // Добавляем более частое обновление, чтобы новые уроки быстрее отображались в меню
-    refetchInterval: 10000, // Проверка каждые 10 секунд
+    refetchInterval: 30000, // Проверка каждые 30 секунд
     refetchOnWindowFocus: true, // Обновление при фокусе окна
     staleTime: 5000 // Данные считаются устаревшими через 5 секунд
   });
@@ -80,7 +83,7 @@ export function TeacherClassesMenu() {
     enabled: !!user && isTeacher()
   });
 
-  // Создаем список уникальных комбинаций класс-предмет на основе расписания
+  // Создаем список уникальных комбинаций класс-предмет-подгруппа на основе расписания
   const classSubjectCombinations: ClassSubjectCombination[] = schedules
     .reduce((combinations, schedule) => {
       // Проверяем, что у расписания есть и класс, и предмет
@@ -94,33 +97,14 @@ export function TeacherClassesMenu() {
       if (!classInfo || !subjectInfo) return combinations;
 
       // Проверяем, есть ли подгруппа для этого расписания
-      const subgroupInfo = schedule.subgroupId 
-        ? subgroups.find(sg => sg.id === schedule.subgroupId) 
+      const subgroupId = schedule.subgroupId || undefined;
+      const subgroupInfo = subgroupId !== undefined
+        ? subgroups.find(sg => sg.id === subgroupId) 
         : null;
 
-      // Если это расписание с подгруппой
-      if (subgroupInfo) {
-        // Проверяем, есть ли уже такая комбинация с подгруппой в списке
-        const existingSubgroupCombination = combinations.find(
-          c => c.classId === schedule.classId && 
-               c.subjectId === schedule.subjectId && 
-               c.subgroupId === schedule.subgroupId
-        );
-
-        // Если комбинации с подгруппой нет в списке, добавляем
-        if (!existingSubgroupCombination) {
-          combinations.push({
-            classId: schedule.classId,
-            className: classInfo.name,
-            subjectId: schedule.subjectId,
-            subjectName: subjectInfo.name,
-            subgroupId: schedule.subgroupId ? schedule.subgroupId : undefined,
-            subgroupName: subgroupInfo.name,
-            isSubgroup: true
-          });
-        }
-      } else {
-        // Это обычное расписание без подгруппы
+      // Сначала добавляем стандартную комбинацию класс-предмет без подгруппы,
+      // если её еще нет в списке (и только если это не подгруппа)
+      if (!subgroupId) {
         // Проверяем, есть ли уже такая стандартная комбинация в списке
         const existingCombination = combinations.find(
           c => c.classId === schedule.classId && 
@@ -140,15 +124,55 @@ export function TeacherClassesMenu() {
         }
       }
 
+      // Если это расписание с подгруппой, обязательно добавляем его, чтобы было видно в меню
+      if (subgroupInfo) {
+        // Проверяем, есть ли уже такая комбинация с подгруппой в списке
+        const existingSubgroupCombination = combinations.find(
+          c => c.classId === schedule.classId && 
+               c.subjectId === schedule.subjectId && 
+               c.subgroupId === subgroupId
+        );
+
+        // Если комбинации с подгруппой нет в списке, добавляем
+        if (!existingSubgroupCombination) {
+          combinations.push({
+            classId: schedule.classId,
+            className: classInfo.name,
+            subjectId: schedule.subjectId,
+            subjectName: subjectInfo.name,
+            subgroupId: subgroupId !== undefined ? subgroupId : undefined,
+            subgroupName: subgroupInfo.name,
+            isSubgroup: true
+          });
+        }
+      }
+
       return combinations;
     }, [] as ClassSubjectCombination[]);
     
-  // Сортируем комбинации сначала по имени класса, затем по имени предмета
+  // Сортируем комбинации сначала по имени класса, затем по имени предмета, затем подгруппы вместе с их предметами
   classSubjectCombinations.sort((a, b) => {
+    // Сначала сортируем по имени класса
     if (a.className !== b.className) {
       return a.className.localeCompare(b.className);
     }
-    return a.subjectName.localeCompare(b.subjectName);
+    
+    // Затем по предмету
+    if (a.subjectName !== b.subjectName) {
+      return a.subjectName.localeCompare(b.subjectName);
+    }
+    
+    // Если один из элементов - подгруппа, а другой нет, ставим обычный предмет вперед
+    if (a.isSubgroup !== b.isSubgroup) {
+      return a.isSubgroup ? 1 : -1; // Обычные предметы идут первыми
+    }
+    
+    // Если оба элемента - подгруппы, сортируем по имени подгруппы
+    if (a.isSubgroup && b.isSubgroup && a.subgroupName && b.subgroupName) {
+      return a.subgroupName.localeCompare(b.subgroupName);
+    }
+    
+    return 0;
   });
 
   const isLoading = schedulesLoading || subjectsLoading || classesLoading || subgroupsLoading;
@@ -212,7 +236,9 @@ export function TeacherClassesMenu() {
                       isItemActive(item.classId, item.subjectId, item.subgroupId) 
                         ? "bg-accent/50 text-accent-foreground" 
                         : "hover:bg-muted text-foreground/80",
-                      item.isSubgroup ? "ml-2 text-sm" : "" // Немного отступа для подгрупп 
+                      item.isSubgroup 
+                        ? "ml-4 text-sm border-l-2 pl-4 border-muted-foreground/20" 
+                        : "" // Стильное оформление для подгрупп
                     )}
                   >
                     <span className="truncate">
