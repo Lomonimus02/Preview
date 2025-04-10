@@ -130,17 +130,35 @@ export default function ClassGradeDetailsPage() {
   
   // Получаем студентов, связанных с подгруппой, если указан ID подгруппы
   const { data: studentSubgroups = [], isLoading: isStudentSubgroupsLoading } = useQuery<Array<{studentId: number, subgroupId: number}>>({
-    queryKey: ["/api/student-subgroups"],
+    queryKey: ["/api/student-subgroups", subgroupId],
+    queryFn: async () => {
+      if (subgroupId) {
+        const res = await apiRequest(`/api/student-subgroups?subgroupId=${subgroupId}`);
+        return res.json();
+      }
+      return [];
+    },
+    enabled: !!subgroupId && !!user,
+  });
+  
+  // Если указана подгруппа, получаем информацию о ней
+  const { data: subgroupData } = useQuery<{id: number, name: string, classId: number}>({
+    queryKey: ["/api/subgroups", subgroupId],
+    queryFn: async () => {
+      if (subgroupId) {
+        const res = await apiRequest(`/api/subgroups/${subgroupId}`);
+        return res.json();
+      }
+      return null;
+    },
     enabled: !!subgroupId && !!user,
   });
   
   // Отфильтрованный список студентов, учитывая подгруппу, если она указана
   const filteredStudents = useMemo(() => {
-    if (subgroupId) {
-      // Находим ID студентов, которые относятся к выбранной подгруппе
-      const subgroupStudentIds = studentSubgroups
-        .filter(sg => sg.subgroupId === subgroupId)
-        .map(sg => sg.studentId);
+    if (subgroupId && studentSubgroups.length > 0) {
+      // Получаем ID студентов из списка подгрупп
+      const subgroupStudentIds = studentSubgroups.map(sg => sg.studentId);
       
       // Возвращаем только студентов из этой подгруппы
       return students.filter(student => 
@@ -148,7 +166,8 @@ export default function ClassGradeDetailsPage() {
       );
     }
     
-    // Если подгруппа не указана, возвращаем всех студентов класса
+    // Если подгруппа не указана или нет данных о студентах подгруппы, 
+    // возвращаем всех студентов класса
     return students;
   }, [students, subgroupId, studentSubgroups]);
   
@@ -853,8 +872,16 @@ export default function ClassGradeDetailsPage() {
                 <CardTitle className="flex items-center gap-2">
                   <CalendarIcon className="h-5 w-5" />
                   Оценки по предмету
+                  {subgroupId && subgroupData && (
+                    <span className="ml-2 text-sm bg-primary/10 text-primary px-2 py-1 rounded-md">
+                      Подгруппа: {subgroupData.name}
+                    </span>
+                  )}
                 </CardTitle>
                 <CardDescription>
+                  {subgroupId 
+                    ? `Журнал показывает только учеников из выбранной подгруппы. `
+                    : ''}
                   Нажмите на ячейку с "+" чтобы добавить оценку. Нажмите на дату урока, чтобы изменить его статус.
                 </CardDescription>
               </CardHeader>
