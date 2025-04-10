@@ -186,6 +186,13 @@ export class DatabaseStorage implements IStorage {
     const [newSubject] = await db.insert(subjects).values(subject).returning();
     return newSubject;
   }
+  
+  async deleteSubject(id: number): Promise<Subject | undefined> {
+    const [deletedSubject] = await db.delete(subjects)
+      .where(eq(subjects.id, id))
+      .returning();
+    return deletedSubject;
+  }
 
   // ===== Schedule operations =====
   async getSchedule(id: number): Promise<Schedule | undefined> {

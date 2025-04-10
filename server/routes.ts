@@ -1011,6 +1011,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(201).json(subject);
   });
 
+  // DELETE endpoint for subjects
+  app.delete("/api/subjects/:id", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      const subjectId = parseInt(req.params.id);
+      if (isNaN(subjectId)) {
+        return res.status(400).json({ message: "Некорректный ID предмета" });
+      }
+      
+      // Get the subject to check if it exists and get its school
+      const subject = await dataStorage.getSubject(subjectId);
+      if (!subject) {
+        return res.status(404).json({ message: "Предмет не найден" });
+      }
+      
+      // Check if school admin has permission to delete this subject
+      if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+        // Get the correct schoolId for the school admin
+        let adminSchoolId = req.user.schoolId;
+        
+        // If user doesn't have schoolId in profile, check their roles
+        if (!adminSchoolId) {
+          const userRoles = await dataStorage.getUserRoles(req.user.id);
+          const schoolAdminRole = userRoles.find(role => 
+            role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
+          );
+          
+          if (schoolAdminRole && schoolAdminRole.schoolId) {
+            adminSchoolId = schoolAdminRole.schoolId;
+          }
+        }
+        
+        // Check if the subject belongs to the admin's school
+        if (!adminSchoolId || subject.schoolId !== adminSchoolId) {
+          return res.status(403).json({ 
+            message: "Вы можете удалять только предметы вашей школы" 
+          });
+        }
+      }
+      
+      // Delete the subject
+      const deletedSubject = await dataStorage.deleteSubject(subjectId);
+      
+      // Log the action
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "subject_deleted",
+        details: `Deleted subject: ${subject.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.json(deletedSubject);
+    } catch (error) {
+      console.error("Error deleting subject:", error);
+      res.status(500).json({ message: "Не удалось удалить предмет" });
+    }
+  });
+
   // Schedule API
   app.get("/api/schedules", isAuthenticated, async (req, res) => {
     let schedules = [];
