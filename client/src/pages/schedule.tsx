@@ -404,16 +404,24 @@ export default function SchedulePage() {
                   
                   console.log(`Ученик ID=${user.id} состоит в подгруппах:`, studentSubgroupIds);
                   
+                  // Выводим информацию о уроках с подгруппами для отладки
+                  const schedulesWithSubgroups = filteredSchedules.filter(s => s.subgroupId !== null);
+                  console.log("Уроки с подгруппами до фильтрации:", schedulesWithSubgroups);
+                  
                   // Фильтруем расписание: 
                   // 1. Уроки без подгрупп (для всего класса)
                   // 2. Уроки с подгруппами, в которых состоит ученик
                   filteredSchedules = filteredSchedules.filter(schedule => {
                     // Если у урока нет подгруппы, он виден всем ученикам класса
-                    if (!schedule.subgroupId) return true;
+                    if (schedule.subgroupId === null) return true;
                     
                     // Если у урока есть подгруппа, проверяем, состоит ли ученик в этой подгруппе
-                    return studentSubgroupIds.includes(schedule.subgroupId);
+                    const isInSubgroup = studentSubgroupIds.includes(schedule.subgroupId);
+                    console.log(`Урок ID=${schedule.id}, подгруппа=${schedule.subgroupId}, ученик в подгруппе: ${isInSubgroup}`);
+                    return isInSubgroup;
                   });
+                  
+                  console.log("Уроки после фильтрации:", filteredSchedules);
                 }
                 
                 // Добавляем названия подгрупп к расписанию
