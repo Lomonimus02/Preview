@@ -2,12 +2,13 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { dbStorage } from "./db-storage";
 import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 // Используем хранилище БД для всех операций
 const dataStorage = dbStorage;
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { UserRoleEnum } from "@shared/schema";
+import { UserRoleEnum, schedules } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -1657,6 +1658,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/grades", isAuthenticated, async (req, res) => {
     let grades = [];
     
+    // Добавляем фильтр по подгруппе
+    const subgroupId = req.query.subgroupId ? parseInt(req.query.subgroupId as string) : null;
+    
     if (req.query.studentId) {
       const studentId = parseInt(req.query.studentId as string);
       
@@ -1675,26 +1679,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Получаем все оценки студента
+      let allGrades = await dataStorage.getGradesByStudent(studentId);
+      
       // Если указан также subjectId, фильтруем оценки по предмету
       if (req.query.subjectId) {
         const subjectId = parseInt(req.query.subjectId as string);
-        const allGrades = await dataStorage.getGradesByStudent(studentId);
-        grades = allGrades.filter(grade => grade.subjectId === subjectId);
+        
+        // Фильтруем по предмету и учитываем подгруппы:
+        // - Если запрашиваются оценки для подгруппы, показываем только оценки этой подгруппы
+        // - Если запрашиваются оценки основного предмета, показываем только оценки без подгрупп
+        if (subgroupId) {
+          grades = allGrades.filter(grade => grade.subjectId === subjectId && grade.subgroupId === subgroupId);
+        } else {
+          grades = allGrades.filter(grade => grade.subjectId === subjectId && grade.subgroupId === null);
+        }
       } else {
-        grades = await dataStorage.getGradesByStudent(studentId);
+        // Если не указан предмет, но указана подгруппа
+        if (subgroupId) {
+          grades = allGrades.filter(grade => grade.subgroupId === subgroupId);
+        } else {
+          grades = allGrades;
+        }
       }
     } else if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
       
       // Teachers, school admins, principals, and vice principals can view class grades
       if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+        // Получаем все оценки класса
+        const classGrades = await dataStorage.getGradesByClass(classId);
+        
         // Если указан также subjectId, фильтруем оценки по предмету и классу
         if (req.query.subjectId) {
           const subjectId = parseInt(req.query.subjectId as string);
-          const classGrades = await dataStorage.getGradesByClass(classId);
-          grades = classGrades.filter(grade => grade.subjectId === subjectId);
+          
+          // Фильтруем с учетом подгруппы
+          if (subgroupId) {
+            grades = classGrades.filter(grade => grade.subjectId === subjectId && grade.subgroupId === subgroupId);
+          } else {
+            // Для основного предмета показываем только оценки, не связанные с подгруппами
+            grades = classGrades.filter(grade => grade.subjectId === subjectId && grade.subgroupId === null);
+          }
         } else {
-          grades = await dataStorage.getGradesByClass(classId);
+          // Если не указан предмет, но указана подгруппа
+          if (subgroupId) {
+            grades = classGrades.filter(grade => grade.subgroupId === subgroupId);
+          } else {
+            grades = classGrades;
+          }
         }
       } else {
         return res.status(403).json({ message: "Forbidden" });
@@ -1722,6 +1755,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Если не передан scheduleId, установим его как null (опционально)
       if (gradeData.scheduleId === undefined) {
         gradeData.scheduleId = null;
+      }
+      
+      // Если указан scheduleId, проверяем связан ли он с подгруппой
+      if (gradeData.scheduleId) {
+        try {
+          // Получаем информацию о расписании
+          const scheduleInfo = await db.select().from(schedules)
+            .where(eq(schedules.id, gradeData.scheduleId))
+            .limit(1);
+          
+          if (scheduleInfo.length > 0 && scheduleInfo[0].subgroupId) {
+            // Если урок связан с подгруппой, устанавливаем subgroupId для оценки
+            console.log("Оценка для подгруппы: ", scheduleInfo[0].subgroupId);
+            gradeData.subgroupId = scheduleInfo[0].subgroupId;
+          }
+        } catch (scheduleError) {
+          console.error('Ошибка при получении информации о расписании:', scheduleError);
+        }
       }
       
       if (gradeData.date) {
