@@ -570,6 +570,59 @@ export default function ClassGradeDetailsPage() {
     },
   });
   
+  // Форма для добавления задания
+  const assignmentForm = useForm<z.infer<typeof assignmentFormSchema>>({
+    resolver: zodResolver(assignmentFormSchema),
+    defaultValues: {
+      assignmentType: undefined,
+      maxScore: "",
+      description: "",
+      scheduleId: undefined,
+      subjectId: subjectId,
+      classId: classId,
+      teacherId: user?.id,
+      subgroupId: subgroupId || undefined,
+    },
+  });
+
+  // Mutation to add assignment
+  const addAssignmentMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof assignmentFormSchema>) => {
+      const res = await apiRequest("/api/assignments", "POST", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Задание создано",
+        description: "Задание успешно добавлено к уроку",
+      });
+      
+      // Закрываем диалог и сбрасываем форму
+      setIsAssignmentDialogOpen(false);
+      assignmentForm.reset({
+        assignmentType: undefined,
+        maxScore: "",
+        description: "",
+        scheduleId: undefined,
+        subjectId: subjectId,
+        classId: classId,
+        teacherId: user?.id,
+        subgroupId: subgroupId || undefined,
+      });
+      
+      // Обновляем данные о заданиях
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+    },
+    onError: (error) => {
+      console.error("Ошибка при создании задания:", error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось создать задание. Попробуйте позже.",
+        variant: "destructive",
+      });
+    }
+  });
+
   // Mutation to update schedule status
   const updateScheduleStatusMutation = useMutation({
     mutationFn: async ({ scheduleId, status }: { scheduleId: number, status: string }) => {
@@ -718,6 +771,42 @@ export default function ClassGradeDetailsPage() {
       scheduleId: selectedSchedule.id,
       status
     });
+  };
+  
+  // Open dialog to create a new assignment
+  const openAssignmentDialog = (scheduleId?: number) => {
+    // Если передан ID урока, находим его в списке
+    if (scheduleId) {
+      const schedule = getScheduleById(scheduleId);
+      if (schedule) {
+        // Проверяем, проведен ли урок
+        if (schedule.status !== 'conducted') {
+          toast({
+            title: "Невозможно добавить задание",
+            description: "Урок не отмечен как проведенный. Отметьте урок как проведенный, чтобы добавить задание.",
+            variant: "destructive",
+          });
+          return;
+        }
+        setSelectedSchedule(schedule);
+      }
+    } else {
+      setSelectedSchedule(null);
+    }
+    
+    // Сбрасываем форму и устанавливаем значения по умолчанию
+    assignmentForm.reset({
+      assignmentType: undefined,
+      maxScore: "",
+      description: "",
+      scheduleId: scheduleId || undefined,
+      subjectId: subjectId,
+      classId: classId,
+      teacherId: user?.id,
+      subgroupId: subgroupId || undefined,
+    });
+    
+    setIsAssignmentDialogOpen(true);
   };
   
   // Open grade dialog to edit existing grade
@@ -1412,6 +1501,120 @@ export default function ClassGradeDetailsPage() {
                 Закрыть
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Dialog for adding an assignment */}
+        <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Добавить задание</DialogTitle>
+              <DialogDescription>
+                Создайте новое задание для накопительной системы оценивания.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...assignmentForm}>
+              <form onSubmit={assignmentForm.handleSubmit(data => addAssignmentMutation.mutate(data))}>
+                <div className="grid gap-4 py-4">
+                  <FormField
+                    control={assignmentForm.control}
+                    name="assignmentType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Тип задания</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Выберите тип задания" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value={AssignmentTypeEnum.CONTROL_WORK}>Контрольная работа</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.TEST_WORK}>Проверочная работа</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.CURRENT_WORK}>Текущая работа</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.HOMEWORK}>Домашнее задание</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.CLASSWORK}>Работа на уроке</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.PROJECT_WORK}>Работа с проектом</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.CLASS_ASSIGNMENT}>Классная работа</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={assignmentForm.control}
+                    name="maxScore"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Максимальный балл</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Введите максимальный балл" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={assignmentForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Описание (опционально)</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} placeholder="Введите описание задания" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {!selectedSchedule && (
+                    <FormField
+                      control={assignmentForm.control}
+                      name="scheduleId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Урок</FormLabel>
+                          <Select
+                            onValueChange={(value) => field.onChange(parseInt(value))}
+                            defaultValue={field.value?.toString()}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Выберите урок" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {schedules
+                                .filter(s => s.subjectId === subjectId && (subgroupId ? s.subgroupId === subgroupId : true))
+                                .map(schedule => (
+                                  <SelectItem key={schedule.id} value={schedule.id.toString()}>
+                                    {format(new Date(schedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })} - {schedule.startTime}
+                                    {schedule.subgroupId && ` (${subgroups.find(sg => sg.id === schedule.subgroupId)?.name || 'Подгруппа'})`}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={addAssignmentMutation.isPending}>
+                    {addAssignmentMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Создать задание
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
         
