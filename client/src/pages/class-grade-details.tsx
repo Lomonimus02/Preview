@@ -14,8 +14,18 @@ import {
   Subject,
   User,
   GradingSystemEnum,
-  AssignmentTypeEnum
+  AssignmentTypeEnum,
+  Assignment
 } from "@shared/schema";
+
+// Определяем интерфейс для слотов расписания
+interface LessonSlot {
+  date: string;
+  scheduleId: number;
+  formattedDate: string;
+  startTime?: string;
+  assignments?: Assignment[];
+}
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { 
@@ -257,19 +267,7 @@ export default function ClassGradeDetailsPage() {
     enabled: !!classId && !!subjectId && !!user,
   });
   
-  // Тип Assignment
-interface Assignment {
-  id: number;
-  assignmentType: string;
-  maxScore: string;
-  scheduleId: number;
-  subjectId: number;
-  classId: number;
-  teacherId: number;
-  description?: string | null;
-  subgroupId?: number | null;
-  displayOrder?: number;
-}
+  // Используем тип Assignment импортированный из schema
 
 // Получаем задания для этого класса и предмета, чтобы знать, какие ячейки активировать для выставления оценок
   const { data: assignments = [], isLoading: isAssignmentsLoading } = useQuery<Assignment[]>({
