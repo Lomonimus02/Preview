@@ -169,6 +169,16 @@ export default function ClassGradeDetailsPage() {
     enabled: !!subjectId && !!user,
   });
   
+  // Получаем все подгруппы 
+  const { data: allSubgroups = [], isLoading: isAllSubgroupsLoading } = useQuery<Array<{id: number, name: string, classId: number}>>({
+    queryKey: ["/api/subgroups"],
+    queryFn: async () => {
+      const res = await apiRequest(`/api/subgroups`);
+      return res.json();
+    },
+    enabled: !!user,
+  });
+
   // Fetch subgroup details if subgroupId is provided
   const { data: subgroupData, isLoading: isSubgroupLoading } = useQuery<{id: number, name: string, classId: number}>({
     queryKey: ["/api/subgroups", subgroupId],
@@ -1740,7 +1750,7 @@ export default function ClassGradeDetailsPage() {
                                 .map(schedule => (
                                   <SelectItem key={schedule.id} value={schedule.id.toString()}>
                                     {format(new Date(schedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })} - {schedule.startTime}
-                                    {schedule.subgroupId && ` (${subgroups.find(sg => sg.id === schedule.subgroupId)?.name || 'Подгруппа'})`}
+                                    {schedule.subgroupId && ` (${allSubgroups.find(sg => sg.id === schedule.subgroupId)?.name || 'Подгруппа'})`}
                                   </SelectItem>
                                 ))}
                             </SelectContent>
