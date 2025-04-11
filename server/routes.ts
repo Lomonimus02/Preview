@@ -2782,6 +2782,287 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // ===== Assignment routes =====
+
+  // Получение всех заданий для класса
+  app.get("/api/assignments/class/:classId", isAuthenticated, async (req, res) => {
+    try {
+      const classId = parseInt(req.params.classId);
+      const assignments = await dataStorage.getAssignmentsByClass(classId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching assignments:", error);
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  // Получение всех заданий учителя
+  app.get("/api/assignments/teacher/:teacherId", isAuthenticated, async (req, res) => {
+    try {
+      const teacherId = parseInt(req.params.teacherId);
+      const assignments = await dataStorage.getAssignmentsByTeacher(teacherId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching teacher assignments:", error);
+      res.status(500).json({ message: "Failed to fetch teacher assignments" });
+    }
+  });
+
+  // Получение всех заданий для предмета
+  app.get("/api/assignments/subject/:subjectId", isAuthenticated, async (req, res) => {
+    try {
+      const subjectId = parseInt(req.params.subjectId);
+      const assignments = await dataStorage.getAssignmentsBySubject(subjectId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching subject assignments:", error);
+      res.status(500).json({ message: "Failed to fetch subject assignments" });
+    }
+  });
+
+  // Получение всех заданий для подгруппы
+  app.get("/api/assignments/subgroup/:subgroupId", isAuthenticated, async (req, res) => {
+    try {
+      const subgroupId = parseInt(req.params.subgroupId);
+      const assignments = await dataStorage.getAssignmentsBySubgroup(subgroupId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching subgroup assignments:", error);
+      res.status(500).json({ message: "Failed to fetch subgroup assignments" });
+    }
+  });
+
+  // Получение всех заданий для урока (расписания)
+  app.get("/api/assignments/schedule/:scheduleId", isAuthenticated, async (req, res) => {
+    try {
+      const scheduleId = parseInt(req.params.scheduleId);
+      const assignments = await dataStorage.getAssignmentsBySchedule(scheduleId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching schedule assignments:", error);
+      res.status(500).json({ message: "Failed to fetch schedule assignments" });
+    }
+  });
+
+  // Получение задания по ID
+  app.get("/api/assignments/:id", isAuthenticated, async (req, res) => {
+    try {
+      const assignmentId = parseInt(req.params.id);
+      const assignment = await dataStorage.getAssignment(assignmentId);
+      
+      if (!assignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+      
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error fetching assignment:", error);
+      res.status(500).json({ message: "Failed to fetch assignment" });
+    }
+  });
+
+  // Создание нового задания (для учителей и администраторов)
+  app.post("/api/assignments", isAuthenticated, hasRole([
+    UserRoleEnum.TEACHER, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.CLASS_TEACHER
+  ]), async (req, res) => {
+    try {
+      const assignment = req.body;
+      const newAssignment = await dataStorage.createAssignment(assignment);
+      res.status(201).json(newAssignment);
+    } catch (error) {
+      console.error("Error creating assignment:", error);
+      res.status(500).json({ message: "Failed to create assignment" });
+    }
+  });
+
+  // Обновление задания
+  app.patch("/api/assignments/:id", isAuthenticated, hasRole([
+    UserRoleEnum.TEACHER, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.CLASS_TEACHER
+  ]), async (req, res) => {
+    try {
+      const assignmentId = parseInt(req.params.id);
+      const assignmentData = req.body;
+      
+      const updatedAssignment = await dataStorage.updateAssignment(assignmentId, assignmentData);
+      
+      if (!updatedAssignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+      
+      res.json(updatedAssignment);
+    } catch (error) {
+      console.error("Error updating assignment:", error);
+      res.status(500).json({ message: "Failed to update assignment" });
+    }
+  });
+
+  // Удаление задания
+  app.delete("/api/assignments/:id", isAuthenticated, hasRole([
+    UserRoleEnum.TEACHER, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.CLASS_TEACHER
+  ]), async (req, res) => {
+    try {
+      const assignmentId = parseInt(req.params.id);
+      
+      const deletedAssignment = await dataStorage.deleteAssignment(assignmentId);
+      
+      if (!deletedAssignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+      
+      res.json({ message: "Assignment deleted successfully", assignment: deletedAssignment });
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+      res.status(500).json({ message: "Failed to delete assignment" });
+    }
+  });
+
+  // ===== Cumulative Grade routes =====
+
+  // Получение всех накопительных оценок по заданию
+  app.get("/api/cumulative-grades/assignment/:assignmentId", isAuthenticated, async (req, res) => {
+    try {
+      const assignmentId = parseInt(req.params.assignmentId);
+      const grades = await dataStorage.getCumulativeGradesByAssignment(assignmentId);
+      res.json(grades);
+    } catch (error) {
+      console.error("Error fetching cumulative grades:", error);
+      res.status(500).json({ message: "Failed to fetch cumulative grades" });
+    }
+  });
+
+  // Получение всех накопительных оценок ученика
+  app.get("/api/cumulative-grades/student/:studentId", isAuthenticated, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      const grades = await dataStorage.getCumulativeGradesByStudent(studentId);
+      res.json(grades);
+    } catch (error) {
+      console.error("Error fetching student cumulative grades:", error);
+      res.status(500).json({ message: "Failed to fetch student cumulative grades" });
+    }
+  });
+
+  // Получение конкретной накопительной оценки ученика по заданию
+  app.get("/api/cumulative-grades/student/:studentId/assignment/:assignmentId", isAuthenticated, async (req, res) => {
+    try {
+      const studentId = parseInt(req.params.studentId);
+      const assignmentId = parseInt(req.params.assignmentId);
+      
+      const grade = await dataStorage.getStudentCumulativeGradesByAssignment(studentId, assignmentId);
+      
+      if (!grade) {
+        return res.status(404).json({ message: "Cumulative grade not found" });
+      }
+      
+      res.json(grade);
+    } catch (error) {
+      console.error("Error fetching student's cumulative grade for assignment:", error);
+      res.status(500).json({ message: "Failed to fetch student's cumulative grade" });
+    }
+  });
+
+  // Получение накопительной оценки по ID
+  app.get("/api/cumulative-grades/:id", isAuthenticated, async (req, res) => {
+    try {
+      const gradeId = parseInt(req.params.id);
+      const grade = await dataStorage.getCumulativeGrade(gradeId);
+      
+      if (!grade) {
+        return res.status(404).json({ message: "Cumulative grade not found" });
+      }
+      
+      res.json(grade);
+    } catch (error) {
+      console.error("Error fetching cumulative grade:", error);
+      res.status(500).json({ message: "Failed to fetch cumulative grade" });
+    }
+  });
+
+  // Создание новой накопительной оценки
+  app.post("/api/cumulative-grades", isAuthenticated, hasRole([
+    UserRoleEnum.TEACHER, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.CLASS_TEACHER
+  ]), async (req, res) => {
+    try {
+      const grade = req.body;
+      const newGrade = await dataStorage.createCumulativeGrade(grade);
+      res.status(201).json(newGrade);
+    } catch (error) {
+      console.error("Error creating cumulative grade:", error);
+      res.status(500).json({ message: "Failed to create cumulative grade" });
+    }
+  });
+
+  // Обновление накопительной оценки
+  app.patch("/api/cumulative-grades/:id", isAuthenticated, hasRole([
+    UserRoleEnum.TEACHER, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.CLASS_TEACHER
+  ]), async (req, res) => {
+    try {
+      const gradeId = parseInt(req.params.id);
+      const gradeData = req.body;
+      
+      const updatedGrade = await dataStorage.updateCumulativeGrade(gradeId, gradeData);
+      
+      if (!updatedGrade) {
+        return res.status(404).json({ message: "Cumulative grade not found" });
+      }
+      
+      res.json(updatedGrade);
+    } catch (error) {
+      console.error("Error updating cumulative grade:", error);
+      res.status(500).json({ message: "Failed to update cumulative grade" });
+    }
+  });
+
+  // Удаление накопительной оценки
+  app.delete("/api/cumulative-grades/:id", isAuthenticated, hasRole([
+    UserRoleEnum.TEACHER, 
+    UserRoleEnum.SCHOOL_ADMIN, 
+    UserRoleEnum.SUPER_ADMIN, 
+    UserRoleEnum.CLASS_TEACHER
+  ]), async (req, res) => {
+    try {
+      const gradeId = parseInt(req.params.id);
+      
+      const deletedGrade = await dataStorage.deleteCumulativeGrade(gradeId);
+      
+      if (!deletedGrade) {
+        return res.status(404).json({ message: "Cumulative grade not found" });
+      }
+      
+      res.json({ message: "Cumulative grade deleted successfully", grade: deletedGrade });
+    } catch (error) {
+      console.error("Error deleting cumulative grade:", error);
+      res.status(500).json({ message: "Failed to delete cumulative grade" });
+    }
+  });
+
+  // Получение среднего балла для всех заданий класса
+  app.get("/api/class/:classId/average-scores", isAuthenticated, async (req, res) => {
+    try {
+      const classId = parseInt(req.params.classId);
+      const averageScores = await dataStorage.calculateClassAverageScores(classId);
+      res.json(averageScores);
+    } catch (error) {
+      console.error("Error calculating class average scores:", error);
+      res.status(500).json({ message: "Failed to calculate class average scores" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
