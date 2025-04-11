@@ -21,11 +21,13 @@ import {
   UserRoleEnum, UserRoleModel, InsertUserRole,
   Subgroup, InsertSubgroup,
   StudentSubgroup, InsertStudentSubgroup,
+  Assignment, InsertAssignment, AssignmentTypeEnum,
+  CumulativeGrade, InsertCumulativeGrade, GradingSystemEnum,
   users, schools, classes, subjects, schedules,
   homework, homeworkSubmissions, grades, attendance,
   documents, messages, notifications, parentStudents,
   systemLogs, teacherSubjects, studentClasses, userRoles,
-  subgroups, studentSubgroups
+  subgroups, studentSubgroups, assignments, cumulativeGrades
 } from '@shared/schema';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
@@ -667,6 +669,122 @@ export class DatabaseStorage implements IStorage {
   async getSchedulesBySubgroup(subgroupId: number): Promise<Schedule[]> {
     return await db.select().from(schedules)
       .where(eq(schedules.subgroupId, subgroupId));
+  }
+
+  // ===== Assignment operations =====
+  async getAssignment(id: number): Promise<Assignment | undefined> {
+    const result = await db.select().from(assignments).where(eq(assignments.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAssignmentsBySchedule(scheduleId: number): Promise<Assignment[]> {
+    return await db.select().from(assignments).where(eq(assignments.scheduleId, scheduleId));
+  }
+
+  async getAssignmentsByClass(classId: number): Promise<Assignment[]> {
+    return await db.select().from(assignments).where(eq(assignments.classId, classId));
+  }
+
+  async getAssignmentsByTeacher(teacherId: number): Promise<Assignment[]> {
+    return await db.select().from(assignments).where(eq(assignments.teacherId, teacherId));
+  }
+
+  async getAssignmentsBySubject(subjectId: number): Promise<Assignment[]> {
+    return await db.select().from(assignments).where(eq(assignments.subjectId, subjectId));
+  }
+
+  async getAssignmentsBySubgroup(subgroupId: number): Promise<Assignment[]> {
+    return await db.select().from(assignments).where(eq(assignments.subgroupId, subgroupId));
+  }
+
+  async createAssignment(assignment: InsertAssignment): Promise<Assignment> {
+    const [newAssignment] = await db.insert(assignments).values(assignment).returning();
+    return newAssignment;
+  }
+
+  async updateAssignment(id: number, assignmentData: Partial<InsertAssignment>): Promise<Assignment | undefined> {
+    const [updatedAssignment] = await db.update(assignments)
+      .set(assignmentData)
+      .where(eq(assignments.id, id))
+      .returning();
+    return updatedAssignment;
+  }
+
+  async deleteAssignment(id: number): Promise<Assignment | undefined> {
+    const [deletedAssignment] = await db.delete(assignments)
+      .where(eq(assignments.id, id))
+      .returning();
+    return deletedAssignment;
+  }
+
+  // ===== Cumulative Grade operations =====
+  async getCumulativeGrade(id: number): Promise<CumulativeGrade | undefined> {
+    const result = await db.select().from(cumulativeGrades).where(eq(cumulativeGrades.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getCumulativeGradesByAssignment(assignmentId: number): Promise<CumulativeGrade[]> {
+    return await db.select().from(cumulativeGrades).where(eq(cumulativeGrades.assignmentId, assignmentId));
+  }
+
+  async getCumulativeGradesByStudent(studentId: number): Promise<CumulativeGrade[]> {
+    return await db.select().from(cumulativeGrades).where(eq(cumulativeGrades.studentId, studentId));
+  }
+
+  async createCumulativeGrade(grade: InsertCumulativeGrade): Promise<CumulativeGrade> {
+    const [newGrade] = await db.insert(cumulativeGrades).values(grade).returning();
+    return newGrade;
+  }
+
+  async updateCumulativeGrade(id: number, gradeData: Partial<InsertCumulativeGrade>): Promise<CumulativeGrade | undefined> {
+    const [updatedGrade] = await db.update(cumulativeGrades)
+      .set(gradeData)
+      .where(eq(cumulativeGrades.id, id))
+      .returning();
+    return updatedGrade;
+  }
+
+  async deleteCumulativeGrade(id: number): Promise<CumulativeGrade | undefined> {
+    const [deletedGrade] = await db.delete(cumulativeGrades)
+      .where(eq(cumulativeGrades.id, id))
+      .returning();
+    return deletedGrade;
+  }
+
+  async getStudentCumulativeGradesByAssignment(studentId: number, assignmentId: number): Promise<CumulativeGrade | undefined> {
+    const result = await db.select().from(cumulativeGrades)
+      .where(and(
+        eq(cumulativeGrades.studentId, studentId),
+        eq(cumulativeGrades.assignmentId, assignmentId)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  // Helper method to calculate average scores for all assignments in a class
+  async calculateClassAverageScores(classId: number): Promise<{ assignmentId: number, averageScore: number }[]> {
+    // Get all assignments for this class
+    const classAssignments = await this.getAssignmentsByClass(classId);
+    
+    const results = [];
+    
+    for (const assignment of classAssignments) {
+      // Get all grades for this assignment
+      const grades = await this.getCumulativeGradesByAssignment(assignment.id);
+      
+      if (grades.length > 0) {
+        // Calculate average score
+        const totalScore = grades.reduce((sum, grade) => sum + Number(grade.score), 0);
+        const averageScore = totalScore / grades.length;
+        
+        results.push({
+          assignmentId: assignment.id,
+          averageScore
+        });
+      }
+    }
+    
+    return results;
   }
 }
 
