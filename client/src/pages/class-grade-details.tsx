@@ -73,6 +73,8 @@ const gradeFormSchema = z.object({
   date: z.string().optional().nullable(),
   // Добавляем поле scheduleId для связи с конкретным уроком
   scheduleId: z.number().optional().nullable(),
+  // Добавляем поле subgroupId для явной связи с подгруппой
+  subgroupId: z.number().optional().nullable(),
 });
 
 export default function ClassGradeDetailsPage() {

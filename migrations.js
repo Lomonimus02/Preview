@@ -85,12 +85,41 @@ async function addUserRolesClassIdColumn() {
   }
 }
 
+async function addGradeSubgroupIdColumn() {
+  try {
+    console.log('Проверяем наличие колонки subgroup_id в таблице grades...');
+    const checkColumnExistsQuery = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'grades' AND column_name = 'subgroup_id'
+    `;
+    
+    const result = await db.execute(sql.raw(checkColumnExistsQuery));
+    
+    if (result.length === 0) {
+      console.log('Колонка subgroup_id не найдена, добавляем...');
+      const addColumnQuery = `
+        ALTER TABLE grades 
+        ADD COLUMN subgroup_id INTEGER
+      `;
+      await db.execute(sql.raw(addColumnQuery));
+      console.log('Колонка subgroup_id успешно добавлена');
+    } else {
+      console.log('Колонка subgroup_id уже существует');
+    }
+  } catch (error) {
+    console.error('Ошибка при добавлении колонки subgroup_id:', error);
+    throw error;
+  }
+}
+
 async function runMigrations() {
   try {
     console.log('Запуск миграций...');
     await addScheduleDateColumn();
     await addGradeScheduleIdColumn();
     await addUserRolesClassIdColumn();
+    await addGradeSubgroupIdColumn();
     console.log('Миграции успешно выполнены');
   } catch (error) {
     console.error('Ошибка при выполнении миграций:', error);
