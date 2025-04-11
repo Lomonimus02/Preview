@@ -257,6 +257,20 @@ export default function ClassGradeDetailsPage() {
     enabled: !!classId && !!subjectId && !!user,
   });
   
+  // Получаем задания для этого класса и предмета, чтобы знать, какие ячейки активировать для выставления оценок
+  const { data: assignments = [], isLoading: isAssignmentsLoading } = useQuery<Assignment[]>({
+    queryKey: ["/api/assignments", { classId, subjectId, subgroupId }],
+    queryFn: async () => {
+      let url = `/api/assignments?classId=${classId}&subjectId=${subjectId}`;
+      if (subgroupId) {
+        url += `&subgroupId=${subgroupId}`;
+      }
+      const res = await apiRequest(url);
+      return res.json();
+    },
+    enabled: !!classId && !!subjectId && !!user && classData?.gradingSystem === GradingSystemEnum.CUMULATIVE,
+  });
+  
   // Get unique lesson slots (date + scheduleId pairs) from schedules for this class and subject
   const lessonSlots = useMemo(() => {
     // Фильтруем расписания для текущего предмета
