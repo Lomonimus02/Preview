@@ -722,22 +722,41 @@ export default function ClassGradeDetailsPage() {
       const res = await apiRequest("/api/assignments", "POST", data);
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (newAssignment) => {
       toast({
         title: "Задание создано",
         description: "Задание успешно добавлено к уроку",
       });
       
-      // Обновляем запросы, чтобы получить обновленные данные
-      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      // Ручное обновление lessonSlots
+      // Добавляем созданное задание в соответствующий слот расписания
+      const updatedLessonSlots = [...lessonSlots];
+      const slotIndex = updatedLessonSlots.findIndex(
+        slot => slot.scheduleId === newAssignment.scheduleId
+      );
       
-      // Принудительно обновляем запрос assignments, чтобы получить актуальные данные
-      // Это приведет к обновлению useEffect и пересозданию lessonSlots
-      setTimeout(() => {
-        queryClient.invalidateQueries({ 
-          queryKey: ["/api/assignments", { classId, subjectId, subgroupId }] 
+      if (slotIndex !== -1) {
+        // Если нашли слот расписания, добавляем к нему задание
+        if (!updatedLessonSlots[slotIndex].assignments) {
+          updatedLessonSlots[slotIndex].assignments = [];
+        }
+        updatedLessonSlots[slotIndex].assignments?.push(newAssignment);
+        
+        // Обновляем состояние lessonSlots
+        setLessonSlots(updatedLessonSlots);
+        
+        console.log('Задание добавлено в слот:', {
+          slotIndex,
+          slot: updatedLessonSlots[slotIndex],
+          newAssignment
         });
-      }, 100);
+      }
+      
+      // Обновляем кеш запросов
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/assignments", { classId, subjectId, subgroupId }] 
+      });
       
       // Закрываем диалог и сбрасываем форму
       setIsAssignmentDialogOpen(false);
@@ -751,9 +770,6 @@ export default function ClassGradeDetailsPage() {
         teacherId: user?.id,
         subgroupId: subgroupId || undefined,
       });
-      
-      // Обновляем данные о заданиях
-      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
     },
     onError: (error) => {
       console.error("Ошибка при создании задания:", error);
