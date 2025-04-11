@@ -1843,6 +1843,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.scheduleId = existingGrade.scheduleId;
       }
       
+      // Если указан scheduleId, проверяем связан ли он с подгруппой
+      if (updateData.scheduleId) {
+        try {
+          // Получаем информацию о расписании
+          const scheduleInfo = await db.select().from(schedules)
+            .where(eq(schedules.id, updateData.scheduleId))
+            .limit(1);
+          
+          if (scheduleInfo.length > 0 && scheduleInfo[0].subgroupId) {
+            // Если урок связан с подгруппой, устанавливаем subgroupId для оценки
+            console.log("Обновление оценки для подгруппы: ", scheduleInfo[0].subgroupId);
+            updateData.subgroupId = scheduleInfo[0].subgroupId;
+          } else {
+            // Если новый урок не связан с подгруппой, сбрасываем subgroupId
+            updateData.subgroupId = null;
+          }
+        } catch (scheduleError) {
+          console.error('Ошибка при получении информации о расписании:', scheduleError);
+        }
+      }
+      
       // Обновляем оценку
       const updatedGrade = await dataStorage.updateGrade(gradeId, updateData);
       
@@ -1897,6 +1918,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const validTypes = ['classwork', 'homework', 'test', 'exam', 'project', 'Текущая', 'Контрольная', 'Экзамен', 'Практическая', 'Домашняя'];
         if (!validTypes.includes(data.gradeType)) {
           return res.status(400).json({ message: "Некорректный тип оценки" });
+        }
+      }
+      
+      // Если указан scheduleId, проверяем связан ли он с подгруппой
+      if (data.scheduleId) {
+        try {
+          // Получаем информацию о расписании
+          const scheduleInfo = await db.select().from(schedules)
+            .where(eq(schedules.id, data.scheduleId))
+            .limit(1);
+          
+          if (scheduleInfo.length > 0 && scheduleInfo[0].subgroupId) {
+            // Если урок связан с подгруппой, устанавливаем subgroupId для оценки
+            console.log("Обновление оценки для подгруппы: ", scheduleInfo[0].subgroupId);
+            data.subgroupId = scheduleInfo[0].subgroupId;
+          }
+        } catch (scheduleError) {
+          console.error('Ошибка при получении информации о расписании:', scheduleError);
         }
       }
       
