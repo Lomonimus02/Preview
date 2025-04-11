@@ -775,10 +775,81 @@ export default function ClassGradeDetailsPage() {
       });
     },
     onError: (error) => {
-      console.error("Ошибка при создании задания:", error);
       toast({
         title: "Ошибка",
-        description: "Не удалось создать задание. Попробуйте позже.",
+        description: `Не удалось создать задание: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+  
+  // Mutation to update assignment
+  const updateAssignmentMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof assignmentFormSchema> & { id: number }) => {
+      const { id, ...updateData } = data;
+      const res = await apiRequest(`/api/assignments/${id}`, "PATCH", updateData);
+      return res.json();
+    },
+    onSuccess: (updatedAssignment) => {
+      toast({
+        title: "Задание обновлено",
+        description: "Задание успешно изменено",
+      });
+      
+      // Обновляем кеш запросов
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/assignments", { classId, subjectId, subgroupId }] 
+      });
+      
+      // Закрываем диалог и сбрасываем форму
+      setIsAssignmentDialogOpen(false);
+      setEditingAssignmentId(null);
+      setSelectedAssignmentForEdit(null);
+      
+      assignmentForm.reset({
+        assignmentType: undefined,
+        maxScore: "",
+        description: "",
+        scheduleId: undefined,
+        subjectId: subjectId,
+        classId: classId,
+        teacherId: user?.id,
+        subgroupId: subgroupId || undefined,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: `Не удалось обновить задание: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+  
+  // Mutation to delete assignment
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest(`/api/assignments/${id}`, "DELETE");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Задание удалено",
+        description: "Задание успешно удалено",
+      });
+      
+      // Обновляем кеш запросов
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/assignments", { classId, subjectId, subgroupId }] 
+      });
+    },
+    onError: (error) => {
+      console.error("Ошибка при удалении задания:", error);
+      toast({
+        title: "Ошибка",
+        description: `Не удалось удалить задание: ${error.message}`,
         variant: "destructive",
       });
     }
@@ -936,6 +1007,10 @@ export default function ClassGradeDetailsPage() {
   
   // Open dialog to create a new assignment
   const openAssignmentDialog = (scheduleId?: number) => {
+    // Сбрасываем информацию о редактировании задания
+    setEditingAssignmentId(null);
+    setSelectedAssignmentForEdit(null);
+    
     // Если передан ID урока, находим его в списке
     if (scheduleId) {
       const schedule = getScheduleById(scheduleId);
@@ -968,6 +1043,41 @@ export default function ClassGradeDetailsPage() {
     });
     
     setIsAssignmentDialogOpen(true);
+  };
+  
+  // Open dialog to edit an existing assignment
+  const openEditAssignmentDialog = (assignment: Assignment) => {
+    setEditingAssignmentId(assignment.id);
+    setSelectedAssignmentForEdit(assignment);
+    
+    // Находим урок, к которому привязано задание
+    if (assignment.scheduleId) {
+      const schedule = getScheduleById(assignment.scheduleId);
+      if (schedule) {
+        setSelectedSchedule(schedule);
+      }
+    }
+    
+    // Заполняем форму данными задания
+    assignmentForm.reset({
+      assignmentType: assignment.assignmentType as any,
+      maxScore: assignment.maxScore.toString(),
+      description: assignment.description || "",
+      scheduleId: assignment.scheduleId || undefined,
+      subjectId: assignment.subjectId,
+      classId: assignment.classId,
+      teacherId: assignment.teacherId,
+      subgroupId: assignment.subgroupId || undefined,
+    });
+    
+    setIsAssignmentDialogOpen(true);
+  };
+  
+  // Handle assignment deletion
+  const handleDeleteAssignment = (id: number) => {
+    if (window.confirm("Вы действительно хотите удалить задание? Все оценки, связанные с этим заданием, будут удалены.")) {
+      deleteAssignmentMutation.mutate(id);
+    }
   };
   
   // Open grade dialog to edit existing grade
