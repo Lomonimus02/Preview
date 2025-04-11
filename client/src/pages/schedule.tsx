@@ -138,8 +138,19 @@ export default function SchedulePage() {
   
   // Получаем учеников подгруппы
   const { data: studentSubgroups = [] } = useQuery<Array<{studentId: number, subgroupId: number}>>({
-    queryKey: ["/api/student-subgroups"],
-    enabled: !!user,
+    queryKey: ["/api/student-subgroups", user?.id ? { studentId: user.id } : null],
+    enabled: !!user && user.role === UserRoleEnum.STUDENT,
+    queryFn: async ({ queryKey }) => {
+      const [_url, params] = queryKey;
+      // Если пользователь - студент, запрашиваем его подгруппы
+      if (params && 'studentId' in params) {
+        const response = await apiRequest(`/api/student-subgroups?studentId=${params.studentId}`, 'GET');
+        return response.json();
+      }
+      // В остальных случаях запрашиваем все связи
+      const response = await apiRequest('/api/student-subgroups', 'GET');
+      return response.json();
+    },
     onSuccess: (data) => {
       console.log("Получены данные о подгруппах студента:", data);
     },
