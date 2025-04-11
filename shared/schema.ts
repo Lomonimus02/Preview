@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, date, timestamp, primaryKey, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, date, timestamp, primaryKey, foreignKey, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -221,6 +221,43 @@ export const systemLogs = pgTable("system_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Типы работ для накопительной системы оценивания
+export enum AssignmentTypeEnum {
+  CONTROL_WORK = "control_work", // Контрольная работа
+  TEST_WORK = "test_work", // Проверочная работа
+  CURRENT_WORK = "current_work", // Текущая работа
+  HOMEWORK = "homework", // Домашнее задание
+  CLASSWORK = "classwork", // Работа на уроке
+  PROJECT_WORK = "project_work", // Работа с проектом
+  CLASS_ASSIGNMENT = "class_assignment" // Классная работа
+}
+
+// Таблица заданий для накопительной системы оценок
+export const assignments = pgTable("assignments", {
+  id: serial("id").primaryKey(),
+  scheduleId: integer("schedule_id").notNull(), // Связь с уроком
+  assignmentType: text("assignment_type").$type<AssignmentTypeEnum>().notNull(), // Тип работы
+  maxScore: numeric("max_score").notNull(), // Максимальный балл
+  teacherId: integer("teacher_id").notNull(), // Кто создал задание
+  classId: integer("class_id").notNull(), // Какой класс
+  subjectId: integer("subject_id").notNull(), // Какой предмет
+  subgroupId: integer("subgroup_id"), // Опциональная связь с подгруппой
+  description: text("description"), // Описание задания (опционально)
+  displayOrder: integer("display_order").default(0).notNull(), // Порядок отображения (для нескольких заданий в одном уроке)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Оценки для накопительной системы
+export const cumulativeGrades = pgTable("cumulative_grades", {
+  id: serial("id").primaryKey(),
+  assignmentId: integer("assignment_id").notNull(), // Связь с заданием
+  studentId: integer("student_id").notNull(), // Ученик
+  score: numeric("score").notNull(), // Полученный балл
+  comment: text("comment"), // Комментарий (опционально)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Zod schemas for inserting data
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -303,6 +340,17 @@ export const insertSystemLogSchema = createInsertSchema(systemLogs).omit({
   createdAt: true
 });
 
+export const insertAssignmentSchema = createInsertSchema(assignments).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertCumulativeGradeSchema = createInsertSchema(cumulativeGrades).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -357,3 +405,9 @@ export type StudentSubgroup = typeof studentSubgroups.$inferSelect;
 
 export type InsertSystemLog = z.infer<typeof insertSystemLogSchema>;
 export type SystemLog = typeof systemLogs.$inferSelect;
+
+export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
+export type Assignment = typeof assignments.$inferSelect;
+
+export type InsertCumulativeGrade = z.infer<typeof insertCumulativeGradeSchema>;
+export type CumulativeGrade = typeof cumulativeGrades.$inferSelect;
