@@ -17,6 +17,9 @@ import {
   AssignmentTypeEnum,
   Assignment
 } from "@shared/schema";
+import { z } from "zod";
+
+
 
 // Определяем интерфейс для слотов расписания
 interface LessonSlot {
@@ -56,10 +59,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-
 // Схема для формы добавления задания
 const assignmentFormSchema = z.object({
   assignmentType: z.nativeEnum(AssignmentTypeEnum, {
@@ -163,6 +162,7 @@ export default function ClassGradeDetailsPage() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [editingGradeId, setEditingGradeId] = useState<number | null>(null);
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   
   // Fetch class details
   const { data: classData, isLoading: isClassLoading } = useQuery<ClassType>({
@@ -403,8 +403,15 @@ export default function ClassGradeDetailsPage() {
     }, {} as Record<number, string[]>);
   }, [teacherSchedules]);
   
+  // Определяем схему на основе системы оценивания класса
+  const gradeFormSchema = useMemo(() => {
+    // Находим максимальный балл для выбранного задания (если выбрано)
+    const maxScore = selectedAssignment ? parseInt(selectedAssignment.maxScore) : undefined;
+    return createGradeFormSchema(classData?.gradingSystem, maxScore);
+  }, [classData?.gradingSystem, selectedAssignment]);
+
   // Grade form
-  const gradeForm = useForm<z.infer<typeof gradeFormSchema>>({
+  const gradeForm = useForm<z.infer<ReturnType<typeof createGradeFormSchema>>>({
     resolver: zodResolver(gradeFormSchema),
     defaultValues: {
       studentId: undefined,
@@ -416,12 +423,24 @@ export default function ClassGradeDetailsPage() {
       teacherId: user?.id,
       scheduleId: null, // Добавляем scheduleId с изначальным значением null
       subgroupId: subgroupId || null, // Важно! Устанавливаем subgroupId если открыт журнал подгруппы
+      assignmentId: null, // Добавляем поле для связи с заданием (для накопительной системы)
     },
   });
   
+  // Обновляем форму при изменении выбранного задания
+  useEffect(() => {
+    if (selectedAssignment) {
+      gradeForm.setValue('assignmentId', selectedAssignment.id);
+      // Перевалидируем форму с новыми ограничениями на максимальный балл
+      gradeForm.trigger('grade');
+    } else {
+      gradeForm.setValue('assignmentId', null);
+    }
+  }, [selectedAssignment, gradeForm]);
+  
   // Mutation to add grade
   const addGradeMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof gradeFormSchema>) => {
+    mutationFn: async (data: z.infer<ReturnType<typeof createGradeFormSchema>>) => {
       // Убедимся, что scheduleId всегда передается, если был выбран конкретный урок
       const gradeData = {
         ...data,
