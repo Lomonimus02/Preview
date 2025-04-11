@@ -29,6 +29,7 @@ interface ScheduleItemProps {
   room: string;
   grades?: Grade[];
   homework?: Homework | undefined;
+  assignments?: Assignment[];
   isCompleted?: boolean;
   onClick: (e?: React.MouseEvent, actionType?: string) => void;
 }
@@ -40,9 +41,38 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
   room,
   grades = [],
   homework,
+  assignments = [],
   isCompleted = false,
   onClick,
 }) => {
+  // Function to get assignment type name
+  const getAssignmentTypeName = (type: AssignmentTypeEnum) => {
+    const typeNames: Record<AssignmentTypeEnum, string> = {
+      [AssignmentTypeEnum.CONTROL_WORK]: "Контрольная работа",
+      [AssignmentTypeEnum.TEST_WORK]: "Проверочная работа",
+      [AssignmentTypeEnum.CURRENT_WORK]: "Текущая работа",
+      [AssignmentTypeEnum.HOMEWORK]: "Домашнее задание",
+      [AssignmentTypeEnum.CLASSWORK]: "Работа на уроке",
+      [AssignmentTypeEnum.PROJECT_WORK]: "Работа с проектом",
+      [AssignmentTypeEnum.CLASS_ASSIGNMENT]: "Классная работа"
+    };
+    return typeNames[type] || type;
+  };
+
+  // Function to get color for assignment type
+  const getAssignmentTypeColor = (type: AssignmentTypeEnum) => {
+    const typeColors: Record<AssignmentTypeEnum, string> = {
+      [AssignmentTypeEnum.CONTROL_WORK]: "bg-red-100 text-red-800 border-red-200",
+      [AssignmentTypeEnum.TEST_WORK]: "bg-blue-100 text-blue-800 border-blue-200",
+      [AssignmentTypeEnum.CURRENT_WORK]: "bg-green-100 text-green-800 border-green-200",
+      [AssignmentTypeEnum.HOMEWORK]: "bg-amber-100 text-amber-800 border-amber-200",
+      [AssignmentTypeEnum.CLASSWORK]: "bg-indigo-100 text-indigo-800 border-indigo-200",
+      [AssignmentTypeEnum.PROJECT_WORK]: "bg-purple-100 text-purple-800 border-purple-200",
+      [AssignmentTypeEnum.CLASS_ASSIGNMENT]: "bg-emerald-100 text-emerald-800 border-emerald-200"
+    };
+    return typeColors[type] || "bg-gray-100 text-gray-800 border-gray-200";
+  };
+
   return (
     <div 
       className={`
@@ -88,6 +118,31 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           <FiUser className="text-gray-400" size={14} />
           <span>{teacherName}</span>
         </div>
+        
+        {/* Отображаем задания, если они есть */}
+        {assignments.length > 0 && (
+          <div className="mt-2">
+            <div className="flex items-center gap-1 mb-1">
+              <FiList className="text-primary" size={14} />
+              <span className="text-xs font-medium text-gray-700">Задания:</span>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {assignments.map((assignment) => (
+                <div 
+                  key={assignment.id}
+                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${getAssignmentTypeColor(assignment.assignmentType)}`}
+                  title={`${getAssignmentTypeName(assignment.assignmentType)} (${assignment.maxScore} баллов)`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Можно добавить действие для редактирования задания
+                  }}
+                >
+                  {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)} ({assignment.maxScore})
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         {/* Отображаем оценки, если они есть */}
         {grades.length > 0 && (
