@@ -578,15 +578,40 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                       {getScheduleHomework(selectedSchedule) ? (
                         <>
                           <FiEdit3 className="mr-2" />
-                          Изменить задание
+                          Изменить домашнее задание
                         </>
                       ) : (
                         <>
                           <FiPlus className="mr-2" />
-                          Добавить задание
+                          Добавить домашнее задание
                         </>
                       )}
                     </Button>
+                    
+                    {/* Кнопка для добавления/просмотра заданий (для накопительной системы оценок) */}
+                    {selectedSchedule.status === "conducted" && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => {
+                          setIsDetailsOpen(false);
+                          setSelectedAssignment(undefined);
+                          setIsAssignmentDialogOpen(true);
+                        }}
+                      >
+                        {selectedSchedule.assignments && selectedSchedule.assignments.length > 0 ? (
+                          <>
+                            <FiEdit3 className="mr-2" />
+                            Редактировать задания
+                          </>
+                        ) : (
+                          <>
+                            <FiPlus className="mr-2" />
+                            Добавить задание
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </>
                 )}
                 
@@ -607,6 +632,30 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                 )}
               </DialogFooter>
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог с формой для заданий (накопительная система оценок) */}
+      <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedAssignment ? "Редактирование задания" : "Создание задания"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedAssignment 
+                ? "Отредактируйте данные задания" 
+                : "Добавьте новое задание для урока"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedSchedule && (
+            <AssignmentForm
+              schedule={selectedSchedule}
+              existingAssignment={selectedAssignment}
+              onClose={() => setIsAssignmentDialogOpen(false)}
+            />
           )}
         </DialogContent>
       </Dialog>
