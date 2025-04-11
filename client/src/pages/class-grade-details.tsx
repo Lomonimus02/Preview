@@ -718,6 +718,14 @@ export default function ClassGradeDetailsPage() {
 
   // Фильтрация оценок в зависимости от подгруппы
   const filteredGrades = useMemo(() => {
+    // Логируем для отладки
+    console.log("Фильтрация оценок:", {
+      subgroupId,
+      gradeCount: grades.length,
+      scheduleCount: schedules.length,
+      subjectId
+    });
+    
     // Если есть подгруппа, фильтруем только для неё
     if (subgroupId) {
       // 1. Получаем все расписания для этой подгруппы
@@ -725,32 +733,53 @@ export default function ClassGradeDetailsPage() {
         .filter(schedule => schedule.subgroupId === subgroupId)
         .map(schedule => schedule.id);
       
+      console.log(`Найдено ${subgroupScheduleIds.length} расписаний для подгруппы ${subgroupId}:`, subgroupScheduleIds);
+      
       // 2. Фильтруем оценки, чтобы показать только те, которые:
       // - относятся к урокам этой подгруппы (по scheduleId)
-      // - или не привязаны к расписанию, но принадлежат студентам из подгруппы
-      return grades.filter(grade => {
+      // - или не привязаны к расписанию, но принадлежат студентам из подгруппы и нужному предмету
+      const result = grades.filter(grade => {
         // Если оценка привязана к уроку подгруппы, показываем её
         if (grade.scheduleId && subgroupScheduleIds.includes(grade.scheduleId)) {
           return true;
         }
         
         // Если оценка не привязана к уроку, проверяем, принадлежит ли студент к подгруппе
-        if (!grade.scheduleId && filteredStudents.some(student => student.id === grade.studentId)) {
+        // и относится ли оценка к текущему предмету
+        if (!grade.scheduleId && 
+            grade.subjectId === subjectId && 
+            filteredStudents.some(student => student.id === grade.studentId)) {
           return true;
         }
         
         return false;
       });
+      
+      console.log(`Отфильтровано ${result.length} оценок для подгруппы ${subgroupId}`);
+      return result;
     } 
     // Если подгруппа не указана, фильтруем оценки для основного предмета
     else {
-      // 1. Получаем все расписания для подгрупп в этом предмете и классе
+      // 1. Получаем все расписания подгрупп, связанных с текущим предметом (subjectId)
       const allSubgroupScheduleIds = schedules
-        .filter(schedule => schedule.subgroupId !== null && schedule.subgroupId !== undefined)
+        .filter(schedule => 
+          // Только подгруппы текущего предмета
+          schedule.subjectId === subjectId && 
+          // Только с указанной подгруппой
+          schedule.subgroupId !== null && 
+          schedule.subgroupId !== undefined
+        )
         .map(schedule => schedule.id);
       
-      // 2. Фильтруем оценки, исключая те, которые относятся к урокам подгрупп
-      return grades.filter(grade => {
+      console.log(`Найдено ${allSubgroupScheduleIds.length} расписаний подгрупп для предмета ${subjectId}:`, allSubgroupScheduleIds);
+      
+      // 2. Фильтруем оценки, исключая те, которые относятся к урокам подгрупп текущего предмета
+      const result = grades.filter(grade => {
+        // Убедимся, что оценка относится к текущему предмету
+        if (grade.subjectId !== subjectId) {
+          return false;
+        }
+        
         // Не показываем оценки, привязанные к урокам подгрупп
         if (grade.scheduleId && allSubgroupScheduleIds.includes(grade.scheduleId)) {
           return false;
@@ -758,8 +787,11 @@ export default function ClassGradeDetailsPage() {
         
         return true;
       });
+      
+      console.log(`Отфильтровано ${result.length} оценок для основного предмета ${subjectId}`);
+      return result;
     }
-  }, [grades, subgroupId, schedules, filteredStudents]);
+  }, [grades, subgroupId, schedules, filteredStudents, subjectId]);
 
   // Calculate average grade for a student with weight based on grade type
   const calculateAverageGrade = (studentId: number) => {
