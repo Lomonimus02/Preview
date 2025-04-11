@@ -19,9 +19,38 @@ import {
   DialogFooter 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { FiClock, FiMapPin, FiUser, FiCheck, FiPlus, FiList, FiEdit3 } from "react-icons/fi";
 import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, Assignment, AssignmentTypeEnum } from "@shared/schema";
 import { HomeworkForm } from "./homework-form";
+
+// Функция для получения названия типа задания
+const getAssignmentTypeName = (type: AssignmentTypeEnum) => {
+  const typeNames: Record<AssignmentTypeEnum, string> = {
+    [AssignmentTypeEnum.CONTROL_WORK]: "Контрольная работа",
+    [AssignmentTypeEnum.TEST_WORK]: "Проверочная работа", 
+    [AssignmentTypeEnum.CURRENT_WORK]: "Текущая работа",
+    [AssignmentTypeEnum.HOMEWORK]: "Домашнее задание",
+    [AssignmentTypeEnum.CLASSWORK]: "Работа на уроке",
+    [AssignmentTypeEnum.PROJECT_WORK]: "Работа с проектом",
+    [AssignmentTypeEnum.CLASS_ASSIGNMENT]: "Классная работа"
+  };
+  return typeNames[type] || type;
+};
+
+// Функция для получения цвета типа задания
+const getAssignmentTypeColor = (type: AssignmentTypeEnum) => {
+  const typeColors: Record<AssignmentTypeEnum, string> = {
+    [AssignmentTypeEnum.CONTROL_WORK]: "bg-red-100 text-red-800 border-red-200",
+    [AssignmentTypeEnum.TEST_WORK]: "bg-blue-100 text-blue-800 border-blue-200",
+    [AssignmentTypeEnum.CURRENT_WORK]: "bg-green-100 text-green-800 border-green-200",
+    [AssignmentTypeEnum.HOMEWORK]: "bg-amber-100 text-amber-800 border-amber-200",
+    [AssignmentTypeEnum.CLASSWORK]: "bg-indigo-100 text-indigo-800 border-indigo-200",
+    [AssignmentTypeEnum.PROJECT_WORK]: "bg-purple-100 text-purple-800 border-purple-200",
+    [AssignmentTypeEnum.CLASS_ASSIGNMENT]: "bg-emerald-100 text-emerald-800 border-emerald-200"
+  };
+  return typeColors[type] || "bg-gray-100 text-gray-800 border-gray-200";
+};
 
 interface ScheduleItemProps {
   schedule: Schedule;
@@ -476,11 +505,11 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                     {getScheduleAssignments(selectedSchedule).map((assignment) => (
                       <div key={assignment.id} className="flex flex-col">
                         <div className="flex items-center gap-2">
-                          <Badge 
-                            className={`${getAssignmentTypeColor(assignment.assignmentType)}`}
+                          <div 
+                            className={`px-2 py-1 text-xs font-medium rounded ${getAssignmentTypeColor(assignment.assignmentType)}`}
                           >
                             {getAssignmentTypeName(assignment.assignmentType)}
-                          </Badge>
+                          </div>
                           <span className="text-sm font-medium">
                             {assignment.description || "Без описания"}
                           </span>
