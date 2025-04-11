@@ -1451,7 +1451,15 @@ interface Assignment {
                             return (
                               <TableCell 
                                 key={`${slot.date}-${slot.scheduleId}`} 
-                                className={`text-center ${classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && slot.assignments && slot.assignments.length > 0 ? 'bg-gray-50 border-gray-200' : ''}`}
+                                className={`text-center ${
+                                  classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
+                                  slot.assignments && 
+                                  slot.assignments.length > 0 
+                                    ? slot.assignments.length === 1 
+                                      ? getAssignmentTypeColor(slot.assignments[0].assignmentType) 
+                                      : 'bg-gray-50 border-gray-200' 
+                                    : ''
+                                }`}
                               >
                                 {studentGrades.length > 0 ? (
                                   <div className="flex flex-wrap justify-center gap-1 items-center">
