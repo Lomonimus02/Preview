@@ -121,20 +121,38 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
               : subject?.name || "Предмет"}
           </span>
         </div>
-        <div 
-          className="cursor-pointer" 
-          onClick={(e) => {
-            e.stopPropagation(); // Предотвращаем всплытие события
-            if (onClick && typeof onClick === 'function') {
-              onClick(e, "homework");
-            }
-          }}
-        >
-          {isCompleted ? (
-            <FiEdit3 className="text-orange-500 w-5 h-5" title="Редактировать домашнее задание" />
-          ) : (
-            <FiPlus className="text-orange-500 w-5 h-5" title="Добавить домашнее задание" />
+        <div className="flex items-center gap-2">
+          {/* Кнопка для создания задания (Отображается только для учетелей и если урок проведен) */}
+          {schedule.status === 'conducted' && (
+            <div 
+              className="cursor-pointer" 
+              onClick={(e) => {
+                e.stopPropagation(); // Предотвращаем всплытие события
+                if (onClick && typeof onClick === 'function') {
+                  onClick(e, "assignment");
+                }
+              }}
+            >
+              <FiList className="text-blue-500 w-5 h-5" title="Создать задание" />
+            </div>
           )}
+          
+          {/* Кнопка для создания домашнего задания */}
+          <div 
+            className="cursor-pointer" 
+            onClick={(e) => {
+              e.stopPropagation(); // Предотвращаем всплытие события
+              if (onClick && typeof onClick === 'function') {
+                onClick(e, "homework");
+              }
+            }}
+          >
+            {isCompleted ? (
+              <FiEdit3 className="text-orange-500 w-5 h-5" title="Редактировать домашнее задание" />
+            ) : (
+              <FiPlus className="text-orange-500 w-5 h-5" title="Добавить домашнее задание" />
+            )}
+          </div>
         </div>
       </div>
       <div className="text-sm text-gray-600">
@@ -305,14 +323,23 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     return homework.find(hw => hw.scheduleId === schedule.id);
   };
 
-  // Состояние для диалогового окна добавления домашнего задания
+  // Состояния для диалоговых окон
   const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = useState(false);
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | undefined>(undefined);
+  const { toast } = useToast();
 
-  const handleScheduleClick = (schedule: Schedule, actionType?: string) => {
+  const handleScheduleClick = (schedule: Schedule, actionType?: string, assignment?: Assignment) => {
     setSelectedSchedule(schedule);
     
     if (actionType === "homework" && isTeacher()) {
       setIsHomeworkDialogOpen(true);
+    } else if (actionType === "assignment" && isTeacher() && schedule.status === "conducted") {
+      setSelectedAssignment(undefined); // Создание нового задания
+      setIsAssignmentDialogOpen(true);
+    } else if (actionType === "edit-assignment" && assignment && isTeacher()) {
+      setSelectedAssignment(assignment); // Редактирование существующего задания
+      setIsAssignmentDialogOpen(true);
     } else {
       setIsDetailsOpen(true);
     }
@@ -396,6 +423,34 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
               schedule={selectedSchedule}
               existingHomework={getScheduleHomework(selectedSchedule)}
               onClose={() => setIsHomeworkDialogOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог для создания/редактирования задания */}
+      <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{selectedAssignment ? "Редактировать задание" : "Создать задание"}</DialogTitle>
+            <DialogDescription>
+              {selectedSchedule && (
+                <>
+                  Предмет: {getSubject(selectedSchedule.subjectId)?.name}, 
+                  Класс: {getClassName(selectedSchedule.classId)}
+                  {selectedSchedule.subgroupId && (
+                    <>, Подгруппа: {selectedSchedule.subgroupName || "Подгруппа"}</>
+                  )}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedSchedule && isTeacher() && (
+            <AssignmentForm 
+              schedule={selectedSchedule}
+              existingAssignment={selectedAssignment}
+              onClose={() => setIsAssignmentDialogOpen(false)}
             />
           )}
         </DialogContent>
