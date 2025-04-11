@@ -160,6 +160,8 @@ export default function ClassGradeDetailsPage() {
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
+  const [selectedAssignmentForEdit, setSelectedAssignmentForEdit] = useState<Assignment | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
