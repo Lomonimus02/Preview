@@ -165,6 +165,7 @@ export default function ClassGradeDetailsPage() {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [editingGradeId, setEditingGradeId] = useState<number | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<number | null>(null);
   
   // Fetch class details
   const { data: classData, isLoading: isClassLoading } = useQuery<ClassType>({
