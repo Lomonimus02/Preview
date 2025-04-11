@@ -1953,7 +1953,7 @@ export default function ClassGradeDetailsPage() {
                 if (editingAssignmentId) {
                   updateAssignmentMutation.mutate({
                     id: editingAssignmentId,
-                    data
+                    ...data
                   });
                 } else {
                   addAssignmentMutation.mutate(data);
