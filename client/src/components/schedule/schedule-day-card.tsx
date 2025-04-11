@@ -187,17 +187,26 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
         // Оценка должна быть связана с предметом этого урока
         const isSubjectMatch = grade.subjectId === schedule.subjectId;
         
+        // Оценка привязана к конкретному уроку
+        const isScheduleMatch = grade.scheduleId === schedule.id;
+        
         // Проверяем принадлежность к подгруппе, если урок для подгруппы
         if (schedule.subgroupId) {
-          // Если урок для подгруппы, оценка должна быть для этой же подгруппы
-          // или быть привязана непосредственно к этому уроку
-          return isStudentGrade && isSubjectMatch && 
-                 (grade.subgroupId === schedule.subgroupId || grade.scheduleId === schedule.id);
+          // Урок для подгруппы:
+          // 1. Показываем оценки, привязанные конкретно к этому уроку расписания
+          // 2. ИЛИ показываем оценки по этому предмету, выставленные для этой подгруппы
+          return isStudentGrade && (
+            isScheduleMatch || 
+            (isSubjectMatch && grade.subgroupId === schedule.subgroupId)
+          );
         } else {
-          // Если обычный урок (не для подгруппы), показываем оценки без привязки к подгруппе
-          // или оценки, привязанные непосредственно к этому уроку
-          return isStudentGrade && isSubjectMatch && 
-                 (!grade.subgroupId || grade.scheduleId === schedule.id);
+          // Обычный урок (не для подгруппы):
+          // 1. Показываем оценки, привязанные конкретно к этому уроку расписания
+          // 2. ИЛИ показываем оценки по этому предмету без привязки к подгруппам
+          return isStudentGrade && (
+            isScheduleMatch || 
+            (isSubjectMatch && !grade.subgroupId)
+          );
         }
       });
     }
