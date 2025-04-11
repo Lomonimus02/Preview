@@ -344,7 +344,17 @@ export default function ClassGradeDetailsPage() {
     },
     onSuccess: (newGrade) => {
       // После успешного запроса обновляем кеш актуальными данными
-      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      // Добавляем параметр subgroupId в invalidation, чтобы обновить соответствующие данные
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades"] 
+      });
+      
+      // Обязательно инвалидируем запрос с конкретными параметрами для журнала подгруппы
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId, subgroupId }] 
+      });
+      
+      console.log("Оценка добавлена:", newGrade, "для подгруппы:", subgroupId);
       
       // Закрываем диалог только после успешного добавления
       setIsGradeDialogOpen(false);
@@ -383,7 +393,13 @@ export default function ClassGradeDetailsPage() {
     },
     // Всегда возвращаемся к актуальному состоянию после выполнения мутации
     onSettled: () => {
+      // Добавляем дополнительную инвалидацию для запроса с параметрами подгруппы
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      // Явно инвалидируем запрос с параметрами для текущего класса, предмета и подгруппы
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId, subgroupId }] 
+      });
+      console.log("Запрос данных для подгруппы после сохранения оценки:", { classId, subjectId, subgroupId });
     },
   });
   
@@ -470,7 +486,15 @@ export default function ClassGradeDetailsPage() {
       });
     },
     onSettled: () => {
+      // Добавляем дополнительную инвалидацию для запроса с параметрами подгруппы
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      
+      // Явно инвалидируем запрос с параметрами для текущего класса, предмета и подгруппы
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId, subgroupId }] 
+      });
+      
+      console.log("Запрос данных после обновления оценки:", { classId, subjectId, subgroupId });
     },
   });
   
@@ -567,7 +591,15 @@ export default function ClassGradeDetailsPage() {
       });
     },
     onSettled: () => {
+      // Добавляем дополнительную инвалидацию для запроса с параметрами подгруппы
       queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      
+      // Явно инвалидируем запрос с параметрами для текущего класса, предмета и подгруппы
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId, subgroupId }] 
+      });
+      
+      console.log("Запрос данных после удаления оценки:", { classId, subjectId, subgroupId });
     },
   });
   
