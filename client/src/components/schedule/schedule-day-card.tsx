@@ -160,14 +160,15 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
               {assignments.map((assignment) => (
                 <div 
                   key={assignment.id}
-                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${getAssignmentTypeColor(assignment.assignmentType)}`}
+                  className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium cursor-pointer ${getAssignmentTypeColor(assignment.assignmentType)}`}
                   title={`${getAssignmentTypeName(assignment.assignmentType)} (${assignment.maxScore} баллов)`}
                   onClick={(e) => {
                     e.stopPropagation();
                     // Можно добавить действие для редактирования задания
                   }}
                 >
-                  {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)} ({assignment.maxScore})
+                  <span className="font-bold">{getAssignmentTypeName(assignment.assignmentType)}</span>
+                  <span className="ml-1">({assignment.maxScore} б.)</span>
                 </div>
               ))}
             </div>
