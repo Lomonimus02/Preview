@@ -716,11 +716,36 @@ export default function ClassGradeDetailsPage() {
       const res = await apiRequest("/api/assignments", "POST", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
         title: "Задание создано",
         description: "Задание успешно добавлено к уроку",
       });
+      
+      // Обновляем запросы, чтобы получить обновленные данные
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      
+      // Обновляем массив lessonSlots, добавляя новое задание
+      // к соответствующему уроку
+      const newAssignment = data;
+      const updatedLessonSlots = [...lessonSlots];
+      
+      // Находим урок, к которому привязано задание
+      const slotIndex = updatedLessonSlots.findIndex(
+        slot => slot.scheduleId === newAssignment.scheduleId
+      );
+      
+      if (slotIndex !== -1) {
+        // Если урок найден, добавляем к нему задание
+        if (!updatedLessonSlots[slotIndex].assignments) {
+          updatedLessonSlots[slotIndex].assignments = [];
+        }
+        
+        updatedLessonSlots[slotIndex].assignments?.push(newAssignment);
+        
+        // Обновляем state
+        setLessonSlots(updatedLessonSlots);
+      }
       
       // Закрываем диалог и сбрасываем форму
       setIsAssignmentDialogOpen(false);
