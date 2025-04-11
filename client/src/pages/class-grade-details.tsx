@@ -1449,7 +1449,10 @@ interface Assignment {
                           {lessonSlots.map((slot) => {
                             const studentGrades = getStudentGradeForSlot(student.id, slot, filteredGrades);
                             return (
-                              <TableCell key={`${slot.date}-${slot.scheduleId}`} className="text-center">
+                              <TableCell 
+                                key={`${slot.date}-${slot.scheduleId}`} 
+                                className={`text-center ${classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && slot.assignments && slot.assignments.length > 0 ? 'bg-gray-50 border-gray-200' : ''}`}
+                              >
                                 {studentGrades.length > 0 ? (
                                   <div className="flex flex-wrap justify-center gap-1 items-center">
                                     {studentGrades.map((grade) => (
