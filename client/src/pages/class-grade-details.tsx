@@ -1206,34 +1206,71 @@ export default function ClassGradeDetailsPage() {
     const studentGrades = filteredGrades.filter(g => g.studentId === studentId);
     if (studentGrades.length === 0) return "-";
     
-    // Весовые коэффициенты для разных типов оценок
-    const weights: Record<string, number> = {
-      'test': 2,
-      'exam': 3,
-      'homework': 1,
-      'project': 2,
-      'classwork': 1,
-      'Текущая': 1,
-      'Контрольная': 2,
-      'Экзамен': 3,
-      'Практическая': 1.5,
-      'Домашняя': 1
-    };
-    
-    let weightedSum = 0;
-    let totalWeight = 0;
-    
-    studentGrades.forEach(grade => {
-      const weight = weights[grade.gradeType] || 1;
-      weightedSum += grade.grade * weight;
-      totalWeight += weight;
-    });
-    
-    // Если нет оценок с весами, возвращаем "-"
-    if (totalWeight === 0) return "-";
-    
-    const average = weightedSum / totalWeight;
-    return average.toFixed(1);
+    // Если используется накопительная система оценивания
+    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+      // Для накопительной системы используем другой алгоритм расчета
+      // Считаем сумму полученных баллов и максимально возможных для всех заданий
+      
+      let totalEarnedScore = 0;
+      let totalMaxScore = 0;
+      
+      // Для каждой оценки находим соответствующее задание, чтобы получить максимальный балл
+      studentGrades.forEach(grade => {
+        // Находим урок, на который эта оценка
+        const slot = lessonSlots.find(slot => slot.scheduleId === grade.scheduleId);
+        if (slot && slot.assignments && slot.assignments.length > 0) {
+          // Если нет конкретной связи с заданием, берем первое задание урока
+          const assignmentId = grade.assignmentId || slot.assignments[0].id;
+          
+          // Находим задание с соответствующим ID
+          const assignment = slot.assignments.find(a => a.id === assignmentId);
+          
+          if (assignment) {
+            // Если нашли задание, добавляем баллы
+            totalEarnedScore += grade.grade;
+            totalMaxScore += Number(assignment.maxScore);
+          }
+        }
+      });
+      
+      // Если нет максимального балла, возвращаем прочерк
+      if (totalMaxScore === 0) return "-";
+      
+      // Вычисляем процент выполнения и форматируем его
+      const percentage = (totalEarnedScore / totalMaxScore) * 100;
+      return `${percentage.toFixed(1)}%`;
+    } else {
+      // Для пятибалльной системы оценивания - используем старый алгоритм с весами
+      
+      // Весовые коэффициенты для разных типов оценок
+      const weights: Record<string, number> = {
+        'test': 2,
+        'exam': 3,
+        'homework': 1,
+        'project': 2,
+        'classwork': 1,
+        'Текущая': 1,
+        'Контрольная': 2,
+        'Экзамен': 3,
+        'Практическая': 1.5,
+        'Домашняя': 1
+      };
+      
+      let weightedSum = 0;
+      let totalWeight = 0;
+      
+      studentGrades.forEach(grade => {
+        const weight = weights[grade.gradeType] || 1;
+        weightedSum += grade.grade * weight;
+        totalWeight += weight;
+      });
+      
+      // Если нет оценок с весами, возвращаем "-"
+      if (totalWeight === 0) return "-";
+      
+      const average = weightedSum / totalWeight;
+      return average.toFixed(1);
+    }
   };
   
   // Determine if a lesson is conducted
@@ -1253,6 +1290,30 @@ export default function ClassGradeDetailsPage() {
     return isLessonConducted(scheduleId) && 
            slot.assignments && 
            slot.assignments.length > 0;
+  };
+  
+  // Функция для определения должен ли клик по заголовку колонки открыть диалог статуса или диалог добавления задания
+  const handleHeaderClick = (slot: LessonSlot) => {
+    if (!canEditGrades) return;
+    
+    // Находим урок и проверяем его статус
+    const schedule = getScheduleById(slot.scheduleId);
+    if (!schedule) return;
+    
+    // Если накопительная система оценивания и урок проведен, то отображаем контекстное меню
+    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && schedule.status === 'conducted') {
+      // Если у урока уже есть задания, предлагаем добавить еще одно
+      if (slot.assignments && slot.assignments.length > 0) {
+        // Открываем диалог добавления задания
+        openAssignmentDialog(slot.scheduleId);
+      } else {
+        // Открываем диалог добавления первого задания
+        openAssignmentDialog(slot.scheduleId);
+      }
+    } else {
+      // Для всех остальных случаев - открываем диалог статуса урока
+      openStatusDialog(slot.scheduleId);
+    }
   };
   
   // Loading state
@@ -1449,7 +1510,7 @@ export default function ClassGradeDetailsPage() {
                             <TableHead 
                               key={`${slot.date}-${slot.scheduleId}`} 
                               className="text-center cursor-pointer"
-                              onClick={() => canEditGrades ? openStatusDialog(slot.scheduleId) : null}
+                              onClick={() => canEditGrades ? handleHeaderClick(slot) : null}
                             >
                               <div className="flex flex-col items-center justify-center">
                                 {slot.formattedDate}
