@@ -941,6 +941,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     res.status(201).json(newClass);
   });
+  
+  app.patch("/api/classes/:id", hasRole([UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    const classId = parseInt(req.params.id);
+    
+    if (isNaN(classId)) {
+      return res.status(400).json({ message: "Invalid class ID" });
+    }
+    
+    // Проверяем существование класса
+    const classData = await dataStorage.getClass(classId);
+    if (!classData) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+    
+    // Проверка прав: школьный администратор может обновлять только классы своей школы
+    if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
+      let userSchoolId = req.user.schoolId;
+      
+      // Если у пользователя нет schoolId в профиле, проверяем роли
+      if (!userSchoolId) {
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const schoolAdminRole = userRoles.find(role => 
+          role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
+        );
+        
+        if (schoolAdminRole && schoolAdminRole.schoolId) {
+          userSchoolId = schoolAdminRole.schoolId;
+        }
+      }
+      
+      // Проверяем принадлежность класса к школе пользователя
+      if (!userSchoolId || classData.schoolId !== userSchoolId) {
+        return res.status(403).json({ message: "You can only update classes in your school" });
+      }
+    }
+    
+    // Обновляем данные класса
+    try {
+      const updatedClass = await dataStorage.updateClass(classId, req.body);
+      
+      // Логируем действие
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "class_updated",
+        details: `Updated class: ${updatedClass.name}`,
+        ipAddress: req.ip
+      });
+      
+      res.json(updatedClass);
+    } catch (error) {
+      console.error("Error updating class:", error);
+      res.status(500).json({ message: "Failed to update class" });
+    }
+  });
 
   // Subjects API
   app.get("/api/subjects", isAuthenticated, async (req, res) => {
