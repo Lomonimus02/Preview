@@ -1251,6 +1251,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return false;
       });
     }
+
+    // Для каждого расписания получаем связанные задания
+    for (const schedule of schedules) {
+      if (schedule.status === 'conducted') {
+        try {
+          // Получаем задания для проведенного урока
+          const assignments = await dataStorage.getAssignmentsBySchedule(schedule.id);
+          if (assignments && assignments.length > 0) {
+            // Добавляем задания к объекту расписания
+            schedule.assignments = assignments;
+          }
+        } catch (error) {
+          console.error(`Error fetching assignments for schedule ${schedule.id}:`, error);
+          // Продолжаем работу даже при ошибке получения заданий
+        }
+      }
+    }
     
     res.json(schedules);
   });
@@ -2675,6 +2692,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         schedules = [...schedules, ...classSchedules];
       }
       
+      // Для каждого расписания получаем связанные задания
+      for (const schedule of schedules) {
+        if (schedule.status === 'conducted') {
+          try {
+            // Получаем задания для проведенного урока
+            const assignments = await dataStorage.getAssignmentsBySchedule(schedule.id);
+            if (assignments && assignments.length > 0) {
+              // Добавляем задания к объекту расписания
+              schedule.assignments = assignments;
+            }
+          } catch (error) {
+            console.error(`Error fetching assignments for schedule ${schedule.id}:`, error);
+            // Продолжаем работу даже при ошибке получения заданий
+          }
+        }
+      }
+      
       res.json(schedules);
     } catch (error) {
       console.error("Error fetching student schedules:", error);
@@ -2773,6 +2807,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const cls of studentClasses) {
         const classSchedules = await dataStorage.getSchedulesByClass(cls.id);
         studentSchedules.push(...classSchedules);
+      }
+      
+      // Для каждого расписания получаем связанные задания
+      for (const schedule of studentSchedules) {
+        if (schedule.status === 'conducted') {
+          try {
+            // Получаем задания для проведенного урока
+            const assignments = await dataStorage.getAssignmentsBySchedule(schedule.id);
+            if (assignments && assignments.length > 0) {
+              // Добавляем задания к объекту расписания
+              schedule.assignments = assignments;
+            }
+          } catch (error) {
+            console.error(`Error fetching assignments for schedule ${schedule.id}:`, error);
+            // Продолжаем работу даже при ошибке получения заданий
+          }
+        }
       }
       
       res.json(studentSchedules);
