@@ -46,19 +46,17 @@ export const AssignmentForm: React.FC<AssignmentFormProps> = ({
     try {
       if (existingAssignment) {
         // Редактирование существующего задания
-        await apiRequest(`/api/assignments/${existingAssignment.id}`, 
-          JSON.stringify({
-            method: "PATCH",
-            data: {
-              ...data,
-              scheduleId: schedule.id,
-              teacherId: schedule.teacherId,
-              classId: schedule.classId,
-              subjectId: schedule.subjectId,
-              subgroupId: schedule.subgroupId,
-            },
-          })
-        );
+        await apiRequest(`/api/assignments/${existingAssignment.id}`, {
+          method: "PATCH",
+          data: {
+            ...data,
+            scheduleId: schedule.id,
+            teacherId: schedule.teacherId,
+            classId: schedule.classId,
+            subjectId: schedule.subjectId,
+            subgroupId: schedule.subgroupId,
+          },
+        });
 
         toast({
           title: "Задание обновлено",
@@ -66,19 +64,17 @@ export const AssignmentForm: React.FC<AssignmentFormProps> = ({
         });
       } else {
         // Создание нового задания
-        await apiRequest("/api/assignments", 
-          JSON.stringify({
-            method: "POST",
-            data: {
-              ...data,
-              scheduleId: schedule.id,
-              teacherId: schedule.teacherId,
-              classId: schedule.classId,
-              subjectId: schedule.subjectId,
-              subgroupId: schedule.subgroupId,
-            },
-          })
-        );
+        await apiRequest("/api/assignments", {
+          method: "POST",
+          data: {
+            ...data,
+            scheduleId: schedule.id,
+            teacherId: schedule.teacherId,
+            classId: schedule.classId,
+            subjectId: schedule.subjectId,
+            subgroupId: schedule.subgroupId,
+          },
+        });
 
         toast({
           title: "Задание создано",
@@ -105,11 +101,9 @@ export const AssignmentForm: React.FC<AssignmentFormProps> = ({
     if (!existingAssignment) return;
 
     try {
-      await apiRequest(`/api/assignments/${existingAssignment.id}`, 
-        JSON.stringify({
-          method: "DELETE"
-        })
-      );
+      await apiRequest(`/api/assignments/${existingAssignment.id}`, {
+        method: "DELETE"
+      });
 
       toast({
         title: "Задание удалено",
