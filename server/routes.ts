@@ -1974,28 +1974,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Проверяем, имеет ли учитель право удалить эту оценку
       if (existingGrade.teacherId !== req.user.id) {
+        console.log(`DELETE /api/grades/${gradeId} - ошибка доступа: teacherId ${existingGrade.teacherId} != userId ${req.user.id}`);
         return res.status(403).json({ message: "Вы можете удалять только выставленные вами оценки" });
       }
       
       // Удаляем оценку
+      console.log(`DELETE /api/grades/${gradeId} - начинаем процесс удаления`);
       await dataStorage.deleteGrade(gradeId);
+      console.log(`DELETE /api/grades/${gradeId} - оценка успешно удалена`);
       
       // Уведомляем ученика об удалении оценки
-      await dataStorage.createNotification({
-        userId: existingGrade.studentId,
-        title: "Удаление оценки",
-        content: `Ваша оценка по предмету была удалена`
-      });
+      try {
+        await dataStorage.createNotification({
+          userId: existingGrade.studentId,
+          title: "Удаление оценки",
+          content: `Ваша оценка по предмету была удалена`
+        });
+        console.log(`DELETE /api/grades/${gradeId} - создано уведомление для студента ${existingGrade.studentId}`);
+      } catch (notificationError) {
+        console.error(`DELETE /api/grades/${gradeId} - ошибка при создании уведомления:`, notificationError);
+        // Продолжаем выполнение даже при ошибке создания уведомления
+      }
       
       // Логируем действие
-      await dataStorage.createSystemLog({
-        userId: req.user.id,
-        action: "grade_deleted",
-        details: `Deleted grade for student ${existingGrade.studentId}`,
-        ipAddress: req.ip
-      });
+      try {
+        await dataStorage.createSystemLog({
+          userId: req.user.id,
+          action: "grade_deleted",
+          details: `Deleted grade for student ${existingGrade.studentId}`,
+          ipAddress: req.ip
+        });
+        console.log(`DELETE /api/grades/${gradeId} - создана запись в системном журнале`);
+      } catch (logError) {
+        console.error(`DELETE /api/grades/${gradeId} - ошибка при создании записи в журнале:`, logError);
+        // Продолжаем выполнение даже при ошибке создания записи в журнале
+      }
       
-      res.status(200).json({ success: true });
+      console.log(`DELETE /api/grades/${gradeId} - завершение запроса с успехом`);
+      res.status(200).json({ success: true, message: "Оценка успешно удалена", deletedGrade: existingGrade });
     } catch (error) {
       console.error('Ошибка при удалении оценки:', error);
       res.status(500).json({ message: 'Не удалось удалить оценку', error: error.message });

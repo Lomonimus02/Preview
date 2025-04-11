@@ -521,8 +521,11 @@ export default function ClassGradeDetailsPage() {
   // Mutation to delete grade
   const deleteGradeMutation = useMutation({
     mutationFn: async (id: number) => {
+      console.log(`Выполняется запрос на удаление оценки с ID: ${id}`);
       const res = await apiRequest(`/api/grades/${id}`, "DELETE");
-      return res.json();
+      const result = await res.json();
+      console.log(`Результат запроса на удаление оценки:`, result);
+      return result;
     },
     onMutate: async (id) => {
       // Отменяем исходящие запросы
