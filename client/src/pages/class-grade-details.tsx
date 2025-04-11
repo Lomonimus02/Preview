@@ -344,14 +344,28 @@ export default function ClassGradeDetailsPage() {
     },
     onSuccess: (newGrade) => {
       // После успешного запроса обновляем кеш актуальными данными
-      // Добавляем параметр subgroupId в invalidation, чтобы обновить соответствующие данные
+      // Обновляем все запросы связанные с оценками
       queryClient.invalidateQueries({ 
-        queryKey: ["/api/grades"] 
+        queryKey: ["/api/grades"]
       });
       
-      // Обязательно инвалидируем запрос с конкретными параметрами для журнала подгруппы
+      // Инвалидируем запрос с конкретными параметрами класса и предмета (для основного журнала)
       queryClient.invalidateQueries({ 
-        queryKey: ["/api/grades", { classId, subjectId, subgroupId }] 
+        queryKey: ["/api/grades", { classId, subjectId }]
+      });
+      
+      // Если оценка добавлена в подгруппе, инвалидируем запрос этой подгруппы
+      if (subgroupId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/grades", { classId, subjectId, subgroupId }]
+        });
+      }
+      
+      console.log("Запрос данных обновлен после добавления оценки:", { 
+        classId, 
+        subjectId, 
+        subgroupId,
+        grade: newGrade 
       });
       
       console.log("Оценка добавлена:", newGrade, "для подгруппы:", subgroupId);
@@ -447,8 +461,30 @@ export default function ClassGradeDetailsPage() {
       
       return { previousGrades, previousGradesWithFilter };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+    onSuccess: (updatedGrade) => {
+      // Обновляем все запросы связанные с оценками
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades"]
+      });
+      
+      // Инвалидируем запрос с конкретными параметрами класса и предмета (для основного журнала)
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId }]
+      });
+      
+      // Если оценка обновлена в подгруппе, инвалидируем запрос этой подгруппы
+      if (subgroupId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/grades", { classId, subjectId, subgroupId }]
+        });
+      }
+      
+      console.log("Запрос данных обновлен после обновления оценки:", { 
+        classId, 
+        subjectId, 
+        subgroupId,
+        grade: updatedGrade 
+      });
       
       // Закрываем диалог и очищаем форму после успешного обновления
       setIsGradeDialogOpen(false);
@@ -568,7 +604,28 @@ export default function ClassGradeDetailsPage() {
       return { previousGrades, previousGradesWithFilter };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      // Обновляем все запросы связанные с оценками
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades"]
+      });
+      
+      // Инвалидируем запрос с конкретными параметрами класса и предмета (для основного журнала)
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId }]
+      });
+      
+      // Если оценка удалена в подгруппе, инвалидируем запрос этой подгруппы
+      if (subgroupId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/grades", { classId, subjectId, subgroupId }]
+        });
+      }
+      
+      console.log("Запрос данных обновлен после удаления оценки:", { 
+        classId, 
+        subjectId, 
+        subgroupId
+      });
       
       toast({
         title: "Оценка удалена",
@@ -750,38 +807,67 @@ export default function ClassGradeDetailsPage() {
 
   // Фильтрация оценок в зависимости от подгруппы
   const filteredGrades = useMemo(() => {
+    // Защита от пустых данных
+    if (!grades || !grades.length) {
+      return [];
+    }
+    
     // Логируем для отладки
     console.log("Фильтрация оценок:", {
       subgroupId,
       gradeCount: grades.length,
       scheduleCount: schedules.length,
-      subjectId
+      subjectId,
+      studentSubgroupCount: studentSubgroups.length
     });
     
-    // Если есть подгруппа, фильтруем только для неё
+    // Если выбрана конкретная подгруппа (просмотр журнала подгруппы)
     if (subgroupId) {
-      // 1. Получаем все расписания для этой подгруппы
+      // 1. Получаем ID студентов этой подгруппы
+      const subgroupStudentIds = studentSubgroups
+        .filter(ss => ss.subgroupId === subgroupId)
+        .map(ss => ss.studentId);
+      
+      console.log(`Студенты в подгруппе ${subgroupId}:`, subgroupStudentIds);
+      
+      // 2. Получаем все расписания (уроки) для этой подгруппы
       const subgroupScheduleIds = schedules
         .filter(schedule => schedule.subgroupId === subgroupId)
         .map(schedule => schedule.id);
       
-      console.log(`Найдено ${subgroupScheduleIds.length} расписаний для подгруппы ${subgroupId}:`, subgroupScheduleIds);
+      console.log(`Расписания для подгруппы ${subgroupId}:`, subgroupScheduleIds);
       
-      // 2. Фильтруем оценки, чтобы показать только те, которые:
-      // - относятся к урокам этой подгруппы (по scheduleId)
-      // - или не привязаны к расписанию, но принадлежат студентам из подгруппы и нужному предмету
+      // 3. Фильтруем оценки только для этой подгруппы
       const result = grades.filter(grade => {
-        // Если оценка привязана к уроку подгруппы, показываем её
-        if (grade.scheduleId && subgroupScheduleIds.includes(grade.scheduleId)) {
-          return true;
+        // Базовая проверка - оценка должна быть для этого предмета
+        if (grade.subjectId !== subjectId) {
+          return false;
         }
         
-        // Если оценка не привязана к уроку, проверяем, принадлежит ли студент к подгруппе
-        // и относится ли оценка к текущему предмету
-        if (!grade.scheduleId && 
-            grade.subjectId === subjectId && 
-            filteredStudents.some(student => student.id === grade.studentId)) {
-          return true;
+        // Используем два основных критерия проверки:
+        
+        // КРИТЕРИЙ 1: Оценка привязана к уроку этой конкретной подгруппы
+        const isLinkedToSubgroupSchedule = grade.scheduleId && 
+                                           subgroupScheduleIds.includes(grade.scheduleId);
+        
+        if (isLinkedToSubgroupSchedule) {
+          return true; // Это главный критерий - показываем такие оценки всегда
+        }
+        
+        // КРИТЕРИЙ 2: Студент в этой подгруппе и оценка либо:
+        // - явно маркирована этой подгруппой через subgroupId
+        // - не привязана ни к какому расписанию вообще (общая оценка)
+        if (subgroupStudentIds.includes(grade.studentId)) {
+          // Есть явная метка подгруппы, и это именно наша подгруппа
+          if (grade.subgroupId === subgroupId) {
+            return true;
+          }
+          
+          // Оценка без привязки к расписанию, но студент в нашей подгруппе
+          // Показываем ТОЛЬКО если нет явной привязки к другой подгруппе
+          if (!grade.scheduleId && grade.subgroupId === null) {
+            return true;
+          }
         }
         
         return false;
@@ -790,26 +876,10 @@ export default function ClassGradeDetailsPage() {
       console.log(`Отфильтровано ${result.length} оценок для подгруппы ${subgroupId}`);
       return result;
     } 
-    // Если подгруппа не указана, фильтруем оценки для основного предмета
+    // Если просматриваем журнал основного предмета (не подгруппы)
     else {
-      // 1. Получаем все расписания подгрупп, связанных с текущим предметом (subjectId)
-      const allSubgroupScheduleIds = schedules
-        .filter(schedule => 
-          // Только подгруппы текущего предмета
-          schedule.subjectId === subjectId && 
-          // Только с указанной подгруппой
-          schedule.subgroupId !== null && 
-          schedule.subgroupId !== undefined
-        )
-        .map(schedule => schedule.id);
-      
-      console.log(`Найдено ${allSubgroupScheduleIds.length} расписаний подгрупп для предмета ${subjectId}:`, allSubgroupScheduleIds);
-      
-      // 2. Собираем ID студентов всех подгрупп данного предмета
-      const subgroupStudentIds = new Set<number>();
-      
-      // Получаем все ID подгрупп для текущего предмета
-      const allSubgroupIds = schedules
+      // 1. Собираем все ID подгрупп, связанных с этим предметом
+      const relatedSubgroupIds = schedules
         .filter(schedule => 
           schedule.subjectId === subjectId && 
           schedule.subgroupId !== null
@@ -817,10 +887,25 @@ export default function ClassGradeDetailsPage() {
         .map(schedule => schedule.subgroupId)
         .filter((id): id is number => id !== null);
       
-      console.log(`Найдено подгрупп для предмета ${subjectId}:`, allSubgroupIds);
+      // Убираем дубликаты, если есть
+      const uniqueSubgroupIds = [...new Set(relatedSubgroupIds)];
+      console.log(`Подгруппы для предмета ${subjectId}:`, uniqueSubgroupIds);
       
-      // Собираем всех студентов этих подгрупп
-      allSubgroupIds.forEach(sgId => {
+      // 2. Собираем все расписания (уроки) этих подгрупп
+      const subgroupScheduleIds = schedules
+        .filter(schedule => 
+          schedule.subjectId === subjectId && 
+          schedule.subgroupId !== null
+        )
+        .map(schedule => schedule.id);
+      
+      console.log(`Расписания подгрупп предмета ${subjectId}:`, subgroupScheduleIds);
+      
+      // 3. Собираем ID студентов, входящих в эти подгруппы
+      const subgroupStudentIds = new Set<number>();
+      
+      // Обрабатываем каждую подгруппу связанную с этим предметом
+      uniqueSubgroupIds.forEach(sgId => {
         const studentsInSubgroup = studentSubgroups
           .filter(ss => ss.subgroupId === sgId)
           .map(ss => ss.studentId);
@@ -828,29 +913,33 @@ export default function ClassGradeDetailsPage() {
         studentsInSubgroup.forEach(id => subgroupStudentIds.add(id));
       });
       
-      console.log(`Студенты в подгруппах для предмета ${subjectId}:`, [...subgroupStudentIds]);
+      console.log(`Студенты в подгруппах предмета ${subjectId}:`, [...subgroupStudentIds]);
       
-      // 3. Фильтруем оценки, исключая те, которые:
-      // - относятся к урокам подгрупп текущего предмета
-      // - или принадлежат студентам подгрупп данного предмета
+      // 4. Фильтруем оценки для основного предмета, исключая подгруппы
       const result = grades.filter(grade => {
-        // Убедимся, что оценка относится к текущему предмету
+        // Базовая проверка - оценка должна быть для этого предмета
         if (grade.subjectId !== subjectId) {
           return false;
         }
         
-        // Не показываем оценки, привязанные к урокам подгрупп
-        if (grade.scheduleId && allSubgroupScheduleIds.includes(grade.scheduleId)) {
+        // КРИТЕРИЙ 1: Оценка не должна быть связана с уроком в подгруппе
+        if (grade.scheduleId && subgroupScheduleIds.includes(grade.scheduleId)) {
+          return false; // Оценка связана с уроком подгруппы, не показываем в основном журнале
+        }
+        
+        // КРИТЕРИЙ 2: Оценка не должна быть явно помечена как оценка подгруппы
+        if (grade.subgroupId !== null && uniqueSubgroupIds.includes(grade.subgroupId)) {
+          return false; // Явная метка подгруппы, не показываем в основном журнале
+        }
+        
+        // КРИТЕРИЙ 3: Если студент состоит в подгруппе по этому предмету,
+        // то не показываем его оценки без расписания в основном журнале
+        // (они должны быть только в журнале подгруппы)
+        if (subgroupStudentIds.has(grade.studentId) && !grade.scheduleId) {
           return false;
         }
         
-        // Не показываем оценки студентов подгрупп, даже если они не привязаны к scheduleId
-        if (subgroupStudentIds.has(grade.studentId)) {
-          // Можно также проверить, есть ли у студента оценки в основном предмете
-          // В данном случае просто не показываем оценки студентов из подгрупп
-          return false;
-        }
-        
+        // В остальных случаях показываем оценку в основном журнале
         return true;
       });
       
