@@ -282,6 +282,7 @@ export default function ClassGradeDetailsPage() {
       classId: classId,
       teacherId: user?.id,
       scheduleId: null, // Добавляем scheduleId с изначальным значением null
+      subgroupId: subgroupId || null, // Важно! Устанавливаем subgroupId если открыт журнал подгруппы
     },
   });
   
@@ -332,6 +333,8 @@ export default function ClassGradeDetailsPage() {
         gradeType: newGradeData.gradeType || "Текущая",
         // Добавляем scheduleId для привязки к конкретному уроку
         scheduleId: newGradeData.scheduleId || null,
+        // Очень важно! Добавляем subgroupId, если оценка ставится в подгруппе
+        subgroupId: newGradeData.subgroupId || null,
         // Используем строковое представление даты для отображения в UI
         // В БД сама дата будет приведена к нужному типу
         createdAt: createdAt as unknown as Date,
@@ -385,6 +388,7 @@ export default function ClassGradeDetailsPage() {
         classId: classId,
         teacherId: user?.id,
         scheduleId: null, // Добавляем scheduleId с изначальным значением null
+        subgroupId: subgroupId || null, // Сохраняем текущую подгруппу, если мы в контексте подгруппы
       });
       
       toast({
@@ -501,6 +505,7 @@ export default function ClassGradeDetailsPage() {
         classId: classId,
         teacherId: user?.id,
         scheduleId: null, // Добавляем scheduleId с изначальным значением null
+        subgroupId: subgroupId || null, // Сохраняем текущую подгруппу, если мы в контексте подгруппы
       });
       
       toast({
@@ -702,6 +707,7 @@ export default function ClassGradeDetailsPage() {
       classId: grade.classId,
       teacherId: grade.teacherId,
       scheduleId: grade.scheduleId || null,
+      subgroupId: grade.subgroupId || null, // Важно! Сохраняем связь с подгруппой при редактировании
     });
     
     setIsGradeDialogOpen(true);
@@ -740,6 +746,7 @@ export default function ClassGradeDetailsPage() {
         teacherId: user?.id,
         date: date || null,
         scheduleId: scheduleId || null,
+        subgroupId: subgroupId || null, // Важно! Сохраняем связь с подгруппой при создании новой оценки
       });
       
       setIsGradeDialogOpen(true);
@@ -755,11 +762,12 @@ export default function ClassGradeDetailsPage() {
         data
       });
     } else {
-      // Adding new grade - обеспечиваем, что scheduleId всегда будет установлен,
-      // так как это критически важно для правильного отображения оценок
+      // Adding new grade - обеспечиваем, что scheduleId и subgroupId всегда будут корректно установлены,
+      // так как это критически важно для правильного отображения оценок в журналах
       const finalData = {
         ...data,
-        scheduleId: data.scheduleId || null
+        scheduleId: data.scheduleId || null,
+        subgroupId: data.subgroupId || null // Сохраняем связь с подгруппой
       };
       addGradeMutation.mutate(finalData);
     }
