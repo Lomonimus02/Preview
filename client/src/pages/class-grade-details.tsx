@@ -1195,6 +1195,19 @@ interface Assignment {
     return schedule?.status === 'conducted';
   };
   
+  // Проверяет, можно ли добавить оценку для урока в накопительной системе
+  const canAddGradeToLesson = (scheduleId: number, slot: LessonSlot) => {
+    // Для пятибалльной системы достаточно только, чтобы урок был проведен
+    if (!classData || classData.gradingSystem !== GradingSystemEnum.CUMULATIVE) {
+      return isLessonConducted(scheduleId);
+    }
+    
+    // Для накопительной системы должно быть еще и задание
+    return isLessonConducted(scheduleId) && 
+           slot.assignments && 
+           slot.assignments.length > 0;
+  };
+  
   // Loading state
   const isLoading = isClassLoading || isSubjectLoading || isStudentsLoading || isSchedulesLoading || isGradesLoading;
   
@@ -1510,7 +1523,7 @@ interface Assignment {
                                       </div>
                                     ))}
                                     {/* Кнопка "+" для добавления еще одной оценки в тот же дату и урок */}
-                                    {canEditGrades && isLessonConducted(slot.scheduleId) && (
+                                    {canEditGrades && canAddGradeToLesson(slot.scheduleId, slot) && (
                                       <Button 
                                         variant="ghost" 
                                         size="sm" 
@@ -1522,7 +1535,7 @@ interface Assignment {
                                       </Button>
                                     )}
                                   </div>
-                                ) : canEditGrades && isLessonConducted(slot.scheduleId) ? (
+                                ) : canEditGrades && canAddGradeToLesson(slot.scheduleId, slot) ? (
                                   <Button 
                                     variant="ghost" 
                                     size="sm" 
