@@ -805,7 +805,34 @@ export default function ClassGradeDetailsPage() {
       
       console.log(`Найдено ${allSubgroupScheduleIds.length} расписаний подгрупп для предмета ${subjectId}:`, allSubgroupScheduleIds);
       
-      // 2. Фильтруем оценки, исключая те, которые относятся к урокам подгрупп текущего предмета
+      // 2. Собираем ID студентов всех подгрупп данного предмета
+      const subgroupStudentIds = new Set<number>();
+      
+      // Получаем все ID подгрупп для текущего предмета
+      const allSubgroupIds = schedules
+        .filter(schedule => 
+          schedule.subjectId === subjectId && 
+          schedule.subgroupId !== null
+        )
+        .map(schedule => schedule.subgroupId)
+        .filter((id): id is number => id !== null);
+      
+      console.log(`Найдено подгрупп для предмета ${subjectId}:`, allSubgroupIds);
+      
+      // Собираем всех студентов этих подгрупп
+      allSubgroupIds.forEach(sgId => {
+        const studentsInSubgroup = studentSubgroups
+          .filter(ss => ss.subgroupId === sgId)
+          .map(ss => ss.studentId);
+        
+        studentsInSubgroup.forEach(id => subgroupStudentIds.add(id));
+      });
+      
+      console.log(`Студенты в подгруппах для предмета ${subjectId}:`, [...subgroupStudentIds]);
+      
+      // 3. Фильтруем оценки, исключая те, которые:
+      // - относятся к урокам подгрупп текущего предмета
+      // - или принадлежат студентам подгрупп данного предмета
       const result = grades.filter(grade => {
         // Убедимся, что оценка относится к текущему предмету
         if (grade.subjectId !== subjectId) {
@@ -817,13 +844,20 @@ export default function ClassGradeDetailsPage() {
           return false;
         }
         
+        // Не показываем оценки студентов подгрупп, даже если они не привязаны к scheduleId
+        if (subgroupStudentIds.has(grade.studentId)) {
+          // Можно также проверить, есть ли у студента оценки в основном предмете
+          // В данном случае просто не показываем оценки студентов из подгрупп
+          return false;
+        }
+        
         return true;
       });
       
       console.log(`Отфильтровано ${result.length} оценок для основного предмета ${subjectId}`);
       return result;
     }
-  }, [grades, subgroupId, schedules, filteredStudents, subjectId]);
+  }, [grades, subgroupId, schedules, filteredStudents, subjectId, studentSubgroups]);
 
   // Calculate average grade for a student with weight based on grade type
   const calculateAverageGrade = (studentId: number) => {
