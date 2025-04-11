@@ -361,25 +361,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async deleteGrade(id: number): Promise<void> {
-    console.log(`DatabaseStorage.deleteGrade: Удаление оценки с ID: ${id}`);
-    try {
-      // Сначала получаем оценку для логирования
-      const gradeToDelete = await this.getGrade(id);
-      console.log(`DatabaseStorage.deleteGrade: Данные удаляемой оценки:`, JSON.stringify(gradeToDelete));
-      
-      // Выполняем удаление
-      const result = await db.delete(grades).where(eq(grades.id, id));
-      console.log(`DatabaseStorage.deleteGrade: Результат удаления:`, JSON.stringify(result));
-      console.log(`DatabaseStorage.deleteGrade: Успешно удалена оценка с ID: ${id}`);
-      
-      // Проверяем, что оценка действительно удалена
-      const checkGrade = await this.getGrade(id);
-      console.log(`DatabaseStorage.deleteGrade: Проверка после удаления:`, 
-        checkGrade ? `Оценка с ID ${id} все еще существует!` : `Оценка с ID ${id} успешно удалена.`);
-    } catch (error) {
-      console.error(`DatabaseStorage.deleteGrade: Ошибка при удалении оценки с ID ${id}:`, error);
-      throw error;
-    }
+    await db.delete(grades).where(eq(grades.id, id));
   }
 
   // ===== Attendance operations =====

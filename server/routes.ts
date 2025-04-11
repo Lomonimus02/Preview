@@ -2,13 +2,12 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { dbStorage } from "./db-storage";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
 
 // Используем хранилище БД для всех операций
 const dataStorage = dbStorage;
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { UserRoleEnum, schedules } from "@shared/schema";
+import { UserRoleEnum } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -1658,9 +1657,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/grades", isAuthenticated, async (req, res) => {
     let grades = [];
     
-    // Добавляем фильтр по подгруппе
-    const subgroupId = req.query.subgroupId ? parseInt(req.query.subgroupId as string) : null;
-    
     if (req.query.studentId) {
       const studentId = parseInt(req.query.studentId as string);
       
@@ -1679,55 +1675,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Получаем все оценки студента
-      let allGrades = await dataStorage.getGradesByStudent(studentId);
-      
       // Если указан также subjectId, фильтруем оценки по предмету
       if (req.query.subjectId) {
         const subjectId = parseInt(req.query.subjectId as string);
-        
-        // Фильтруем по предмету и учитываем подгруппы:
-        // - Если запрашиваются оценки для подгруппы, показываем только оценки этой подгруппы
-        // - Если запрашиваются оценки основного предмета, показываем только оценки без подгрупп
-        if (subgroupId) {
-          grades = allGrades.filter(grade => grade.subjectId === subjectId && grade.subgroupId === subgroupId);
-        } else {
-          grades = allGrades.filter(grade => grade.subjectId === subjectId && grade.subgroupId === null);
-        }
+        const allGrades = await dataStorage.getGradesByStudent(studentId);
+        grades = allGrades.filter(grade => grade.subjectId === subjectId);
       } else {
-        // Если не указан предмет, но указана подгруппа
-        if (subgroupId) {
-          grades = allGrades.filter(grade => grade.subgroupId === subgroupId);
-        } else {
-          grades = allGrades;
-        }
+        grades = await dataStorage.getGradesByStudent(studentId);
       }
     } else if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
       
       // Teachers, school admins, principals, and vice principals can view class grades
       if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
-        // Получаем все оценки класса
-        const classGrades = await dataStorage.getGradesByClass(classId);
-        
         // Если указан также subjectId, фильтруем оценки по предмету и классу
         if (req.query.subjectId) {
           const subjectId = parseInt(req.query.subjectId as string);
-          
-          // Фильтруем с учетом подгруппы
-          if (subgroupId) {
-            grades = classGrades.filter(grade => grade.subjectId === subjectId && grade.subgroupId === subgroupId);
-          } else {
-            // Для основного предмета показываем только оценки, не связанные с подгруппами
-            grades = classGrades.filter(grade => grade.subjectId === subjectId && grade.subgroupId === null);
-          }
+          const classGrades = await dataStorage.getGradesByClass(classId);
+          grades = classGrades.filter(grade => grade.subjectId === subjectId);
         } else {
-          // Если не указан предмет, но указана подгруппа
-          if (subgroupId) {
-            grades = classGrades.filter(grade => grade.subgroupId === subgroupId);
-          } else {
-            grades = classGrades;
-          }
+          grades = await dataStorage.getGradesByClass(classId);
         }
       } else {
         return res.status(403).json({ message: "Forbidden" });
@@ -1749,32 +1716,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/grades", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
     try {
-      console.log("POST /api/grades - получен запрос:", JSON.stringify(req.body));
-      
       // Если указана дата, используем её для установки createdAt
       let gradeData = { ...req.body, teacherId: req.user.id };
       
       // Если не передан scheduleId, установим его как null (опционально)
       if (gradeData.scheduleId === undefined) {
         gradeData.scheduleId = null;
-      }
-      
-      // Если указан scheduleId, проверяем связан ли он с подгруппой
-      if (gradeData.scheduleId) {
-        try {
-          // Получаем информацию о расписании
-          const scheduleInfo = await db.select().from(schedules)
-            .where(eq(schedules.id, gradeData.scheduleId))
-            .limit(1);
-          
-          if (scheduleInfo.length > 0 && scheduleInfo[0].subgroupId) {
-            // Если урок связан с подгруппой, устанавливаем subgroupId для оценки
-            console.log("Оценка для подгруппы: ", scheduleInfo[0].subgroupId);
-            gradeData.subgroupId = scheduleInfo[0].subgroupId;
-          }
-        } catch (scheduleError) {
-          console.error('Ошибка при получении информации о расписании:', scheduleError);
-        }
       }
       
       if (gradeData.date) {
@@ -1845,27 +1792,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.scheduleId = existingGrade.scheduleId;
       }
       
-      // Если указан scheduleId, проверяем связан ли он с подгруппой
-      if (updateData.scheduleId) {
-        try {
-          // Получаем информацию о расписании
-          const scheduleInfo = await db.select().from(schedules)
-            .where(eq(schedules.id, updateData.scheduleId))
-            .limit(1);
-          
-          if (scheduleInfo.length > 0 && scheduleInfo[0].subgroupId) {
-            // Если урок связан с подгруппой, устанавливаем subgroupId для оценки
-            console.log("Обновление оценки для подгруппы: ", scheduleInfo[0].subgroupId);
-            updateData.subgroupId = scheduleInfo[0].subgroupId;
-          } else {
-            // Если новый урок не связан с подгруппой, сбрасываем subgroupId
-            updateData.subgroupId = null;
-          }
-        } catch (scheduleError) {
-          console.error('Ошибка при получении информации о расписании:', scheduleError);
-        }
-      }
-      
       // Обновляем оценку
       const updatedGrade = await dataStorage.updateGrade(gradeId, updateData);
       
@@ -1923,24 +1849,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Если указан scheduleId, проверяем связан ли он с подгруппой
-      if (data.scheduleId) {
-        try {
-          // Получаем информацию о расписании
-          const scheduleInfo = await db.select().from(schedules)
-            .where(eq(schedules.id, data.scheduleId))
-            .limit(1);
-          
-          if (scheduleInfo.length > 0 && scheduleInfo[0].subgroupId) {
-            // Если урок связан с подгруппой, устанавливаем subgroupId для оценки
-            console.log("Обновление оценки для подгруппы: ", scheduleInfo[0].subgroupId);
-            data.subgroupId = scheduleInfo[0].subgroupId;
-          }
-        } catch (scheduleError) {
-          console.error('Ошибка при получении информации о расписании:', scheduleError);
-        }
-      }
-      
       const updatedGrade = await dataStorage.updateGrade(gradeId, data);
       if (!updatedGrade) {
         return res.status(404).json({ message: "Не удалось обновить оценку" });
@@ -1955,63 +1863,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.delete("/api/grades/:id", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
     try {
-      console.log(`DELETE /api/grades/${req.params.id} - запрос на удаление оценки`);
-      
       const gradeId = parseInt(req.params.id);
       if (isNaN(gradeId)) {
-        console.log(`DELETE /api/grades - ошибка: неверный ID ${req.params.id}`);
         return res.status(400).json({ message: "Invalid grade ID" });
       }
       
       // Проверяем, существует ли оценка
       const existingGrade = await dataStorage.getGrade(gradeId);
       if (!existingGrade) {
-        console.log(`DELETE /api/grades/${gradeId} - ошибка: оценка не найдена`);
         return res.status(404).json({ message: "Оценка не найдена" });
       }
       
-      console.log(`DELETE /api/grades/${gradeId} - найдена оценка:`, JSON.stringify(existingGrade));
-      
       // Проверяем, имеет ли учитель право удалить эту оценку
       if (existingGrade.teacherId !== req.user.id) {
-        console.log(`DELETE /api/grades/${gradeId} - ошибка доступа: teacherId ${existingGrade.teacherId} != userId ${req.user.id}`);
         return res.status(403).json({ message: "Вы можете удалять только выставленные вами оценки" });
       }
       
       // Удаляем оценку
-      console.log(`DELETE /api/grades/${gradeId} - начинаем процесс удаления`);
       await dataStorage.deleteGrade(gradeId);
-      console.log(`DELETE /api/grades/${gradeId} - оценка успешно удалена`);
       
       // Уведомляем ученика об удалении оценки
-      try {
-        await dataStorage.createNotification({
-          userId: existingGrade.studentId,
-          title: "Удаление оценки",
-          content: `Ваша оценка по предмету была удалена`
-        });
-        console.log(`DELETE /api/grades/${gradeId} - создано уведомление для студента ${existingGrade.studentId}`);
-      } catch (notificationError) {
-        console.error(`DELETE /api/grades/${gradeId} - ошибка при создании уведомления:`, notificationError);
-        // Продолжаем выполнение даже при ошибке создания уведомления
-      }
+      await dataStorage.createNotification({
+        userId: existingGrade.studentId,
+        title: "Удаление оценки",
+        content: `Ваша оценка по предмету была удалена`
+      });
       
       // Логируем действие
-      try {
-        await dataStorage.createSystemLog({
-          userId: req.user.id,
-          action: "grade_deleted",
-          details: `Deleted grade for student ${existingGrade.studentId}`,
-          ipAddress: req.ip
-        });
-        console.log(`DELETE /api/grades/${gradeId} - создана запись в системном журнале`);
-      } catch (logError) {
-        console.error(`DELETE /api/grades/${gradeId} - ошибка при создании записи в журнале:`, logError);
-        // Продолжаем выполнение даже при ошибке создания записи в журнале
-      }
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "grade_deleted",
+        details: `Deleted grade for student ${existingGrade.studentId}`,
+        ipAddress: req.ip
+      });
       
-      console.log(`DELETE /api/grades/${gradeId} - завершение запроса с успехом`);
-      res.status(200).json({ success: true, message: "Оценка успешно удалена", deletedGrade: existingGrade });
+      res.status(200).json({ success: true });
     } catch (error) {
       console.error('Ошибка при удалении оценки:', error);
       res.status(500).json({ message: 'Не удалось удалить оценку', error: error.message });
