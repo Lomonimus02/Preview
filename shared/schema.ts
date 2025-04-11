@@ -41,6 +41,12 @@ export const schools = pgTable("schools", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Enum для системы оценивания
+export enum GradingSystemEnum {
+  FIVE_POINT = "five_point", // Пятибалльная
+  CUMULATIVE = "cumulative"  // Накопительная
+}
+
 // Classes table
 export const classes = pgTable("classes", {
   id: serial("id").primaryKey(),
@@ -48,6 +54,7 @@ export const classes = pgTable("classes", {
   schoolId: integer("school_id").notNull(),
   gradeLevel: integer("grade_level").notNull(),
   academicYear: text("academic_year").notNull(),
+  gradingSystem: text("grading_system").$type<GradingSystemEnum>().default(GradingSystemEnum.FIVE_POINT).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

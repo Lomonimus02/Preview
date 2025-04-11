@@ -1,5 +1,7 @@
-import { db } from './server/db.ts';
-import { sql } from 'drizzle-orm';
+// Since we need to import TypeScript files, let's use the Drizzle migration setup directly
+// by leveraging the database connection from the running application
+const { db } = require('./server/db');
+const { sql } = require('drizzle-orm');
 
 async function addScheduleDateColumn() {
   try {
@@ -113,6 +115,34 @@ async function addGradeSubgroupIdColumn() {
   }
 }
 
+async function addClassGradingSystemColumn() {
+  try {
+    console.log('Проверяем наличие колонки grading_system в таблице classes...');
+    const checkColumnExistsQuery = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'classes' AND column_name = 'grading_system'
+    `;
+    
+    const result = await db.execute(sql.raw(checkColumnExistsQuery));
+    
+    if (result.length === 0) {
+      console.log('Колонка grading_system не найдена, добавляем...');
+      const addColumnQuery = `
+        ALTER TABLE classes 
+        ADD COLUMN grading_system TEXT NOT NULL DEFAULT 'five_point'
+      `;
+      await db.execute(sql.raw(addColumnQuery));
+      console.log('Колонка grading_system успешно добавлена');
+    } else {
+      console.log('Колонка grading_system уже существует');
+    }
+  } catch (error) {
+    console.error('Ошибка при добавлении колонки grading_system:', error);
+    throw error;
+  }
+}
+
 async function runMigrations() {
   try {
     console.log('Запуск миграций...');
@@ -120,6 +150,7 @@ async function runMigrations() {
     await addGradeScheduleIdColumn();
     await addUserRolesClassIdColumn();
     await addGradeSubgroupIdColumn();
+    await addClassGradingSystemColumn();
     console.log('Миграции успешно выполнены');
   } catch (error) {
     console.error('Ошибка при выполнении миграций:', error);
