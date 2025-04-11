@@ -1,6 +1,6 @@
 import { IStorage } from './storage';
 import { db } from './db';
-import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
+import { eq, and, or, inArray, sql } from 'drizzle-orm';
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import {
@@ -334,49 +334,16 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async getGradesByStudent(studentId: number, subgroupId?: number): Promise<Grade[]> {
-    if (subgroupId) {
-      // Если указан ID подгруппы, возвращаем только оценки из этой подгруппы
-      return await db.select()
-        .from(grades)
-        .where(and(
-          eq(grades.studentId, studentId),
-          eq(grades.subgroupId, subgroupId)
-        ));
-    } else {
-      // Если ID подгруппы не указан, возвращаем все оценки, включая оценки в подгруппах
-      return await db.select().from(grades).where(eq(grades.studentId, studentId));
-    }
+  async getGradesByStudent(studentId: number): Promise<Grade[]> {
+    return await db.select().from(grades).where(eq(grades.studentId, studentId));
   }
 
-  async getGradesByClass(classId: number, includeSubgroups: boolean = true): Promise<Grade[]> {
-    if (includeSubgroups) {
-      // Вернуть все оценки для класса, включая оценки в подгруппах
-      return await db.select().from(grades).where(eq(grades.classId, classId));
-    } else {
-      // Вернуть только оценки по основным предметам (не в подгруппах)
-      return await db.select()
-        .from(grades)
-        .where(and(
-          eq(grades.classId, classId),
-          isNull(grades.subgroupId)
-        ));
-    }
+  async getGradesByClass(classId: number): Promise<Grade[]> {
+    return await db.select().from(grades).where(eq(grades.classId, classId));
   }
 
-  async getGradesBySubject(subjectId: number, includeSubgroups: boolean = false): Promise<Grade[]> {
-    if (includeSubgroups) {
-      // Включить все оценки, включая оценки в подгруппах по этому предмету
-      return await db.select().from(grades).where(eq(grades.subjectId, subjectId));
-    } else {
-      // Вернуть только оценки по основному предмету (не в подгруппах)
-      return await db.select()
-        .from(grades)
-        .where(and(
-          eq(grades.subjectId, subjectId),
-          isNull(grades.subgroupId)
-        ));
-    }
+  async getGradesBySubject(subjectId: number): Promise<Grade[]> {
+    return await db.select().from(grades).where(eq(grades.subjectId, subjectId));
   }
 
   async createGrade(grade: InsertGrade): Promise<Grade> {
