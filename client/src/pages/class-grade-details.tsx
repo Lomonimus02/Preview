@@ -271,6 +271,55 @@ export default function ClassGradeDetailsPage() {
     enabled: !!classId && !!subjectId && !!user && classData?.gradingSystem === GradingSystemEnum.CUMULATIVE,
   });
   
+  // Функция для определения, есть ли задания для конкретного урока
+  const getAssignmentsForSchedule = useCallback((scheduleId: number) => {
+    return assignments.filter(a => a.scheduleId === scheduleId);
+  }, [assignments]);
+
+  // Функция для получения цвета фона ячейки на основе типа задания
+  const getAssignmentTypeColor = useCallback((assignmentType: string) => {
+    switch(assignmentType) {
+      case AssignmentTypeEnum.CONTROL_WORK:
+        return 'bg-red-100';
+      case AssignmentTypeEnum.TEST_WORK:
+        return 'bg-blue-100';
+      case AssignmentTypeEnum.CURRENT_WORK:
+        return 'bg-green-100';
+      case AssignmentTypeEnum.HOMEWORK:
+        return 'bg-amber-100';
+      case AssignmentTypeEnum.CLASSWORK:
+        return 'bg-purple-100';
+      case AssignmentTypeEnum.PROJECT_WORK:
+        return 'bg-emerald-100';
+      case AssignmentTypeEnum.CLASS_ASSIGNMENT:
+        return 'bg-indigo-100';
+      default:
+        return '';
+    }
+  }, []);
+
+  // Функция для получения названия типа задания
+  const getAssignmentTypeName = useCallback((assignmentType: string) => {
+    switch(assignmentType) {
+      case AssignmentTypeEnum.CONTROL_WORK:
+        return 'Контрольная работа';
+      case AssignmentTypeEnum.TEST_WORK:
+        return 'Проверочная работа';
+      case AssignmentTypeEnum.CURRENT_WORK:
+        return 'Текущая работа';
+      case AssignmentTypeEnum.HOMEWORK:
+        return 'Домашнее задание';
+      case AssignmentTypeEnum.CLASSWORK:
+        return 'Работа на уроке';
+      case AssignmentTypeEnum.PROJECT_WORK:
+        return 'Работа с проектом';
+      case AssignmentTypeEnum.CLASS_ASSIGNMENT:
+        return 'Классная работа';
+      default:
+        return assignmentType;
+    }
+  }, []);
+
   // Get unique lesson slots (date + scheduleId pairs) from schedules for this class and subject
   const lessonSlots = useMemo(() => {
     // Фильтруем расписания для текущего предмета
@@ -291,9 +340,10 @@ export default function ClassGradeDetailsPage() {
         startTime: s.startTime || '',
         endTime: s.endTime || '',
         status: s.status || 'not_conducted',
-        formattedDate: format(new Date(s.scheduleDate as string), "dd.MM", { locale: ru })
+        formattedDate: format(new Date(s.scheduleDate as string), "dd.MM", { locale: ru }),
+        assignments: getAssignmentsForSchedule(s.id)
       }));
-  }, [schedules, subjectId]);
+  }, [schedules, subjectId, getAssignmentsForSchedule]);
   
   // Группируем расписания учителя по предметам
   const schedulesBySubject = useMemo(() => {
