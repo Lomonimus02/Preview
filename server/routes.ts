@@ -1740,6 +1740,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         gradeData.scheduleId = null;
       }
       
+      // Если scheduleId указан, проверяем, является ли это расписанием подгруппы
+      if (gradeData.scheduleId) {
+        try {
+          const schedule = await dataStorage.getSchedule(gradeData.scheduleId);
+          if (schedule && schedule.subgroupId) {
+            // Если расписание связано с подгруппой, автоматически добавляем subgroupId к оценке
+            gradeData.subgroupId = schedule.subgroupId;
+            console.log(`Grade created for subgroup ${schedule.subgroupId} from schedule ${gradeData.scheduleId}`);
+          }
+        } catch (scheduleError) {
+          console.error('Ошибка при получении расписания:', scheduleError);
+        }
+      }
+      
+      // Если subgroupId указан напрямую в запросе, оставляем его как есть
+      if (gradeData.subgroupId === undefined) {
+        gradeData.subgroupId = null;
+      }
+      
       if (gradeData.date) {
         try {
           // Преобразуем дату урока в объект Date
@@ -1759,18 +1778,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const grade = await dataStorage.createGrade(gradeData);
       
+      // Получаем информацию о предмете и подгруппе для уведомления
+      let subjectName = "";
+      let subgroupInfo = "";
+      
+      try {
+        const subject = await dataStorage.getSubject(grade.subjectId);
+        if (subject) {
+          subjectName = subject.name;
+        }
+        
+        if (grade.subgroupId) {
+          const subgroup = await dataStorage.getSubgroup(grade.subgroupId);
+          if (subgroup) {
+            subgroupInfo = ` (подгруппа "${subgroup.name}")`;
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка при получении информации о предмете/подгруппе:', error);
+      }
+      
       // Notify the student
       await dataStorage.createNotification({
         userId: grade.studentId,
         title: "Новая оценка",
-        content: `У вас новая оценка: ${grade.grade} (${grade.gradeType})`
+        content: `У вас новая оценка: ${grade.grade} (${grade.gradeType}) по предмету ${subjectName}${subgroupInfo}`
       });
       
       // Log the action
       await dataStorage.createSystemLog({
         userId: req.user.id,
         action: "grade_created",
-        details: `Created grade ${grade.grade} for student ${grade.studentId}`,
+        details: `Created grade ${grade.grade} for student ${grade.studentId}${grade.subgroupId ? ` in subgroup ${grade.subgroupId}` : ''}`,
         ipAddress: req.ip
       });
       
@@ -1806,6 +1845,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateData.scheduleId === undefined) {
         // Если scheduleId не передан, сохраняем текущее значение
         updateData.scheduleId = existingGrade.scheduleId;
+      } else if (updateData.scheduleId !== existingGrade.scheduleId) {
+        // Если scheduleId изменился, проверяем, является ли новое расписание расписанием подгруппы
+        try {
+          const newSchedule = await dataStorage.getSchedule(updateData.scheduleId);
+          if (newSchedule && newSchedule.subgroupId) {
+            // Обновляем subgroupId в соответствии с новым расписанием
+            updateData.subgroupId = newSchedule.subgroupId;
+            console.log(`Grade updated with subgroup ${newSchedule.subgroupId} from schedule ${updateData.scheduleId}`);
+          } else {
+            // Если новое расписание не связано с подгруппой, убираем subgroupId
+            updateData.subgroupId = null;
+          }
+        } catch (scheduleError) {
+          console.error('Ошибка при получении расписания:', scheduleError);
+        }
+      }
+      
+      // Если subgroupId не указан в запросе и не был обновлен из расписания, оставляем текущее значение
+      if (updateData.subgroupId === undefined) {
+        updateData.subgroupId = existingGrade.subgroupId;
+      }
+      
+      // Получаем информацию о предмете и подгруппе для уведомления
+      let subjectName = "";
+      let subgroupInfo = "";
+      
+      try {
+        const subject = await dataStorage.getSubject(existingGrade.subjectId);
+        if (subject) {
+          subjectName = subject.name;
+        }
+        
+        if (updateData.subgroupId) {
+          const subgroup = await dataStorage.getSubgroup(updateData.subgroupId);
+          if (subgroup) {
+            subgroupInfo = ` (подгруппа "${subgroup.name}")`;
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка при получении информации о предмете/подгруппе:', error);
       }
       
       // Обновляем оценку
@@ -1815,14 +1894,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await dataStorage.createNotification({
         userId: existingGrade.studentId,
         title: "Обновление оценки",
-        content: `Ваша оценка была изменена на: ${req.body.grade} (${req.body.gradeType || existingGrade.gradeType})`
+        content: `Ваша оценка по предмету ${subjectName}${subgroupInfo} была изменена на: ${req.body.grade || existingGrade.grade} (${req.body.gradeType || existingGrade.gradeType})`
       });
       
       // Логируем действие
       await dataStorage.createSystemLog({
         userId: req.user.id,
         action: "grade_updated",
-        details: `Updated grade for student ${existingGrade.studentId}`,
+        details: `Updated grade for student ${existingGrade.studentId}${updateData.subgroupId ? ` in subgroup ${updateData.subgroupId}` : ''}`,
         ipAddress: req.ip
       });
       
@@ -1865,10 +1944,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Если меняется scheduleId, проверяем связь с подгруппой
+      if (data.scheduleId !== undefined && data.scheduleId !== existingGrade.scheduleId) {
+        try {
+          const newSchedule = await dataStorage.getSchedule(data.scheduleId);
+          if (newSchedule && newSchedule.subgroupId) {
+            // Обновляем subgroupId в соответствии с новым расписанием
+            data.subgroupId = newSchedule.subgroupId;
+            console.log(`Grade updated with subgroup ${newSchedule.subgroupId} from schedule ${data.scheduleId}`);
+          } else if (newSchedule) {
+            // Если новое расписание не связано с подгруппой, убираем subgroupId
+            data.subgroupId = null;
+          }
+        } catch (scheduleError) {
+          console.error('Ошибка при получении расписания:', scheduleError);
+        }
+      }
+      
       const updatedGrade = await dataStorage.updateGrade(gradeId, data);
       if (!updatedGrade) {
         return res.status(404).json({ message: "Не удалось обновить оценку" });
       }
+      
+      // Добавляем логирование действия
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "grade_patched",
+        details: `Updated grade ${gradeId} with partial data${data.subgroupId ? `, subgroup: ${data.subgroupId}` : ''}`,
+        ipAddress: req.ip
+      });
       
       res.json(updatedGrade);
     } catch (error) {
@@ -1895,6 +1999,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Вы можете удалять только выставленные вами оценки" });
       }
       
+      // Получаем информацию о предмете и подгруппе для уведомления
+      let subjectName = "предмету";
+      let subgroupInfo = "";
+      
+      try {
+        const subject = await dataStorage.getSubject(existingGrade.subjectId);
+        if (subject) {
+          subjectName = subject.name;
+        }
+        
+        if (existingGrade.subgroupId) {
+          const subgroup = await dataStorage.getSubgroup(existingGrade.subgroupId);
+          if (subgroup) {
+            subgroupInfo = ` (подгруппа "${subgroup.name}")`;
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка при получении информации о предмете/подгруппе:', error);
+      }
+      
       // Удаляем оценку
       await dataStorage.deleteGrade(gradeId);
       
@@ -1902,14 +2026,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await dataStorage.createNotification({
         userId: existingGrade.studentId,
         title: "Удаление оценки",
-        content: `Ваша оценка по предмету была удалена`
+        content: `Ваша оценка по предмету ${subjectName}${subgroupInfo} была удалена`
       });
       
       // Логируем действие
       await dataStorage.createSystemLog({
         userId: req.user.id,
         action: "grade_deleted",
-        details: `Deleted grade for student ${existingGrade.studentId}`,
+        details: `Deleted grade for student ${existingGrade.studentId}${existingGrade.subgroupId ? ` in subgroup ${existingGrade.subgroupId}` : ''}`,
         ipAddress: req.ip
       });
       
