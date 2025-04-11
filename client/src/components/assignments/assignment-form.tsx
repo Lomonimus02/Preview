@@ -44,18 +44,23 @@ export const AssignmentForm: React.FC<AssignmentFormProps> = ({
 
   const onSubmit = async (data: AssignmentFormValues) => {
     try {
+      const requestData = {
+        ...data,
+        scheduleId: schedule.id,
+        teacherId: schedule.teacherId,
+        classId: schedule.classId,
+        subjectId: schedule.subjectId,
+        subgroupId: schedule.subgroupId,
+      };
+
       if (existingAssignment) {
         // Редактирование существующего задания
-        await apiRequest(`/api/assignments/${existingAssignment.id}`, {
+        await fetch(`/api/assignments/${existingAssignment.id}`, {
           method: "PATCH",
-          data: {
-            ...data,
-            scheduleId: schedule.id,
-            teacherId: schedule.teacherId,
-            classId: schedule.classId,
-            subjectId: schedule.subjectId,
-            subgroupId: schedule.subgroupId,
+          headers: {
+            "Content-Type": "application/json"
           },
+          body: JSON.stringify(requestData)
         });
 
         toast({
@@ -64,16 +69,12 @@ export const AssignmentForm: React.FC<AssignmentFormProps> = ({
         });
       } else {
         // Создание нового задания
-        await apiRequest("/api/assignments", {
+        await fetch("/api/assignments", {
           method: "POST",
-          data: {
-            ...data,
-            scheduleId: schedule.id,
-            teacherId: schedule.teacherId,
-            classId: schedule.classId,
-            subjectId: schedule.subjectId,
-            subgroupId: schedule.subgroupId,
+          headers: {
+            "Content-Type": "application/json"
           },
+          body: JSON.stringify(requestData)
         });
 
         toast({
@@ -101,7 +102,7 @@ export const AssignmentForm: React.FC<AssignmentFormProps> = ({
     if (!existingAssignment) return;
 
     try {
-      await apiRequest(`/api/assignments/${existingAssignment.id}`, {
+      await fetch(`/api/assignments/${existingAssignment.id}`, {
         method: "DELETE"
       });
 
