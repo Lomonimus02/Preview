@@ -33,6 +33,8 @@ import {
   FiAlertCircle 
 } from "react-icons/fi";
 import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum, Assignment } from "@shared/schema";
+import { HomeworkForm } from "../homework/homework-form";
+import { AssignmentForm } from "../assignments/assignment-form";
 import { HomeworkForm } from "./homework-form";
 import { AssignmentForm } from "../assignments/assignment-form";
 
@@ -243,8 +245,12 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 }) => {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = useState(false);
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | undefined>(undefined);
   const [, navigate] = useLocation();
   const { isTeacher } = useRoleCheck();
+  const { toast } = useToast();
   
   const formattedDate = format(date, "dd.MM", { locale: ru });
   const sortedSchedules = [...schedules].sort((a, b) => {
@@ -323,11 +329,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     return homework.find(hw => hw.scheduleId === schedule.id);
   };
 
-  // Состояния для диалоговых окон
-  const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = useState(false);
-  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
-  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | undefined>(undefined);
-  const { toast } = useToast();
+  // Состояния для диалоговых окон уже определены выше
 
   const handleScheduleClick = (schedule: Schedule, actionType?: string, assignment?: Assignment) => {
     setSelectedSchedule(schedule);
