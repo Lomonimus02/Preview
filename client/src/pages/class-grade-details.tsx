@@ -12,7 +12,9 @@ import {
   Schedule,
   Class as ClassType,
   Subject,
-  User
+  User,
+  GradingSystemEnum,
+  AssignmentTypeEnum
 } from "@shared/schema";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -47,6 +49,32 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+
+// Схема для формы добавления задания
+const assignmentFormSchema = z.object({
+  assignmentType: z.nativeEnum(AssignmentTypeEnum, {
+    required_error: "Выберите тип задания",
+  }),
+  maxScore: z.string({
+    required_error: "Укажите максимальный балл",
+  }).min(1, "Минимальный балл - 1").refine((val) => !isNaN(Number(val)), {
+    message: "Максимальный балл должен быть числом",
+  }),
+  description: z.string().optional().nullable(),
+  scheduleId: z.number({
+    required_error: "Необходимо указать ID занятия",
+  }),
+  subjectId: z.number({
+    required_error: "Выберите предмет",
+  }),
+  classId: z.number({
+    required_error: "Выберите класс",
+  }),
+  teacherId: z.number({
+    required_error: "Выберите учителя",
+  }),
+  subgroupId: z.number().optional().nullable(),
+});
 
 // Схема для добавления оценки
 const gradeFormSchema = z.object({
@@ -105,6 +133,7 @@ export default function ClassGradeDetailsPage() {
   
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
