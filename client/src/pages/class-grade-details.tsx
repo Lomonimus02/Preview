@@ -1941,13 +1941,24 @@ export default function ClassGradeDetailsPage() {
         <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Добавить задание</DialogTitle>
+              <DialogTitle>{editingAssignmentId ? "Изменить задание" : "Добавить задание"}</DialogTitle>
               <DialogDescription>
-                Создайте новое задание для накопительной системы оценивания.
+                {editingAssignmentId 
+                  ? "Измените параметры существующего задания" 
+                  : "Создайте новое задание для накопительной системы оценивания."}
               </DialogDescription>
             </DialogHeader>
             <Form {...assignmentForm}>
-              <form onSubmit={assignmentForm.handleSubmit(data => addAssignmentMutation.mutate(data))}>
+              <form onSubmit={assignmentForm.handleSubmit(data => {
+                if (editingAssignmentId) {
+                  updateAssignmentMutation.mutate({
+                    id: editingAssignmentId,
+                    data
+                  });
+                } else {
+                  addAssignmentMutation.mutate(data);
+                }
+              })}>
                 <div className="grid gap-4 py-4">
                   <FormField
                     control={assignmentForm.control}
@@ -1957,7 +1968,7 @@ export default function ClassGradeDetailsPage() {
                         <FormLabel>Тип задания</FormLabel>
                         <Select
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -2007,7 +2018,7 @@ export default function ClassGradeDetailsPage() {
                     )}
                   />
                   
-                  {!selectedSchedule && (
+                  {!selectedSchedule && !editingAssignmentId && (
                     <FormField
                       control={assignmentForm.control}
                       name="scheduleId"
@@ -2016,7 +2027,7 @@ export default function ClassGradeDetailsPage() {
                           <FormLabel>Урок</FormLabel>
                           <Select
                             onValueChange={(value) => field.onChange(parseInt(value))}
-                            defaultValue={field.value?.toString()}
+                            value={field.value?.toString()}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -2025,7 +2036,9 @@ export default function ClassGradeDetailsPage() {
                             </FormControl>
                             <SelectContent>
                               {schedules
-                                .filter(s => s.subjectId === subjectId && (subgroupId ? s.subgroupId === subgroupId : true))
+                                .filter(s => s.subjectId === subjectId && 
+                                             (subgroupId ? s.subgroupId === subgroupId : true) &&
+                                             s.status === 'conducted')
                                 .map(schedule => (
                                   <SelectItem key={schedule.id} value={schedule.id.toString()}>
                                     {format(new Date(schedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })} - {schedule.startTime}
@@ -2040,10 +2053,34 @@ export default function ClassGradeDetailsPage() {
                     />
                   )}
                 </div>
-                <DialogFooter>
-                  <Button type="submit" disabled={addAssignmentMutation.isPending}>
-                    {addAssignmentMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Создать задание
+                <DialogFooter className="flex justify-between">
+                  {editingAssignmentId && (
+                    <Button 
+                      type="button" 
+                      variant="destructive"
+                      onClick={() => {
+                        if (window.confirm("Вы уверены, что хотите удалить это задание? Все связанные оценки будут удалены.")) {
+                          deleteAssignmentMutation.mutate(editingAssignmentId);
+                          setIsAssignmentDialogOpen(false);
+                        }
+                      }}
+                      disabled={deleteAssignmentMutation.isPending}
+                    >
+                      {deleteAssignmentMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Удалить
+                    </Button>
+                  )}
+                  <Button 
+                    type="submit" 
+                    disabled={editingAssignmentId 
+                      ? updateAssignmentMutation.isPending 
+                      : addAssignmentMutation.isPending}
+                  >
+                    {(editingAssignmentId 
+                      ? updateAssignmentMutation.isPending 
+                      : addAssignmentMutation.isPending) && 
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {editingAssignmentId ? "Сохранить изменения" : "Создать задание"}
                   </Button>
                 </DialogFooter>
               </form>
