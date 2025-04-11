@@ -1749,6 +1749,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/grades", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
     try {
+      console.log("POST /api/grades - получен запрос:", JSON.stringify(req.body));
+      
       // Если указана дата, используем её для установки createdAt
       let gradeData = { ...req.body, teacherId: req.user.id };
       
