@@ -192,6 +192,14 @@ export class DatabaseStorage implements IStorage {
     return newClass;
   }
 
+  async updateClass(id: number, classData: Partial<InsertClass>): Promise<Class | undefined> {
+    const [updatedClass] = await db.update(classes)
+      .set(classData)
+      .where(eq(classes.id, id))
+      .returning();
+    return updatedClass;
+  }
+
   // ===== Subject operations =====
   async getSubject(id: number): Promise<Subject | undefined> {
     const result = await db.select().from(subjects).where(eq(subjects.id, id)).limit(1);
