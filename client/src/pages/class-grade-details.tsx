@@ -974,6 +974,32 @@ export default function ClassGradeDetailsPage() {
     setSelectedDate(null);
     setEditingGradeId(grade.id);
     
+    // Если есть scheduleId и в накопительной системе, нужно найти задание
+    if (grade.scheduleId && classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+      // Ищем урок
+      const slot = lessonSlots.find(slot => slot.scheduleId === grade.scheduleId);
+      
+      if (slot && slot.assignments && slot.assignments.length > 0) {
+        // Если есть привязка к заданию, используем ее
+        if ('assignmentId' in grade && grade.assignmentId) {
+          const assignment = slot.assignments.find(a => a.id === grade.assignmentId);
+          if (assignment) {
+            setSelectedAssignment(assignment);
+            setSelectedAssignmentId(assignment.id);
+          }
+        } 
+        // Иначе берем первое задание (для обратной совместимости)
+        else if (slot.assignments.length > 0) {
+          setSelectedAssignment(slot.assignments[0]);
+          setSelectedAssignmentId(slot.assignments[0].id);
+        }
+      }
+    } else {
+      // Сбрасываем выбранное задание
+      setSelectedAssignment(null);
+      setSelectedAssignmentId(null);
+    }
+    
     // Сбрасываем и заполняем форму данными существующей оценки
     gradeForm.reset({
       studentId: grade.studentId,
@@ -985,6 +1011,7 @@ export default function ClassGradeDetailsPage() {
       teacherId: grade.teacherId,
       scheduleId: grade.scheduleId || null,
       subgroupId: grade.subgroupId || null, // Важно! Сохраняем связь с подгруппой при редактировании
+      assignmentId: 'assignmentId' in grade ? grade.assignmentId : null, // Для накопительной системы
     });
     
     setIsGradeDialogOpen(true);
@@ -995,6 +1022,10 @@ export default function ClassGradeDetailsPage() {
     setSelectedStudentId(studentId);
     setSelectedDate(date || null);
     setEditingGradeId(null);
+    
+    // Сбросим выбранное задание
+    setSelectedAssignment(null);
+    setSelectedAssignmentId(null);
     
     // Find schedule by ID to check its status
     let canAddGrade = true;
@@ -1024,6 +1055,7 @@ export default function ClassGradeDetailsPage() {
         date: date || null,
         scheduleId: scheduleId || null,
         subgroupId: subgroupId || null, // Важно! Сохраняем связь с подгруппой при создании новой оценки
+        assignmentId: null, // Сбрасываем ID задания
       });
       
       setIsGradeDialogOpen(true);
@@ -1039,12 +1071,13 @@ export default function ClassGradeDetailsPage() {
         data
       });
     } else {
-      // Adding new grade - обеспечиваем, что scheduleId и subgroupId всегда будут корректно установлены,
+      // Adding new grade - обеспечиваем, что scheduleId, assignmentId и subgroupId всегда будут корректно установлены,
       // так как это критически важно для правильного отображения оценок в журналах
       const finalData = {
         ...data,
         scheduleId: data.scheduleId || null,
-        subgroupId: data.subgroupId || null // Сохраняем связь с подгруппой
+        subgroupId: data.subgroupId || null, // Сохраняем связь с подгруппой
+        assignmentId: data.assignmentId || null // Для накопительной системы - ID задания
       };
       addGradeMutation.mutate(finalData);
     }
@@ -1956,44 +1989,104 @@ export default function ClassGradeDetailsPage() {
                 )}
                 
                 {/* Разные элементы формы в зависимости от системы оценивания */}
-                {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && selectedAssignment ? (
-                  <FormField
-                    control={gradeForm.control}
-                    name="grade"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Балл (макс. {selectedAssignment.maxScore})</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            min="0"
-                            max={selectedAssignment.maxScore.toString()}
-                            {...field}
-                            onChange={(e) => {
-                              const value = parseFloat(e.target.value);
-                              const maxScore = parseFloat(selectedAssignment.maxScore.toString());
-                              if (value > maxScore) {
-                                // Ограничиваем значение максимальным баллом
-                                field.onChange(maxScore);
-                                toast({
-                                  title: "Внимание",
-                                  description: `Максимальный балл для этого задания: ${maxScore}`,
-                                  variant: "warning",
-                                });
-                              } else {
-                                field.onChange(value);
-                              }
-                            }}
-                            placeholder={`Введите балл (от 0 до ${selectedAssignment.maxScore})`}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Тип задания: {getAssignmentTypeName(selectedAssignment.assignmentType)}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
+                {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE ? (
+                  <>
+                    {/* Форма выбора задания для накопительной системы */}
+                    <FormField
+                      control={gradeForm.control}
+                      name="assignmentId"
+                      render={({ field }) => {
+                        // Получаем задания для этого урока
+                        const scheduleId = gradeForm.getValues().scheduleId;
+                        const slot = lessonSlots.find(s => s.scheduleId === scheduleId);
+                        const availableAssignments = slot?.assignments || [];
+                        
+                        return (
+                          <FormItem>
+                            <FormLabel>Задание</FormLabel>
+                            <Select
+                              onValueChange={(value) => {
+                                // При выборе задания обновляем selectedAssignment
+                                const assignmentId = parseInt(value);
+                                field.onChange(assignmentId);
+                                const assignment = availableAssignments.find(a => a.id === assignmentId);
+                                if (assignment) {
+                                  setSelectedAssignment(assignment);
+                                  setSelectedAssignmentId(assignment.id);
+                                }
+                              }}
+                              defaultValue={field.value?.toString()}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Выберите задание" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {availableAssignments.length > 0 ? (
+                                  availableAssignments.map((assignment) => (
+                                    <SelectItem key={assignment.id} value={assignment.id.toString()}>
+                                      {getAssignmentTypeName(assignment.assignmentType)} ({assignment.maxScore} б.)
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem disabled value="none">
+                                    Нет доступных заданий
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                    
+                    {/* Поле для ввода баллов */}
+                    {selectedAssignment ? (
+                      <FormField
+                        control={gradeForm.control}
+                        name="grade"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Балл (макс. {selectedAssignment.maxScore})</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                max={selectedAssignment.maxScore.toString()}
+                                {...field}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  const maxScore = parseFloat(selectedAssignment.maxScore.toString());
+                                  if (value > maxScore) {
+                                    // Ограничиваем значение максимальным баллом
+                                    field.onChange(maxScore);
+                                    toast({
+                                      title: "Внимание",
+                                      description: `Максимальный балл для этого задания: ${maxScore}`,
+                                      variant: "warning",
+                                    });
+                                  } else {
+                                    field.onChange(value);
+                                  }
+                                }}
+                                placeholder={`Введите балл (от 0 до ${selectedAssignment.maxScore})`}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Тип задания: {getAssignmentTypeName(selectedAssignment.assignmentType)}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ) : (
+                      <div className="text-sm text-muted-foreground mb-4">
+                        Выберите задание для выставления баллов
+                      </div>
                     )}
-                  />
+                  </>
                 ) : (
                   <FormField
                     control={gradeForm.control}
