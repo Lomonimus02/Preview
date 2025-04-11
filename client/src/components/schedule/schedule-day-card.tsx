@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { useLocation } from "wouter";
 import { useRoleCheck } from "@/hooks/use-role-check";
+import { useQuery } from "@tanstack/react-query";
 import { 
   Card, 
   CardContent, 
@@ -19,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FiClock, FiMapPin, FiUser, FiCheck, FiPlus, FiList, FiEdit3 } from "react-icons/fi";
-import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework } from "@shared/schema";
+import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, Assignment, AssignmentTypeEnum } from "@shared/schema";
 import { HomeworkForm } from "./homework-form";
 
 interface ScheduleItemProps {
@@ -175,6 +176,7 @@ interface ScheduleDayCardProps {
   classes: Class[];
   grades?: Grade[];
   homework?: Homework[];
+  assignments?: Assignment[];
   currentUser?: User | null;
   isAdmin?: boolean;
   onAddSchedule?: (date: Date, scheduleToEdit?: Schedule) => void;
@@ -190,6 +192,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   classes,
   grades = [],
   homework = [],
+  assignments = [],
   currentUser = null,
   isAdmin = false,
   onAddSchedule,
@@ -199,6 +202,12 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [, navigate] = useLocation();
   const { isTeacher } = useRoleCheck();
+  
+  // Запрос для получения assignments
+  const { data: allAssignments = assignments } = useQuery<Assignment[]>({
+    queryKey: ["/api/assignments"],
+    enabled: !!currentUser
+  });
   
   const formattedDate = format(date, "dd.MM", { locale: ru });
   const sortedSchedules = [...schedules].sort((a, b) => {
@@ -276,6 +285,14 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     // Ищем задание именно для этого урока (scheduleId)
     return homework.find(hw => hw.scheduleId === schedule.id);
   };
+  
+  // Функция для получения заданий (assignments) для конкретного расписания
+  const getScheduleAssignments = (schedule: Schedule) => {
+    if (!allAssignments?.length) return [];
+    
+    // Фильтруем задания по scheduleId
+    return allAssignments.filter(assignment => assignment.scheduleId === schedule.id);
+  };
 
   // Состояние для диалогового окна добавления домашнего задания
   const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = useState(false);
@@ -329,7 +346,8 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   room={schedule.room || ""}
                   grades={getScheduleGrades(schedule)}
                   homework={getScheduleHomework(schedule)}
-                  isCompleted={getScheduleHomework(schedule) !== undefined} // Урок считается выполненным, если есть домашнее задание
+                  assignments={getScheduleAssignments(schedule)}
+                  isCompleted={getScheduleHomework(schedule) !== undefined || schedule.status === 'conducted'} // Урок считается выполненным, если есть домашнее задание или статус "проведен"
                   onClick={(e, actionType) => handleScheduleClick(schedule, actionType)}
                 />
               ))}
@@ -450,6 +468,32 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                 </div>
               )}
               
+              {/* Отображение заданий (assignments) */}
+              {getScheduleAssignments(selectedSchedule)?.length > 0 && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                  <h3 className="text-lg font-medium text-blue-800 mb-2">Задания</h3>
+                  <div className="space-y-2">
+                    {getScheduleAssignments(selectedSchedule).map((assignment) => (
+                      <div key={assignment.id} className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <Badge 
+                            className={`${getAssignmentTypeColor(assignment.assignmentType)}`}
+                          >
+                            {getAssignmentTypeName(assignment.assignmentType)}
+                          </Badge>
+                          <span className="text-sm font-medium">
+                            {assignment.description || "Без описания"}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 ml-1 mt-1">
+                          Макс. баллов: {assignment.maxScore}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               <DialogFooter className="flex flex-wrap justify-between gap-2 sm:justify-between">
                 {isAdmin && (
                   <Button 
@@ -481,7 +525,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                       }}
                     >
                       <FiList className="mr-2" />
-                      Оценки класса
+                      Журнал оценок
                     </Button>
                     
                     <Button
@@ -503,6 +547,22 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                           Добавить задание
                         </>
                       )}
+                    </Button>
+                    
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        // Переходим на страницу журнала с параметром открытия формы задания
+                        const url = selectedSchedule.subgroupId 
+                          ? `/class-grade-details/${selectedSchedule.classId}/${selectedSchedule.subjectId}/${selectedSchedule.subgroupId}?action=new-assignment&scheduleId=${selectedSchedule.id}` 
+                          : `/class-grade-details/${selectedSchedule.classId}/${selectedSchedule.subjectId}?action=new-assignment&scheduleId=${selectedSchedule.id}`;
+                        navigate(url);
+                        setIsDetailsOpen(false);
+                      }}
+                    >
+                      <FiPlus className="mr-2" />
+                      Добавить задание
                     </Button>
                   </>
                 )}
