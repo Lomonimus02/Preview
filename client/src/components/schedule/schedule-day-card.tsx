@@ -33,8 +33,6 @@ import {
   FiAlertCircle 
 } from "react-icons/fi";
 import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum, Assignment } from "@shared/schema";
-import { HomeworkForm } from "../homework/homework-form";
-import { AssignmentForm } from "../assignments/assignment-form";
 import { HomeworkForm } from "./homework-form";
 import { AssignmentForm } from "../assignments/assignment-form";
 
