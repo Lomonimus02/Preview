@@ -1656,6 +1656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Grades API
   app.get("/api/grades", isAuthenticated, async (req, res) => {
     let grades = [];
+    const subgroupId = req.query.subgroupId ? parseInt(req.query.subgroupId as string) : undefined;
     
     if (req.query.studentId) {
       const studentId = parseInt(req.query.studentId as string);
@@ -1678,10 +1679,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Если указан также subjectId, фильтруем оценки по предмету
       if (req.query.subjectId) {
         const subjectId = parseInt(req.query.subjectId as string);
-        const allGrades = await dataStorage.getGradesByStudent(studentId);
+        const allGrades = await dataStorage.getGradesByStudent(studentId, subgroupId);
         grades = allGrades.filter(grade => grade.subjectId === subjectId);
       } else {
-        grades = await dataStorage.getGradesByStudent(studentId);
+        grades = await dataStorage.getGradesByStudent(studentId, subgroupId);
       }
     } else if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
@@ -1691,10 +1692,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Если указан также subjectId, фильтруем оценки по предмету и классу
         if (req.query.subjectId) {
           const subjectId = parseInt(req.query.subjectId as string);
-          const classGrades = await dataStorage.getGradesByClass(classId);
-          grades = classGrades.filter(grade => grade.subjectId === subjectId);
+          // Если указан subgroupId, мы отключаем включение оценок из подгрупп, если это не та подгруппа, которую мы запрашиваем
+          const includeSubgroups = !subgroupId;
+          const classGrades = await dataStorage.getGradesByClass(classId, includeSubgroups);
+          grades = classGrades.filter(grade => 
+            grade.subjectId === subjectId && 
+            (!subgroupId || grade.subgroupId === subgroupId)
+          );
         } else {
+          // Если нет subjectId, но есть subgroupId, нам все равно нужны все оценки класса, но отфильтрованные по подгруппе
           grades = await dataStorage.getGradesByClass(classId);
+          if (subgroupId) {
+            grades = grades.filter(grade => grade.subgroupId === subgroupId);
+          }
         }
       } else {
         return res.status(403).json({ message: "Forbidden" });
@@ -1703,12 +1713,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Если указан только subjectId, получаем все оценки по этому предмету
       const subjectId = parseInt(req.query.subjectId as string);
       if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
-        grades = await dataStorage.getGradesBySubject(subjectId);
+        const includeSubgroups = !subgroupId; // Не включаем оценки из подгрупп, если указан конкретный subgroupId
+        grades = await dataStorage.getGradesBySubject(subjectId, includeSubgroups);
+        
+        // Если указан subgroupId, фильтруем результаты только по этой подгруппе
+        if (subgroupId) {
+          grades = grades.filter(grade => grade.subgroupId === subgroupId);
+        }
       } else {
         return res.status(403).json({ message: "Forbidden" });
       }
     } else if (req.user.role === UserRoleEnum.STUDENT) {
-      grades = await dataStorage.getGradesByStudent(req.user.id);
+      grades = await dataStorage.getGradesByStudent(req.user.id, subgroupId);
     }
     
     res.json(grades);
