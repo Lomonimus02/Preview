@@ -1700,8 +1700,12 @@ export default function ClassGradeDetailsPage() {
                                     {slot.assignments.map(assignment => (
                                       <span 
                                         key={assignment.id}
-                                        className={`${getAssignmentTypeColor(assignment.assignmentType)} text-gray-800 px-1.5 py-0.5 rounded-sm border border-gray-300`}
-                                        title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов`}
+                                        className={`${getAssignmentTypeColor(assignment.assignmentType)} text-gray-800 px-1.5 py-0.5 rounded-sm border border-gray-300 cursor-pointer hover:border-primary hover:bg-primary/10 transition-colors`}
+                                        title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. Нажмите для редактирования.`}
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // Предотвращаем открытие диалога статуса
+                                          openEditAssignmentDialog(assignment);
+                                        }}
                                       >
                                         {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)}
                                       </span>
