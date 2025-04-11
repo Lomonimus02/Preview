@@ -139,7 +139,13 @@ export default function SchedulePage() {
   // Получаем учеников подгруппы
   const { data: studentSubgroups = [] } = useQuery<Array<{studentId: number, subgroupId: number}>>({
     queryKey: ["/api/student-subgroups"],
-    enabled: !!user
+    enabled: !!user,
+    onSuccess: (data) => {
+      console.log("Получены данные о подгруппах студента:", data);
+    },
+    onError: (error) => {
+      console.error("Ошибка получения данных о подгруппах студента:", error);
+    }
   });
   
   // Получаем список подгрупп
