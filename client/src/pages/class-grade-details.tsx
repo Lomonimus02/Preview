@@ -41,7 +41,7 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
-import { CalendarIcon, BookOpenIcon, GraduationCapIcon, Loader2, AlertCircle, Download } from "lucide-react";
+import { CalendarIcon, BookOpenIcon, GraduationCapIcon, Loader2, AlertCircle, Download, PlusCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1196,15 +1196,29 @@ export default function ClassGradeDetailsPage() {
                 : "Просмотр и редактирование оценок учеников класса"}
             </p>
           </div>
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={exportToCSV}
-            disabled={isLoading || !filteredStudents.length}
-          >
-            <Download className="h-4 w-4" />
-            Экспорт
-          </Button>
+          <div className="flex gap-2">
+            {/* Показываем кнопку создания задания только если выбран накопительный тип оценивания */}
+            {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && canEditGrades && (
+              <Button
+                variant="default"
+                className="gap-2"
+                onClick={() => openAssignmentDialog()}
+                disabled={isLoading}
+              >
+                <PlusCircle className="h-4 w-4" />
+                Добавить задание
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={exportToCSV}
+              disabled={isLoading || !filteredStudents.length}
+            >
+              <Download className="h-4 w-4" />
+              Экспорт
+            </Button>
+          </div>
         </div>
         
         {isLoading ? (
@@ -1303,11 +1317,27 @@ export default function ClassGradeDetailsPage() {
                                 {slot.formattedDate}
                                 {slot.startTime && <span className="text-xs">({slot.startTime.slice(0, 5)})</span>}
                                 {isLessonConducted && (
-                                  <span className="text-green-600 ml-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                    </svg>
-                                  </span>
+                                  <div className="flex items-center">
+                                    <span className="text-green-600 ml-1">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                      </svg>
+                                    </span>
+                                    
+                                    {/* Кнопка для добавления задания (только для накопительной системы) */}
+                                    {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && canEditGrades && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // Предотвращаем открытие диалога статуса
+                                          openAssignmentDialog(slot.scheduleId);
+                                        }}
+                                        className="ml-1 text-primary hover:text-primary-dark focus:outline-none"
+                                        title="Добавить задание"
+                                      >
+                                        <PlusCircle className="h-3 w-3" />
+                                      </button>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </TableHead>
