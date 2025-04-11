@@ -2784,6 +2784,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // ===== Assignment routes =====
 
+  // Общий маршрут для получения заданий с фильтрацией по параметрам
+  app.get("/api/assignments", isAuthenticated, async (req, res) => {
+    try {
+      const { classId, subjectId, subgroupId } = req.query;
+      
+      let assignments = [];
+      
+      // Если указан classId и subjectId, получаем задания для класса и предмета
+      if (classId && subjectId) {
+        // Получаем задания для класса
+        const classAssignments = await dataStorage.getAssignmentsByClass(Number(classId));
+        
+        // Фильтруем по предмету
+        assignments = classAssignments.filter(assignment => 
+          assignment.subjectId === Number(subjectId)
+        );
+        
+        // Если указан subgroupId, фильтруем дополнительно
+        if (subgroupId) {
+          assignments = assignments.filter(assignment => 
+            assignment.subgroupId === Number(subgroupId)
+          );
+        }
+      } else if (classId) {
+        // Если указан только classId
+        assignments = await dataStorage.getAssignmentsByClass(Number(classId));
+      } else if (subjectId) {
+        // Если указан только subjectId
+        assignments = await dataStorage.getAssignmentsBySubject(Number(subjectId));
+      } else if (subgroupId) {
+        // Если указан только subgroupId
+        assignments = await dataStorage.getAssignmentsBySubgroup(Number(subgroupId));
+      }
+      
+      console.log(`Assignments found: ${assignments.length} for query:`, req.query);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching assignments:", error);
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
   // Получение всех заданий для класса
   app.get("/api/assignments/class/:classId", isAuthenticated, async (req, res) => {
     try {
