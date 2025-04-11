@@ -361,7 +361,14 @@ export class DatabaseStorage implements IStorage {
   }
   
   async deleteGrade(id: number): Promise<void> {
-    await db.delete(grades).where(eq(grades.id, id));
+    console.log(`DatabaseStorage.deleteGrade: Удаление оценки с ID: ${id}`);
+    try {
+      await db.delete(grades).where(eq(grades.id, id));
+      console.log(`DatabaseStorage.deleteGrade: Успешно удалена оценка с ID: ${id}`);
+    } catch (error) {
+      console.error(`DatabaseStorage.deleteGrade: Ошибка при удалении оценки с ID ${id}:`, error);
+      throw error;
+    }
   }
 
   // ===== Attendance operations =====

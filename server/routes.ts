@@ -1955,16 +1955,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.delete("/api/grades/:id", hasRole([UserRoleEnum.TEACHER]), async (req, res) => {
     try {
+      console.log(`DELETE /api/grades/${req.params.id} - запрос на удаление оценки`);
+      
       const gradeId = parseInt(req.params.id);
       if (isNaN(gradeId)) {
+        console.log(`DELETE /api/grades - ошибка: неверный ID ${req.params.id}`);
         return res.status(400).json({ message: "Invalid grade ID" });
       }
       
       // Проверяем, существует ли оценка
       const existingGrade = await dataStorage.getGrade(gradeId);
       if (!existingGrade) {
+        console.log(`DELETE /api/grades/${gradeId} - ошибка: оценка не найдена`);
         return res.status(404).json({ message: "Оценка не найдена" });
       }
+      
+      console.log(`DELETE /api/grades/${gradeId} - найдена оценка:`, JSON.stringify(existingGrade));
       
       // Проверяем, имеет ли учитель право удалить эту оценку
       if (existingGrade.teacherId !== req.user.id) {

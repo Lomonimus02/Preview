@@ -676,8 +676,12 @@ export default function ClassGradeDetailsPage() {
   
   // Handle grade deletion
   const handleDeleteGrade = (id: number) => {
+    console.log(`Запрос на удаление оценки с ID: ${id}`);
     if (window.confirm("Вы действительно хотите удалить оценку?")) {
+      console.log(`Подтверждено удаление оценки с ID: ${id}`);
       deleteGradeMutation.mutate(id);
+    } else {
+      console.log(`Отменено удаление оценки с ID: ${id}`);
     }
   };
   
