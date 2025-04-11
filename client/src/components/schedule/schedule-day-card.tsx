@@ -3,7 +3,6 @@ import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { useLocation } from "wouter";
 import { useRoleCheck } from "@/hooks/use-role-check";
-import { useQuery } from "@tanstack/react-query";
 import { 
   Card, 
   CardContent, 
@@ -19,38 +18,9 @@ import {
   DialogFooter 
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { FiClock, FiMapPin, FiUser, FiCheck, FiPlus, FiList, FiEdit3 } from "react-icons/fi";
-import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, Assignment, AssignmentTypeEnum } from "@shared/schema";
+import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework } from "@shared/schema";
 import { HomeworkForm } from "./homework-form";
-
-// Функция для получения названия типа задания
-const getAssignmentTypeName = (type: AssignmentTypeEnum) => {
-  const typeNames: Record<AssignmentTypeEnum, string> = {
-    [AssignmentTypeEnum.CONTROL_WORK]: "Контрольная работа",
-    [AssignmentTypeEnum.TEST_WORK]: "Проверочная работа", 
-    [AssignmentTypeEnum.CURRENT_WORK]: "Текущая работа",
-    [AssignmentTypeEnum.HOMEWORK]: "Домашнее задание",
-    [AssignmentTypeEnum.CLASSWORK]: "Работа на уроке",
-    [AssignmentTypeEnum.PROJECT_WORK]: "Работа с проектом",
-    [AssignmentTypeEnum.CLASS_ASSIGNMENT]: "Классная работа"
-  };
-  return typeNames[type] || type;
-};
-
-// Функция для получения цвета типа задания
-const getAssignmentTypeColor = (type: AssignmentTypeEnum) => {
-  const typeColors: Record<AssignmentTypeEnum, string> = {
-    [AssignmentTypeEnum.CONTROL_WORK]: "bg-red-100 text-red-800 border-red-200",
-    [AssignmentTypeEnum.TEST_WORK]: "bg-blue-100 text-blue-800 border-blue-200",
-    [AssignmentTypeEnum.CURRENT_WORK]: "bg-green-100 text-green-800 border-green-200",
-    [AssignmentTypeEnum.HOMEWORK]: "bg-amber-100 text-amber-800 border-amber-200",
-    [AssignmentTypeEnum.CLASSWORK]: "bg-indigo-100 text-indigo-800 border-indigo-200",
-    [AssignmentTypeEnum.PROJECT_WORK]: "bg-purple-100 text-purple-800 border-purple-200",
-    [AssignmentTypeEnum.CLASS_ASSIGNMENT]: "bg-emerald-100 text-emerald-800 border-emerald-200"
-  };
-  return typeColors[type] || "bg-gray-100 text-gray-800 border-gray-200";
-};
 
 interface ScheduleItemProps {
   schedule: Schedule;
@@ -59,7 +29,6 @@ interface ScheduleItemProps {
   room: string;
   grades?: Grade[];
   homework?: Homework | undefined;
-  assignments?: Assignment[];
   isCompleted?: boolean;
   onClick: (e?: React.MouseEvent, actionType?: string) => void;
 }
@@ -71,38 +40,9 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
   room,
   grades = [],
   homework,
-  assignments = [],
   isCompleted = false,
   onClick,
 }) => {
-  // Function to get assignment type name
-  const getAssignmentTypeName = (type: AssignmentTypeEnum) => {
-    const typeNames: Record<AssignmentTypeEnum, string> = {
-      [AssignmentTypeEnum.CONTROL_WORK]: "Контрольная работа",
-      [AssignmentTypeEnum.TEST_WORK]: "Проверочная работа",
-      [AssignmentTypeEnum.CURRENT_WORK]: "Текущая работа",
-      [AssignmentTypeEnum.HOMEWORK]: "Домашнее задание",
-      [AssignmentTypeEnum.CLASSWORK]: "Работа на уроке",
-      [AssignmentTypeEnum.PROJECT_WORK]: "Работа с проектом",
-      [AssignmentTypeEnum.CLASS_ASSIGNMENT]: "Классная работа"
-    };
-    return typeNames[type] || type;
-  };
-
-  // Function to get color for assignment type
-  const getAssignmentTypeColor = (type: AssignmentTypeEnum) => {
-    const typeColors: Record<AssignmentTypeEnum, string> = {
-      [AssignmentTypeEnum.CONTROL_WORK]: "bg-red-100 text-red-800 border-red-200",
-      [AssignmentTypeEnum.TEST_WORK]: "bg-blue-100 text-blue-800 border-blue-200",
-      [AssignmentTypeEnum.CURRENT_WORK]: "bg-green-100 text-green-800 border-green-200",
-      [AssignmentTypeEnum.HOMEWORK]: "bg-amber-100 text-amber-800 border-amber-200",
-      [AssignmentTypeEnum.CLASSWORK]: "bg-indigo-100 text-indigo-800 border-indigo-200",
-      [AssignmentTypeEnum.PROJECT_WORK]: "bg-purple-100 text-purple-800 border-purple-200",
-      [AssignmentTypeEnum.CLASS_ASSIGNMENT]: "bg-emerald-100 text-emerald-800 border-emerald-200"
-    };
-    return typeColors[type] || "bg-gray-100 text-gray-800 border-gray-200";
-  };
-
   return (
     <div 
       className={`
@@ -149,32 +89,6 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           <span>{teacherName}</span>
         </div>
         
-        {/* Отображаем задания, если они есть */}
-        {assignments.length > 0 && (
-          <div className="mt-2">
-            <div className="flex items-center gap-1 mb-1">
-              <FiList className="text-primary" size={14} />
-              <span className="text-xs font-medium text-gray-700">Задания:</span>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {assignments.map((assignment) => (
-                <div 
-                  key={assignment.id}
-                  className={`flex flex-col px-2 py-1 rounded text-xs font-medium cursor-pointer ${getAssignmentTypeColor(assignment.assignmentType)}`}
-                  title={`${getAssignmentTypeName(assignment.assignmentType)} (${assignment.maxScore} баллов)`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Можно добавить действие для редактирования задания
-                  }}
-                >
-                  <div className="font-bold leading-tight">{getAssignmentTypeName(assignment.assignmentType)}</div>
-                  <div className="text-right font-bold mt-1">Макс. {assignment.maxScore} б.</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        
         {/* Отображаем оценки, если они есть */}
         {grades.length > 0 && (
           <div className="mt-2">
@@ -206,7 +120,6 @@ interface ScheduleDayCardProps {
   classes: Class[];
   grades?: Grade[];
   homework?: Homework[];
-  assignments?: Assignment[];
   currentUser?: User | null;
   isAdmin?: boolean;
   onAddSchedule?: (date: Date, scheduleToEdit?: Schedule) => void;
@@ -222,7 +135,6 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   classes,
   grades = [],
   homework = [],
-  assignments = [],
   currentUser = null,
   isAdmin = false,
   onAddSchedule,
@@ -232,12 +144,6 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [, navigate] = useLocation();
   const { isTeacher } = useRoleCheck();
-  
-  // Запрос для получения assignments
-  const { data: allAssignments = assignments } = useQuery<Assignment[]>({
-    queryKey: ["/api/assignments"],
-    enabled: !!currentUser
-  });
   
   const formattedDate = format(date, "dd.MM", { locale: ru });
   const sortedSchedules = [...schedules].sort((a, b) => {
@@ -315,14 +221,6 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     // Ищем задание именно для этого урока (scheduleId)
     return homework.find(hw => hw.scheduleId === schedule.id);
   };
-  
-  // Функция для получения заданий (assignments) для конкретного расписания
-  const getScheduleAssignments = (schedule: Schedule) => {
-    if (!allAssignments?.length) return [];
-    
-    // Фильтруем задания по scheduleId
-    return allAssignments.filter(assignment => assignment.scheduleId === schedule.id);
-  };
 
   // Состояние для диалогового окна добавления домашнего задания
   const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = useState(false);
@@ -376,8 +274,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   room={schedule.room || ""}
                   grades={getScheduleGrades(schedule)}
                   homework={getScheduleHomework(schedule)}
-                  assignments={getScheduleAssignments(schedule)}
-                  isCompleted={getScheduleHomework(schedule) !== undefined || schedule.status === 'conducted'} // Урок считается выполненным, если есть домашнее задание или статус "проведен"
+                  isCompleted={getScheduleHomework(schedule) !== undefined} // Урок считается выполненным, если есть домашнее задание
                   onClick={(e, actionType) => handleScheduleClick(schedule, actionType)}
                 />
               ))}
@@ -498,32 +395,6 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                 </div>
               )}
               
-              {/* Отображение заданий (assignments) */}
-              {getScheduleAssignments(selectedSchedule)?.length > 0 && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                  <h3 className="text-lg font-medium text-blue-800 mb-2">Задания</h3>
-                  <div className="space-y-2">
-                    {getScheduleAssignments(selectedSchedule).map((assignment) => (
-                      <div key={assignment.id} className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className={`px-2 py-1 text-xs font-medium rounded ${getAssignmentTypeColor(assignment.assignmentType)}`}
-                          >
-                            {getAssignmentTypeName(assignment.assignmentType)}
-                          </div>
-                          <span className="text-sm font-medium">
-                            {assignment.description || "Без описания"}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-500 ml-1 mt-1">
-                          Макс. баллов: {assignment.maxScore}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
               <DialogFooter className="flex flex-wrap justify-between gap-2 sm:justify-between">
                 {isAdmin && (
                   <Button 
@@ -555,7 +426,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                       }}
                     >
                       <FiList className="mr-2" />
-                      Журнал оценок
+                      Оценки класса
                     </Button>
                     
                     <Button
@@ -577,22 +448,6 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                           Добавить задание
                         </>
                       )}
-                    </Button>
-                    
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        // Переходим на страницу журнала с параметром открытия формы задания
-                        const url = selectedSchedule.subgroupId 
-                          ? `/class-grade-details/${selectedSchedule.classId}/${selectedSchedule.subjectId}/${selectedSchedule.subgroupId}?action=new-assignment&scheduleId=${selectedSchedule.id}` 
-                          : `/class-grade-details/${selectedSchedule.classId}/${selectedSchedule.subjectId}?action=new-assignment&scheduleId=${selectedSchedule.id}`;
-                        navigate(url);
-                        setIsDetailsOpen(false);
-                      }}
-                    >
-                      <FiPlus className="mr-2" />
-                      Добавить задание
                     </Button>
                   </>
                 )}
