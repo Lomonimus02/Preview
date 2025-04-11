@@ -363,9 +363,13 @@ export default function ClassGradeDetailsPage() {
   }, []);
 
   // Get unique lesson slots (date + scheduleId pairs) from schedules for this class and subject
-  const lessonSlots = useMemo(() => {
+  // Используем useState вместо useMemo, чтобы можно было обновлять данные
+  const [lessonSlots, setLessonSlots] = useState<LessonSlot[]>([]);
+  
+  // Обновляем lessonSlots при изменении зависимостей
+  useEffect(() => {
     // Фильтруем расписания для текущего предмета
-    return schedules
+    const newLessonSlots = schedules
       .filter(s => s.scheduleDate && s.subjectId === subjectId) // Filter schedules for this subject only
       .sort((a, b) => {
         // Сортируем по дате, затем по времени начала урока (если есть)
@@ -385,7 +389,9 @@ export default function ClassGradeDetailsPage() {
         formattedDate: format(new Date(s.scheduleDate as string), "dd.MM", { locale: ru }),
         assignments: getAssignmentsForSchedule(s.id)
       }));
-  }, [schedules, subjectId, getAssignmentsForSchedule]);
+    
+    setLessonSlots(newLessonSlots);
+  }, [schedules, subjectId, getAssignmentsForSchedule, assignments]);
   
   // Группируем расписания учителя по предметам
   const schedulesBySubject = useMemo(() => {
@@ -725,27 +731,13 @@ export default function ClassGradeDetailsPage() {
       // Обновляем запросы, чтобы получить обновленные данные
       queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
       
-      // Обновляем массив lessonSlots, добавляя новое задание
-      // к соответствующему уроку
-      const newAssignment = data;
-      const updatedLessonSlots = [...lessonSlots];
-      
-      // Находим урок, к которому привязано задание
-      const slotIndex = updatedLessonSlots.findIndex(
-        slot => slot.scheduleId === newAssignment.scheduleId
-      );
-      
-      if (slotIndex !== -1) {
-        // Если урок найден, добавляем к нему задание
-        if (!updatedLessonSlots[slotIndex].assignments) {
-          updatedLessonSlots[slotIndex].assignments = [];
-        }
-        
-        updatedLessonSlots[slotIndex].assignments?.push(newAssignment);
-        
-        // Обновляем state
-        setLessonSlots(updatedLessonSlots);
-      }
+      // Принудительно обновляем запрос assignments, чтобы получить актуальные данные
+      // Это приведет к обновлению useEffect и пересозданию lessonSlots
+      setTimeout(() => {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/assignments", { classId, subjectId, subgroupId }] 
+        });
+      }, 100);
       
       // Закрываем диалог и сбрасываем форму
       setIsAssignmentDialogOpen(false);
