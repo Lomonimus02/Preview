@@ -53,7 +53,7 @@ import {
 } from "@/components/ui/alert";
 import { CalendarIcon, BookOpenIcon, GraduationCapIcon, Loader2, AlertCircle, Download, PlusCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
@@ -87,33 +87,48 @@ const assignmentFormSchema = z.object({
 });
 
 // Схема для добавления оценки
-const gradeFormSchema = z.object({
-  studentId: z.number({
-    required_error: "Выберите ученика",
-  }),
-  subjectId: z.number({
-    required_error: "Выберите предмет",
-  }),
-  classId: z.number({
-    required_error: "Выберите класс",
-  }),
-  teacherId: z.number({
-    required_error: "Выберите учителя",
-  }),
-  grade: z.number({
-    required_error: "Укажите оценку",
-  }).min(1, "Минимальная оценка - 1").max(5, "Максимальная оценка - 5"),
-  comment: z.string().nullable().optional(),
-  gradeType: z.string({
-    required_error: "Укажите тип оценки",
-  }),
-  // Добавляем поле для даты (необязательное, будет устанавливаться программно)
-  date: z.string().optional().nullable(),
-  // Добавляем поле scheduleId для связи с конкретным уроком
-  scheduleId: z.number().optional().nullable(),
-  // Добавляем поле subgroupId для явной связи с подгруппой
-  subgroupId: z.number().optional().nullable(),
-});
+// Динамическая схема оценки в зависимости от системы оценивания
+const createGradeFormSchema = (gradingSystem: GradingSystemEnum | undefined, assignmentMaxScore?: number) => {
+  // Базовая схема с общими полями
+  const baseSchema = z.object({
+    studentId: z.number({
+      required_error: "Выберите ученика",
+    }),
+    subjectId: z.number({
+      required_error: "Выберите предмет",
+    }),
+    classId: z.number({
+      required_error: "Выберите класс",
+    }),
+    teacherId: z.number({
+      required_error: "Выберите учителя",
+    }),
+    comment: z.string().nullable().optional(),
+    gradeType: z.string({
+      required_error: "Укажите тип оценки",
+    }),
+    date: z.string().optional().nullable(),
+    scheduleId: z.number().optional().nullable(),
+    subgroupId: z.number().optional().nullable(),
+    assignmentId: z.number().optional().nullable(), // Для накопительной системы - ID задания
+  });
+
+  // Если накопительная система и задан максимальный балл
+  if (gradingSystem === GradingSystemEnum.CUMULATIVE && assignmentMaxScore) {
+    return baseSchema.extend({
+      grade: z.number({
+        required_error: "Укажите балл",
+      }).min(0, "Минимальный балл - 0").max(assignmentMaxScore, `Максимальный балл - ${assignmentMaxScore}`),
+    });
+  }
+
+  // Для пятибалльной системы или если система не определена
+  return baseSchema.extend({
+    grade: z.number({
+      required_error: "Укажите оценку",
+    }).min(1, "Минимальная оценка - 1").max(5, "Максимальная оценка - 5"),
+  });
+};
 
 export default function ClassGradeDetailsPage() {
   const params = useParams();
@@ -300,23 +315,26 @@ export default function ClassGradeDetailsPage() {
 
   // Функция для получения цвета фона ячейки на основе типа задания
   const getAssignmentTypeColor = useCallback((assignmentType: string) => {
+    console.log("Получение цвета для типа задания:", assignmentType);
+    
     switch(assignmentType) {
-      case AssignmentTypeEnum.CONTROL_WORK:
+      case AssignmentTypeEnum.CONTROL_WORK: // control_work
         return 'bg-red-100';
-      case AssignmentTypeEnum.TEST_WORK:
+      case AssignmentTypeEnum.TEST_WORK: // test_work
         return 'bg-blue-100';
-      case AssignmentTypeEnum.CURRENT_WORK:
+      case AssignmentTypeEnum.CURRENT_WORK: // current_work
         return 'bg-green-100';
-      case AssignmentTypeEnum.HOMEWORK:
+      case AssignmentTypeEnum.HOMEWORK: // homework
         return 'bg-amber-100';
-      case AssignmentTypeEnum.CLASSWORK:
+      case AssignmentTypeEnum.CLASSWORK: // classwork
         return 'bg-purple-100';
-      case AssignmentTypeEnum.PROJECT_WORK:
+      case AssignmentTypeEnum.PROJECT_WORK: // project_work
         return 'bg-emerald-100';
-      case AssignmentTypeEnum.CLASS_ASSIGNMENT:
+      case AssignmentTypeEnum.CLASS_ASSIGNMENT: // class_assignment
         return 'bg-indigo-100';
       default:
-        return '';
+        console.warn("Неизвестный тип задания:", assignmentType);
+        return 'bg-gray-100'; // Возвращаем серый цвет для неизвестных типов
     }
   }, []);
 
@@ -1821,33 +1839,74 @@ export default function ClassGradeDetailsPage() {
                   />
                 )}
                 
-                <FormField
-                  control={gradeForm.control}
-                  name="grade"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Оценка</FormLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(parseInt(value))}
-                        defaultValue={field.value?.toString()}
-                      >
+                {/* Разные элементы формы в зависимости от системы оценивания */}
+                {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && selectedAssignment ? (
+                  <FormField
+                    control={gradeForm.control}
+                    name="grade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Балл (макс. {selectedAssignment.maxScore})</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите оценку" />
-                          </SelectTrigger>
+                          <Input
+                            type="number"
+                            min="0"
+                            max={selectedAssignment.maxScore.toString()}
+                            {...field}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value);
+                              const maxScore = parseFloat(selectedAssignment.maxScore.toString());
+                              if (value > maxScore) {
+                                // Ограничиваем значение максимальным баллом
+                                field.onChange(maxScore);
+                                toast({
+                                  title: "Внимание",
+                                  description: `Максимальный балл для этого задания: ${maxScore}`,
+                                  variant: "warning",
+                                });
+                              } else {
+                                field.onChange(value);
+                              }
+                            }}
+                            placeholder={`Введите балл (от 0 до ${selectedAssignment.maxScore})`}
+                          />
                         </FormControl>
-                        <SelectContent>
-                          {[1, 2, 3, 4, 5].map((grade) => (
-                            <SelectItem key={grade} value={grade.toString()}>
-                              {grade}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormDescription>
+                          Тип задания: {getAssignmentTypeName(selectedAssignment.assignmentType)}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={gradeForm.control}
+                    name="grade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Оценка</FormLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(parseInt(value))}
+                          defaultValue={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Выберите оценку" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {[1, 2, 3, 4, 5].map((grade) => (
+                              <SelectItem key={grade} value={grade.toString()}>
+                                {grade}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 
                 <FormField
                   control={gradeForm.control}
