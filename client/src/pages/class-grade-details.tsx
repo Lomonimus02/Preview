@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
@@ -257,7 +257,21 @@ export default function ClassGradeDetailsPage() {
     enabled: !!classId && !!subjectId && !!user,
   });
   
-  // Получаем задания для этого класса и предмета, чтобы знать, какие ячейки активировать для выставления оценок
+  // Тип Assignment
+interface Assignment {
+  id: number;
+  assignmentType: string;
+  maxScore: string;
+  scheduleId: number;
+  subjectId: number;
+  classId: number;
+  teacherId: number;
+  description?: string | null;
+  subgroupId?: number | null;
+  displayOrder?: number;
+}
+
+// Получаем задания для этого класса и предмета, чтобы знать, какие ячейки активировать для выставления оценок
   const { data: assignments = [], isLoading: isAssignmentsLoading } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments", { classId, subjectId, subgroupId }],
     queryFn: async () => {
@@ -1380,6 +1394,20 @@ export default function ClassGradeDetailsPage() {
                               <div className="flex flex-col items-center justify-center">
                                 {slot.formattedDate}
                                 {slot.startTime && <span className="text-xs">({slot.startTime.slice(0, 5)})</span>}
+                                {/* Отображаем задания в заголовке если они есть */}
+                                {slot.assignments && slot.assignments.length > 0 && classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && (
+                                  <div className="flex flex-wrap mt-1 mb-1 gap-1 justify-center text-xs">
+                                    {slot.assignments.map(assignment => (
+                                      <span 
+                                        key={assignment.id}
+                                        className={`${getAssignmentTypeColor(assignment.assignmentType)} text-gray-800 px-1.5 py-0.5 rounded-sm border border-gray-300`}
+                                        title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов`}
+                                      >
+                                        {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                                 {isLessonConducted && (
                                   <div className="flex items-center">
                                     <span className="text-green-600 ml-1">
