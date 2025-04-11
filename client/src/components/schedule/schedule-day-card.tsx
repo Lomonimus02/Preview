@@ -19,8 +19,52 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FiClock, FiMapPin, FiUser, FiCheck, FiPlus, FiList, FiEdit3 } from "react-icons/fi";
-import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework } from "@shared/schema";
+import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum } from "@shared/schema";
 import { HomeworkForm } from "./homework-form";
+
+// Функция для получения цвета для типа задания
+const getAssignmentTypeColor = (type?: string): string => {
+  switch (type) {
+    case AssignmentTypeEnum.CONTROL_WORK:
+      return 'bg-red-100';
+    case AssignmentTypeEnum.TEST_WORK:
+      return 'bg-blue-100';
+    case AssignmentTypeEnum.CURRENT_WORK:
+      return 'bg-green-100';
+    case AssignmentTypeEnum.HOMEWORK:
+      return 'bg-amber-100';
+    case AssignmentTypeEnum.CLASSWORK:
+      return 'bg-emerald-100';
+    case AssignmentTypeEnum.PROJECT_WORK:
+      return 'bg-purple-100';
+    case AssignmentTypeEnum.CLASS_ASSIGNMENT:
+      return 'bg-indigo-100';
+    default:
+      return 'bg-gray-100';
+  }
+};
+
+// Функция для получения названия типа задания
+const getAssignmentTypeName = (type?: string): string => {
+  switch (type) {
+    case AssignmentTypeEnum.CONTROL_WORK:
+      return 'Контрольная';
+    case AssignmentTypeEnum.TEST_WORK:
+      return 'Тестирование';
+    case AssignmentTypeEnum.CURRENT_WORK:
+      return 'Текущая';
+    case AssignmentTypeEnum.HOMEWORK:
+      return 'Домашняя';
+    case AssignmentTypeEnum.CLASSWORK:
+      return 'Классная';
+    case AssignmentTypeEnum.PROJECT_WORK:
+      return 'Проект';
+    case AssignmentTypeEnum.CLASS_ASSIGNMENT:
+      return 'Задание';
+    default:
+      return 'Задание';
+  }
+};
 
 interface ScheduleItemProps {
   schedule: Schedule;
@@ -88,6 +132,24 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           <FiUser className="text-gray-400" size={14} />
           <span>{teacherName}</span>
         </div>
+        
+        {/* Отображаем задания, если они есть и урок проведен */}
+        {schedule.status === 'conducted' && schedule.assignments && schedule.assignments.length > 0 && (
+          <div className="mt-2">
+            <div className="text-xs text-gray-500 mb-1">Задания:</div>
+            <div className="flex flex-wrap gap-1">
+              {schedule.assignments.map((assignment) => (
+                <div 
+                  key={assignment.id}
+                  className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium text-gray-800 ${getAssignmentTypeColor(assignment.assignmentType)}`}
+                  title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов`}
+                >
+                  {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)} ({assignment.maxScore})
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         {/* Отображаем оценки, если они есть */}
         {grades.length > 0 && (

@@ -368,6 +368,8 @@ export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
 export type Schedule = typeof schedules.$inferSelect & {
   // Дополнительное поле для имени подгруппы, которое будет заполняться на клиенте
   subgroupName?: string;
+  // Массив заданий для этого урока, будет заполняться на клиенте
+  assignments?: Assignment[];
 };
 
 export type InsertHomework = z.infer<typeof insertHomeworkSchema>;
