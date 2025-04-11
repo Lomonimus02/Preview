@@ -3,6 +3,8 @@ import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { useLocation } from "wouter";
 import { useRoleCheck } from "@/hooks/use-role-check";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   Card, 
   CardContent, 
@@ -15,12 +17,24 @@ import {
   DialogHeader, 
   DialogTitle, 
   DialogDescription, 
-  DialogFooter 
+  DialogFooter,
+  DialogClose
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FiClock, FiMapPin, FiUser, FiCheck, FiPlus, FiList, FiEdit3 } from "react-icons/fi";
-import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum } from "@shared/schema";
+import { 
+  FiClock, 
+  FiMapPin, 
+  FiUser, 
+  FiCheck, 
+  FiPlus, 
+  FiList, 
+  FiEdit3, 
+  FiTrash2, 
+  FiAlertCircle 
+} from "react-icons/fi";
+import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum, Assignment } from "@shared/schema";
 import { HomeworkForm } from "./homework-form";
+import { AssignmentForm } from "../assignments/assignment-form";
 
 // Функция для получения цвета для типа задания
 const getAssignmentTypeColor = (type?: string): string => {
@@ -74,7 +88,7 @@ interface ScheduleItemProps {
   grades?: Grade[];
   homework?: Homework | undefined;
   isCompleted?: boolean;
-  onClick: (e?: React.MouseEvent, actionType?: string) => void;
+  onClick: (e?: React.MouseEvent, actionType?: string, assignment?: Assignment) => void;
 }
 
 export const ScheduleItem: React.FC<ScheduleItemProps> = ({
@@ -141,8 +155,15 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
               {schedule.assignments.map((assignment) => (
                 <div 
                   key={assignment.id}
-                  className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium text-gray-800 ${getAssignmentTypeColor(assignment.assignmentType)}`}
-                  title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов`}
+                  className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium text-gray-800 ${getAssignmentTypeColor(assignment.assignmentType)} hover:bg-opacity-80 cursor-pointer`}
+                  title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. Нажмите для редактирования.`}
+                  onClick={(e) => {
+                    e.stopPropagation(); // Предотвращаем всплытие события
+                    // Вызов обработчика для редактирования задания
+                    if (onClick && typeof onClick === 'function') {
+                      onClick(e, "edit-assignment", assignment);
+                    }
+                  }}
                 >
                   {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)} ({assignment.maxScore})
                 </div>
