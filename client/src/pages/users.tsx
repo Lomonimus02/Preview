@@ -93,7 +93,7 @@ type UserFormData = z.infer<typeof userFormSchema>;
 
 export default function UsersPage() {
   const { user } = useAuth();
-  const { isAdmin } = useRoleCheck();
+  const { isAdmin, canEdit } = useRoleCheck();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRoleEnum | "all">("all");
