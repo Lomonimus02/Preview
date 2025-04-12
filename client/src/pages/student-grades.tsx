@@ -180,17 +180,41 @@ export default function StudentGrades() {
   // Объект для хранения средних оценок по предметам из API
   const [subjectAverages, setSubjectAverages] = useState<Record<string, SubjectAverage>>({});
   
-  // Получение средних оценок из API
-  useQuery({
-    queryKey: ['/api/student-subject-average', user?.id],
-    enabled: !!user && user.role === UserRoleEnum.STUDENT && subjects.length > 0,
-    refetchOnWindowFocus: false,
-    refetchOnMount: true,
-    onSuccess: (data) => {
-      // При успешной загрузке средних оценок сохраняем их
-      // Временно не используем данные, будем получать данные отдельно для каждого предмета
-    }
-  });
+  // Эффект для предварительной загрузки средних оценок для всех предметов
+  useEffect(() => {
+    if (!user || user.role !== UserRoleEnum.STUDENT || !subjects.length) return;
+    
+    const fetchSubjectAverages = async () => {
+      const averagesData: Record<string, SubjectAverage> = {};
+      
+      // Загружаем данные для всех предметов
+      for (const subject of subjects) {
+        try {
+          const subjectId = subject.id;
+          const cacheKey = subject.customId || `${subjectId}`;
+          
+          // Загружаем среднюю оценку для этого предмета
+          const url = `/api/student-subject-average?studentId=${user.id}&subjectId=${subjectId}`;
+          const response = await fetch(url);
+          
+          if (response.ok) {
+            const data = await response.json();
+            averagesData[cacheKey] = data;
+          }
+        } catch (error) {
+          console.error(`Ошибка при загрузке средней оценки для предмета:`, error);
+        }
+      }
+      
+      // Обновляем состояние
+      setSubjectAverages(prev => ({
+        ...prev,
+        ...averagesData
+      }));
+    };
+    
+    fetchSubjectAverages();
+  }, [user, subjects]);
   
   // Определяем систему оценивания класса
   const gradingSystem = useMemo(() => {
