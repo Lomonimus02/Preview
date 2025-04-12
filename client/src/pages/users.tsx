@@ -662,9 +662,11 @@ export default function UsersPage() {
         <TabsContent value="users">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-heading font-bold text-gray-800">Пользователи</h2>
-            <Button onClick={() => { resetForm(); setIsAddDialogOpen(true); }}>
-              <Plus className="mr-2 h-4 w-4" /> Добавить пользователя
-            </Button>
+            {!isPrincipal() && (
+              <Button onClick={() => { resetForm(); setIsAddDialogOpen(true); }}>
+                <Plus className="mr-2 h-4 w-4" /> Добавить пользователя
+              </Button>
+            )}
           </div>
           
           {/* Search and filters */}
