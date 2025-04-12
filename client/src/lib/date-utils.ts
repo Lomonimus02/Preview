@@ -1,97 +1,84 @@
 /**
- * Форматирует дату в формат DD.MM.YYYY
+ * Получает понедельник текущей или указанной недели
+ */
+export function getMonday(date: Date): Date {
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1); // коррекция для воскресенья
+  const monday = new Date(date);
+  monday.setDate(diff);
+  return monday;
+}
+
+/**
+ * Форматирует дату в читаемый вид (день.месяц.год)
  */
 export function formatDate(date: Date): string {
   const day = date.getDate().toString().padStart(2, '0');
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const year = date.getFullYear();
-  
   return `${day}.${month}.${year}`;
 }
 
 /**
- * Форматирует время в формат HH:MM
+ * Получает массив дат для всей недели, начиная с понедельника
  */
-export function formatTime(time: string): string {
-  if (!time) return '';
+export function getWeekDates(startDate: Date): Date[] {
+  const monday = getMonday(startDate);
+  const dates: Date[] = [];
   
-  // Если время уже в нужном формате, возвращаем его
-  if (/^\d{2}:\d{2}(:\d{2})?$/.test(time)) {
-    return time.substring(0, 5);
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    dates.push(date);
   }
   
-  try {
-    const date = new Date(time);
-    
-    if (isNaN(date.getTime())) {
-      return time;
-    }
-    
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    
-    return `${hours}:${minutes}`;
-  } catch (e) {
-    return time;
-  }
+  return dates;
 }
 
 /**
- * Возвращает название дня недели на русском языке
- */
-export function getDayOfWeekName(dayOfWeek: number): string {
-  const days = [
-    'Воскресенье', 
-    'Понедельник', 
-    'Вторник', 
-    'Среда', 
-    'Четверг', 
-    'Пятница', 
-    'Суббота'
-  ];
-  
-  // Если день недели передан в формате 1-7, где 1 - понедельник, а 7 - воскресенье
-  if (dayOfWeek >= 1 && dayOfWeek <= 7) {
-    return days[dayOfWeek === 7 ? 0 : dayOfWeek];
-  }
-  
-  // Если день недели передан в формате 0-6, где 0 - воскресенье, а 6 - суббота
-  if (dayOfWeek >= 0 && dayOfWeek <= 6) {
-    return days[dayOfWeek];
-  }
-  
-  return 'Неизвестный день';
-}
-
-/**
- * Возвращает короткое название дня недели на русском языке
- */
-export function getShortDayOfWeekName(dayOfWeek: number): string {
-  const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-  
-  // Если день недели передан в формате 1-7, где 1 - понедельник, а 7 - воскресенье
-  if (dayOfWeek >= 1 && dayOfWeek <= 7) {
-    return days[dayOfWeek === 7 ? 0 : dayOfWeek];
-  }
-  
-  // Если день недели передан в формате 0-6, где 0 - воскресенье, а 6 - суббота
-  if (dayOfWeek >= 0 && dayOfWeek <= 6) {
-    return days[dayOfWeek];
-  }
-  
-  return '??';
-}
-
-/**
- * Возвращает день недели для даты (1-7, где 1 - понедельник, 7 - воскресенье)
+ * Получает день недели (1-7) для даты, где 1 - понедельник, 7 - воскресенье
  */
 export function getDayOfWeek(date: Date): number {
   const day = date.getDay();
-  return day === 0 ? 7 : day;
+  return day === 0 ? 7 : day; // преобразуем воскресенье (0) в 7
 }
 
 /**
- * Проверяет, совпадают ли две даты (без учета времени)
+ * Получает название дня недели на русском языке
+ */
+export function getDayOfWeekName(dayNumber: number): string {
+  const days = [
+    'Понедельник',
+    'Вторник',
+    'Среда',
+    'Четверг',
+    'Пятница',
+    'Суббота',
+    'Воскресенье'
+  ];
+  
+  // Сдвигаем индекс, т.к. dayNumber начинается с 1 (понедельник)
+  return days[dayNumber - 1] || '';
+}
+
+/**
+ * Форматирует время в строке "ЧЧ:ММ"
+ */
+export function formatTime(date: Date): string {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+/**
+ * Проверяет, является ли первая дата раньше второй
+ */
+export function isDateBefore(date1: Date, date2: Date): boolean {
+  return date1.getTime() < date2.getTime();
+}
+
+/**
+ * Сравнивает две даты без учета времени (только год, месяц, день)
  */
 export function isSameDay(date1: Date, date2: Date): boolean {
   return (
@@ -102,34 +89,10 @@ export function isSameDay(date1: Date, date2: Date): boolean {
 }
 
 /**
- * Получает массив дат для текущей недели, начиная с понедельника
+ * Добавляет указанное количество дней к дате
  */
-export function getWeekDates(currentDate: Date): Date[] {
-  const dates: Date[] = [];
-  const startOfWeek = new Date(currentDate);
-  
-  // Определяем день недели (0 - воскресенье, 1 - понедельник, и т.д.)
-  const dayOfWeek = startOfWeek.getDay();
-  
-  // Устанавливаем дату на понедельник текущей недели
-  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  startOfWeek.setDate(startOfWeek.getDate() + diff);
-  
-  // Создаем массив дат для недели
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(startOfWeek);
-    date.setDate(date.getDate() + i);
-    dates.push(date);
-  }
-  
-  return dates;
-}
-
-/**
- * Получает дату понедельника для недели, содержащей указанную дату
- */
-export function getMonday(date: Date): Date {
-  const day = date.getDay();
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(date.setDate(diff));
+export function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
 }
