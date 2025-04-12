@@ -133,11 +133,24 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
 
   // Обработчик отправки формы
   const handleSubmit = (values: ScheduleFormValues) => {
+    // Вычисляем день недели из выбранной даты 
+    const selectedDate = new Date(values.date);
+    // JS: 0 - воскресенье, 1 - понедельник, ..., 6 - суббота
+    // API: 1 - понедельник, 2 - вторник, ..., 7 - воскресенье
+    const dayOfWeek = selectedDate.getDay() === 0 ? 7 : selectedDate.getDay();
+    
+    // Получаем время начала и конца из выбранного слота
+    const selectedSlot = timeSlots.find(slot => slot.slotNumber.toString() === values.slotNumber);
+    const startTime = selectedSlot ? selectedSlot.startTime : "00:00";
+    const endTime = selectedSlot ? selectedSlot.endTime : "00:00";
+    
     onSubmit({
       subjectId: parseInt(values.subjectId),
       teacherId: parseInt(values.teacherId),
-      date: values.date,
-      slotNumber: parseInt(values.slotNumber),
+      scheduleDate: values.date,
+      dayOfWeek: dayOfWeek,
+      startTime: startTime,
+      endTime: endTime,
       room: values.room,
       subgroupId: values.subgroupId ? parseInt(values.subgroupId) : null,
       theme: values.theme || null,

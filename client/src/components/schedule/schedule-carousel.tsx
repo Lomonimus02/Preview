@@ -28,7 +28,7 @@ interface ScheduleCarouselProps {
   showClassNames?: boolean; // Флаг для отображения имен классов (для общего расписания)
   onAddSchedule?: (date: Date) => void;
   onEditSchedule?: (schedule: Schedule) => void;
-  onDeleteSchedule?: (schedule: Schedule) => void;
+  onDeleteSchedule?: (scheduleId: number) => void;
 }
 
 export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({

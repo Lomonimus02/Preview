@@ -215,9 +215,9 @@ export default function ClassSchedulePage() {
   };
   
   // Обработчик удаления расписания
-  const handleDeleteSchedule = (schedule: Schedule) => {
+  const handleDeleteSchedule = (scheduleId: number) => {
     if (confirm('Вы уверены, что хотите удалить этот урок из расписания?')) {
-      deleteScheduleMutation.mutate(schedule.id);
+      deleteScheduleMutation.mutate(scheduleId);
     }
   };
   
