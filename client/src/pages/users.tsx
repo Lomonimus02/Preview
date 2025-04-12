@@ -738,12 +738,16 @@ export default function UsersPage() {
                       <TableCell>{u.schoolId || '-'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(u)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(u)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canEdit() && (
+                            <>
+                              <Button variant="ghost" size="sm" onClick={() => handleEdit(u)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600" onClick={() => handleDelete(u)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
