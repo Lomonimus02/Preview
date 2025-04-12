@@ -299,7 +299,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   
   // Получаем настроенные временные слоты для класса, если classId известен
   const { data: classTimeSlots = [] } = useQuery<ClassTimeSlot[]>({
-    queryKey: ['/api/class', classId, 'time-slots'],
+    queryKey: [`/api/class/${classId}/time-slots`],
     enabled: !!classId && !showClassNames, // Только если это расписание для конкретного класса
   });
   
