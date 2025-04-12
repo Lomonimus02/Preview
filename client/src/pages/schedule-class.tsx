@@ -252,43 +252,39 @@ export default function ClassSchedulePage() {
               </Button>
             </div>
             
-            <Tabs defaultValue="schedule" className="w-full mb-8">
-              <TabsList className="grid w-[400px] grid-cols-2">
-                <TabsTrigger value="schedule">Расписание</TabsTrigger>
-                <TabsTrigger value="time-slots">Настройка временных слотов</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="schedule" className="mt-4">
-                {schedules.length > 0 ? (
-                  <ScheduleCarousel
-                    schedules={schedules}
-                    subjects={subjects}
-                    teachers={teachers}
-                    classes={classes}
-                    grades={grades}
-                    homework={homework}
-                    currentUser={user}
-                    isAdmin={isSchoolAdmin()}
-                    subgroups={subgroups}
-                    showClassNames={false} // В расписании класса не показываем название класса для каждого урока
-                    onAddSchedule={handleAddSchedule} // Обработчик добавления урока
-                    onEditSchedule={handleEditSchedule} // Обработчик редактирования урока
-                    onDeleteSchedule={handleDeleteSchedule} // Обработчик удаления урока
-                  />
-                ) : (
-                  <Alert>
-                    <AlertTitle>Расписание отсутствует</AlertTitle>
-                    <AlertDescription>
-                      Для данного класса еще не создано расписание
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="time-slots" className="mt-4">
-                <TimeSlotsManager classId={classId} />
-              </TabsContent>
-            </Tabs>
+            <div className="flex flex-wrap items-center gap-4 mb-8">
+              <Link href={`/schedule-class/${classId}`} className={`px-4 py-2 rounded-md font-medium ${!location.includes('/time-slots') ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}>
+                Расписание
+              </Link>
+              <Link href={`/schedule-class/${classId}/time-slots`} className={`px-4 py-2 rounded-md font-medium ${location.includes('/time-slots') ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}>
+                Настройка временных слотов
+              </Link>
+            </div>
+            
+            {schedules.length > 0 ? (
+              <ScheduleCarousel
+                schedules={schedules}
+                subjects={subjects}
+                teachers={teachers}
+                classes={classes}
+                grades={grades}
+                homework={homework}
+                currentUser={user}
+                isAdmin={isSchoolAdmin()}
+                subgroups={subgroups}
+                showClassNames={false} // В расписании класса не показываем название класса для каждого урока
+                onAddSchedule={handleAddSchedule} // Обработчик добавления урока
+                onEditSchedule={handleEditSchedule} // Обработчик редактирования урока
+                onDeleteSchedule={handleDeleteSchedule} // Обработчик удаления урока
+              />
+            ) : (
+              <Alert>
+                <AlertTitle>Расписание отсутствует</AlertTitle>
+                <AlertDescription>
+                  Для данного класса еще не создано расписание
+                </AlertDescription>
+              </Alert>
+            )}
           </>
         )}
       </div>
