@@ -478,11 +478,46 @@ export default function StudentGrades() {
     return subject ? subject.name : `Предмет ${subjectId}`;
   };
   
+  // Получение отображаемого названия для предмета/подгруппы
+  const getDisplayName = (subject: any) => {
+    const subjectId = subject.id;
+    const subgroupId = subject.subgroupId;
+    
+    if (subgroupId) {
+      const subgroup = studentSubgroups.find(sg => sg.id === subgroupId);
+      if (subgroup) {
+        return `${subject.name} (${subgroup.name})`;
+      }
+    }
+    
+    return subject.name;
+  };
+  
   // Получаем предметы и подгруппы с оценками
   const subjectsWithGrades = useMemo(() => {
     // Создаем комбинации предмет+подгруппа
     const subjectSubgroupMap = new Map();
     
+    // Сначала добавляем все подгруппы студента
+    studentSubgroups.forEach(subgroup => {
+      // Находим предмет для подгруппы (если информация доступна)
+      // Обычно подгруппы связаны с предметами через назначения
+      const assignment = assignments.find(a => a.subgroupId === subgroup.id);
+      if (assignment) {
+        const subject = subjects.find(s => s.id === assignment.subjectId);
+        if (subject) {
+          const key = `${subject.id}-${subgroup.id}`;
+          subjectSubgroupMap.set(key, {
+            ...subject,
+            subgroupId: subgroup.id,
+            subgroupName: subgroup.name,
+            customId: key
+          });
+        }
+      }
+    });
+    
+    // Затем добавляем предметы с оценками
     grades.forEach(grade => {
       const key = grade.subgroupId 
         ? `${grade.subjectId}-${grade.subgroupId}` 
@@ -491,10 +526,18 @@ export default function StudentGrades() {
       if (!subjectSubgroupMap.has(key)) {
         const subject = subjects.find(s => s.id === grade.subjectId);
         if (subject) {
+          // Если это подгруппа, находим её название
+          let subgroupName = null;
+          if (grade.subgroupId) {
+            const subgroup = studentSubgroups.find(sg => sg.id === grade.subgroupId);
+            subgroupName = subgroup ? subgroup.name : null;
+          }
+          
           // Сохраняем копию предмета с информацией о подгруппе
           subjectSubgroupMap.set(key, {
-            ...subject, 
+            ...subject,
             subgroupId: grade.subgroupId,
+            subgroupName,
             // Используем customId для сравнения в дальнейшем
             customId: key
           });
@@ -608,17 +651,20 @@ export default function StudentGrades() {
                     </TableHeader>
                     <TableBody>
                       {subjectsWithGrades.map((subject) => (
-                        <TableRow key={subject.id}>
+                        <TableRow key={subject.customId || subject.id}>
                           <TableCell className="font-medium sticky left-0 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)] z-10">
-                            {subject.name}
+                            {subject.subgroupId 
+                              ? getDisplayName(subject) 
+                              : subject.name
+                            }
                           </TableCell>
                           {daysInPeriod.map((day) => (
                             <TableCell key={day.toString()} className="text-center">
                               {renderGradeCell(subject.customId, day)}
                             </TableCell>
                           ))}
-                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(calculateAverageForSubject(subject.customId))}`}>
-                            {calculateAverageForSubject(subject.customId)}
+                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(calculateAverageForSubject(subject))}`}>
+                            {calculateAverageForSubject(subject)}
                           </TableCell>
                         </TableRow>
                       ))}
