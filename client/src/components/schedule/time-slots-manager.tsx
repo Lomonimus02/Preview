@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TimeSlot, ClassTimeSlot } from '@shared/schema';
-import { Loader2, Clock, Save, Trash2, RefreshCw } from 'lucide-react';
+import { Loader2, Clock, Save, Trash2, RefreshCw, Check } from 'lucide-react';
 import { 
   Table, 
   TableBody, 
@@ -21,11 +21,16 @@ interface TimeSlotsManagerProps {
   classId: number;
 }
 
+// Задержка для автосохранения (в мс)
+const AUTO_SAVE_DELAY = 800;
+
 export function TimeSlotsManager({ classId }: TimeSlotsManagerProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [editingSlot, setEditingSlot] = useState<number | null>(null);
+  const [editingSlots, setEditingSlots] = useState<Record<number, boolean>>({});
   const [slotData, setSlotData] = useState<Record<number, { startTime: string, endTime: string }>>({});
+  const [autoSaveTimers, setAutoSaveTimers] = useState<Record<number, NodeJS.Timeout>>({});
+  const [saveStatus, setSaveStatus] = useState<Record<number, 'idle' | 'saving' | 'saved' | 'error'>>({});
 
   // Мутация для создания/обновления временного слота для класса
   const updateClassTimeSlotMutation = useMutation({
@@ -36,17 +41,35 @@ export function TimeSlotsManager({ classId }: TimeSlotsManagerProps) {
         data: { slotNumber, startTime, endTime }
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/class', classId, 'time-slots'] });
       queryClient.invalidateQueries({ queryKey: ['/api/schedules', { classId }] });
+      
+      setSaveStatus(prev => ({
+        ...prev,
+        [variables.slotNumber]: 'saved'
+      }));
+      
+      // Автоматически сбрасываем статус "сохранено" через 2 секунды
+      setTimeout(() => {
+        setSaveStatus(prev => ({
+          ...prev,
+          [variables.slotNumber]: 'idle'
+        }));
+      }, 2000);
+      
       toast({
         title: 'Временной слот обновлен',
         description: 'Настройки временного слота успешно сохранены',
         variant: 'default'
       });
-      setEditingSlot(null);
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
+      setSaveStatus(prev => ({
+        ...prev,
+        [variables.slotNumber]: 'error'
+      }));
+      
       toast({
         title: 'Ошибка',
         description: error.message || 'Не удалось сохранить настройки временного слота',
@@ -117,25 +140,43 @@ export function TimeSlotsManager({ classId }: TimeSlotsManagerProps) {
           endTime: formatTime(slot.endTime)
         }
       });
-      setEditingSlot(slotNumber);
+      setEditingSlots(prev => ({
+        ...prev,
+        [slotNumber]: true
+      }));
     }
   };
 
-  // Обработчик сохранения изменений слота
-  const handleSaveSlot = (slotNumber: number) => {
+  // Функция для автоматического сохранения слота
+  const autoSaveSlot = (slotNumber: number) => {
+    // Отменяем предыдущий таймер автосохранения для этого слота, если он существует
+    if (autoSaveTimers[slotNumber]) {
+      clearTimeout(autoSaveTimers[slotNumber]);
+    }
+    
     const data = slotData[slotNumber];
-    if (data) {
+    if (!data) return;
+    
+    // Устанавливаем статус "сохранение"
+    setSaveStatus(prev => ({
+      ...prev,
+      [slotNumber]: 'saving'
+    }));
+    
+    // Создаем новый таймер автосохранения
+    const timer = setTimeout(() => {
       updateClassTimeSlotMutation.mutate({
         slotNumber,
         startTime: data.startTime,
         endTime: data.endTime
       });
-    }
-  };
-
-  // Обработчик отмены редактирования слота
-  const handleCancelEdit = () => {
-    setEditingSlot(null);
+    }, AUTO_SAVE_DELAY);
+    
+    // Сохраняем ссылку на таймер
+    setAutoSaveTimers(prev => ({
+      ...prev,
+      [slotNumber]: timer
+    }));
   };
 
   // Обработчик сброса настроек слота к значениям по умолчанию
@@ -147,14 +188,24 @@ export function TimeSlotsManager({ classId }: TimeSlotsManagerProps) {
 
   // Обработчик изменения значений времени
   const handleTimeChange = (slotNumber: number, field: 'startTime' | 'endTime', value: string) => {
-    setSlotData({
-      ...slotData,
+    setSlotData(prev => ({
+      ...prev,
       [slotNumber]: {
-        ...slotData[slotNumber],
+        ...prev[slotNumber],
         [field]: value
       }
-    });
+    }));
+    
+    // Запускаем автосохранение при изменении
+    autoSaveSlot(slotNumber);
   };
+
+  // Очищаем таймеры автосохранения при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      Object.values(autoSaveTimers).forEach(timer => clearTimeout(timer));
+    };
+  }, [autoSaveTimers]);
 
   // Если данные загружаются, показываем индикатор загрузки
   if (defaultSlotsLoading || classTimeSlotsLoading) {
@@ -172,7 +223,8 @@ export function TimeSlotsManager({ classId }: TimeSlotsManagerProps) {
         <CardTitle>Настройка временных слотов уроков</CardTitle>
         <CardDescription>
           Настройте время начала и окончания каждого урока для данного класса. 
-          Если не указано отдельное время для класса, будут использованы значения по умолчанию.
+          Изменения сохраняются автоматически. Если не указано отдельное время для класса, 
+          будут использованы значения по умолчанию.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -193,7 +245,8 @@ export function TimeSlotsManager({ classId }: TimeSlotsManagerProps) {
               const classSlot = classTimeSlots.find(s => s.slotNumber === slotNumber);
               const effectiveSlot = classSlot || defaultSlot;
               const isCustomized = !!classSlot;
-              const isEditing = editingSlot === slotNumber;
+              const isEditing = editingSlots[slotNumber];
+              const status = saveStatus[slotNumber];
 
               return (
                 <TableRow key={slotNumber}>
@@ -205,24 +258,32 @@ export function TimeSlotsManager({ classId }: TimeSlotsManagerProps) {
                   </TableCell>
                   <TableCell>
                     {isEditing ? (
-                      <Input
-                        type="time"
-                        value={slotData[slotNumber]?.startTime || formatTime(effectiveSlot.startTime)}
-                        onChange={(e) => handleTimeChange(slotNumber, 'startTime', e.target.value)}
-                        className="w-32"
-                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="time"
+                          value={slotData[slotNumber]?.startTime || formatTime(effectiveSlot.startTime)}
+                          onChange={(e) => handleTimeChange(slotNumber, 'startTime', e.target.value)}
+                          className="w-32"
+                        />
+                        {status === 'saving' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                        {status === 'saved' && <Check className="h-3 w-3 text-green-500" />}
+                      </div>
                     ) : (
                       formatTime(effectiveSlot.startTime)
                     )}
                   </TableCell>
                   <TableCell>
                     {isEditing ? (
-                      <Input
-                        type="time"
-                        value={slotData[slotNumber]?.endTime || formatTime(effectiveSlot.endTime)}
-                        onChange={(e) => handleTimeChange(slotNumber, 'endTime', e.target.value)}
-                        className="w-32"
-                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="time"
+                          value={slotData[slotNumber]?.endTime || formatTime(effectiveSlot.endTime)}
+                          onChange={(e) => handleTimeChange(slotNumber, 'endTime', e.target.value)}
+                          className="w-32"
+                        />
+                        {status === 'saving' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+                        {status === 'saved' && <Check className="h-3 w-3 text-green-500" />}
+                      </div>
                     ) : (
                       formatTime(effectiveSlot.endTime)
                     )}
@@ -240,51 +301,36 @@ export function TimeSlotsManager({ classId }: TimeSlotsManagerProps) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end space-x-1">
-                      {isEditing ? (
-                        <>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            onClick={() => handleSaveSlot(slotNumber)}
-                            disabled={updateClassTimeSlotMutation.isPending}
-                          >
-                            {updateClassTimeSlotMutation.isPending && (
-                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            )}
-                            Сохранить
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleCancelEdit}
-                          >
-                            Отмена
-                          </Button>
-                        </>
+                      {!isEditing ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditSlot(slotNumber)}
+                        >
+                          Изменить
+                        </Button>
                       ) : (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditSlot(slotNumber)}
-                          >
-                            Изменить
-                          </Button>
-                          {isCustomized && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleResetSlot(slotNumber)}
-                              disabled={deleteClassTimeSlotMutation.isPending}
-                            >
-                              {deleteClassTimeSlotMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <RefreshCw className="h-4 w-4" />
-                              )}
-                            </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingSlots(prev => ({ ...prev, [slotNumber]: false }))}
+                        >
+                          Готово
+                        </Button>
+                      )}
+                      {isCustomized && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleResetSlot(slotNumber)}
+                          disabled={deleteClassTimeSlotMutation.isPending}
+                        >
+                          {deleteClassTimeSlotMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
                           )}
-                        </>
+                        </Button>
                       )}
                     </div>
                   </TableCell>
