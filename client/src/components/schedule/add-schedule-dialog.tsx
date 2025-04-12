@@ -1,35 +1,21 @@
 import { useState } from "react";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { insertScheduleSchema, Schedule, Subject, User } from "@shared/schema";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle,
-  DialogFooter
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon, Loader2 } from "lucide-react";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDate, getDayOfWeek } from "@/lib/date-utils";
+import { Schedule, Subject, User } from "@shared/schema";
+import { cn } from "@/lib/utils";
 
 interface AddScheduleDialogProps {
   isOpen: boolean;
@@ -42,15 +28,16 @@ interface AddScheduleDialogProps {
   onSuccess: () => void;
 }
 
-// Схема для валидации
-const scheduleFormSchema = insertScheduleSchema.extend({
-  subjectId: z.coerce.number().min(1, { message: "Выберите предмет" }),
-  teacherId: z.coerce.number().min(1, { message: "Выберите учителя" }),
-  startTime: z.string().min(1, { message: "Укажите время начала" }),
-  endTime: z.string().min(1, { message: "Укажите время окончания" }),
-  dayOfWeek: z.coerce.number(),
-  subgroupId: z.coerce.number().optional(),
-  roomNumber: z.string().optional()
+// Схема валидации для формы добавления расписания
+const scheduleFormSchema = z.object({
+  dayOfWeek: z.number().min(1).max(7),
+  startTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Время должно быть в формате ЧЧ:ММ"),
+  endTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Время должно быть в формате ЧЧ:ММ"),
+  subjectId: z.number().positive("Выберите предмет"),
+  teacherId: z.number().positive("Выберите учителя"),
+  room: z.string().min(1, "Укажите кабинет"),
+  subgroupId: z.number().optional(),
+  status: z.string().default("not_conducted")
 });
 
 type ScheduleFormValues = z.infer<typeof scheduleFormSchema>;
@@ -66,24 +53,27 @@ export function AddScheduleDialog({
   onSuccess
 }: AddScheduleDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isEditing = !!schedule;
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Получаем день недели из выбранной даты
+  // Определяем день недели для выбранной даты
   const dayOfWeek = getDayOfWeek(selectedDate);
 
-  // Настройка формы
+  // Значения по умолчанию для формы
+  const defaultValues: Partial<ScheduleFormValues> = {
+    dayOfWeek: dayOfWeek,
+    startTime: schedule?.startTime || "08:30",
+    endTime: schedule?.endTime || "09:15",
+    subjectId: schedule?.subjectId || 0,
+    teacherId: schedule?.teacherId || 0,
+    room: schedule?.room || "",
+    status: schedule?.status || "not_conducted"
+  };
+
+  // Инициализируем форму с помощью React Hook Form
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
-    defaultValues: {
-      classId: classId,
-      subjectId: schedule?.subjectId || 0,
-      teacherId: schedule?.teacherId || 0,
-      startTime: schedule?.startTime || "08:00",
-      endTime: schedule?.endTime || "08:45",
-      dayOfWeek: schedule?.dayOfWeek || dayOfWeek,
-      subgroupId: schedule?.subgroupId || 0,
-      roomNumber: schedule?.roomNumber || ""
-    }
+    defaultValues
   });
 
   // Обработчик отправки формы
@@ -91,52 +81,79 @@ export function AddScheduleDialog({
     setIsSubmitting(true);
 
     try {
-      // Если это редактирование, отправляем PATCH запрос, иначе POST
-      const url = isEditing 
-        ? `/api/schedules/${schedule.id}` 
-        : "/api/schedules";
+      // Определяем endpoint и HTTP метод в зависимости от того, редактируем ли существующее расписание или создаем новое
+      const endpoint = schedule ? `/api/schedules/${schedule.id}` : "/api/schedules";
+      const method = schedule ? "PATCH" : "POST";
+
+      // Подготавливаем данные для отправки на сервер
+      const scheduleData = {
+        ...data,
+        classId: classId
+      };
+
+      // Отправляем запрос
+      const response = await apiRequest(endpoint, {
+        method,
+        data: scheduleData
+      });
+
+      // Инвалидируем кеш запросов расписания
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
       
-      const method = isEditing ? "PATCH" : "POST";
-      
-      const response = await apiRequest(url, method, data);
-      
-      if (!response.ok) {
-        throw new Error("Не удалось сохранить расписание");
-      }
-      
+      // Показываем сообщение об успехе
+      toast({
+        title: schedule ? "Расписание обновлено" : "Расписание добавлено",
+        description: `Урок ${response.subjectId} в ${response.startTime} успешно ${schedule ? "обновлен" : "добавлен"}.`,
+        variant: "default"
+      });
+
+      // Вызываем колбэк успешного добавления
       onSuccess();
     } catch (error) {
-      console.error("Error saving schedule:", error);
+      console.error("Ошибка при сохранении расписания:", error);
+      
+      // Показываем сообщение об ошибке
+      toast({
+        title: "Ошибка",
+        description: "Не удалось сохранить расписание. Пожалуйста, попробуйте снова.",
+        variant: "destructive"
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Фильтруем учителей, оставляя только тех, у кого есть роль TEACHER
+  const teachersList = teachers.filter(teacher => 
+    teacher.roles?.some(role => role.role === "teacher" || role.role === "TEACHER")
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>
-            {isEditing ? "Редактировать урок" : "Добавить новый урок"}
-          </DialogTitle>
+          <DialogTitle>{schedule ? "Редактирование" : "Добавление"} урока</DialogTitle>
         </DialogHeader>
-
+        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="text-sm text-muted-foreground mb-2">
-              Дата: {formatDate(selectedDate)}
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">
+                {formatDate(selectedDate)} (День недели: {dayOfWeek})
+              </span>
             </div>
-
-            {/* Предмет */}
+            
+            {/* Поле выбора предмета */}
             <FormField
               control={form.control}
               name="subjectId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Предмет</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value.toString()}
+                  <Select 
+                    onValueChange={(value) => field.onChange(parseInt(value))}
+                    defaultValue={field.value !== 0 ? field.value?.toString() : undefined}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -155,17 +172,17 @@ export function AddScheduleDialog({
                 </FormItem>
               )}
             />
-
-            {/* Учитель */}
+            
+            {/* Поле выбора учителя */}
             <FormField
               control={form.control}
               name="teacherId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Учитель</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value.toString()}
+                  <Select 
+                    onValueChange={(value) => field.onChange(parseInt(value))}
+                    defaultValue={field.value !== 0 ? field.value?.toString() : undefined}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -173,23 +190,18 @@ export function AddScheduleDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {teachers
-                        .filter(teacher => 
-                          teacher.role === "teacher" || 
-                          teacher.role === "class_teacher"
-                        )
-                        .map((teacher) => (
-                          <SelectItem key={teacher.id} value={teacher.id.toString()}>
-                            {teacher.lastName} {teacher.firstName}
-                          </SelectItem>
-                        ))}
+                      {teachersList.map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id.toString()}>
+                          {teacher.lastName} {teacher.firstName} {teacher.middleName || ''}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
+            
             {/* Время начала и окончания */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -205,7 +217,7 @@ export function AddScheduleDialog({
                   </FormItem>
                 )}
               />
-
+              
               <FormField
                 control={form.control}
                 name="endTime"
@@ -220,22 +232,22 @@ export function AddScheduleDialog({
                 )}
               />
             </div>
-
-            {/* Номер кабинета */}
+            
+            {/* Кабинет */}
             <FormField
               control={form.control}
-              name="roomNumber"
+              name="room"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Номер кабинета</FormLabel>
+                  <FormLabel>Кабинет</FormLabel>
                   <FormControl>
-                    <Input placeholder="Введите номер кабинета" {...field} />
+                    <Input placeholder="Номер кабинета" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
+            
             <DialogFooter>
               <Button 
                 type="button" 
@@ -246,12 +258,14 @@ export function AddScheduleDialog({
                 Отмена
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting 
-                  ? "Сохранение..." 
-                  : isEditing 
-                    ? "Сохранить изменения" 
-                    : "Добавить урок"
-                }
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Сохранение...
+                  </>
+                ) : (
+                  "Сохранить"
+                )}
               </Button>
             </DialogFooter>
           </form>

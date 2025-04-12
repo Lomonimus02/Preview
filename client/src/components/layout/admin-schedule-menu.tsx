@@ -17,8 +17,8 @@ export function AdminScheduleMenu() {
     setIsOpen(false);
   }, [location]);
 
-  // Загружаем список классов школы
-  const { data: schools = [] } = useQuery({
+  // Загружаем список школ
+  const { data: schools = [] } = useQuery<{ id: number, name: string }[]>({
     queryKey: ["/api/schools"],
     enabled: user?.activeRole === UserRoleEnum.SCHOOL_ADMIN || 
              user?.activeRole === UserRoleEnum.PRINCIPAL || 
