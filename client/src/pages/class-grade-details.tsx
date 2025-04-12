@@ -2166,6 +2166,8 @@ export default function ClassGradeDetailsPage() {
                                 if (assignment) {
                                   setSelectedAssignment(assignment);
                                   setSelectedAssignmentId(assignment.id);
+                                  // Автоматически устанавливаем тип оценки на основе типа задания
+                                  gradeForm.setValue('gradeType', assignment.assignmentType);
                                 }
                               }}
                               defaultValue={field.value?.toString()}
@@ -2270,34 +2272,37 @@ export default function ClassGradeDetailsPage() {
                   />
                 )}
                 
-                <FormField
-                  control={gradeForm.control}
-                  name="gradeType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Тип оценки</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите тип оценки" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Текущая">Текущая оценка</SelectItem>
-                          <SelectItem value="test">Контрольная работа</SelectItem>
-                          <SelectItem value="exam">Экзамен</SelectItem>
-                          <SelectItem value="classwork">Классная работа</SelectItem>
-                          <SelectItem value="homework">Домашняя работа</SelectItem>
-                          <SelectItem value="project">Проект</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* Поле выбора типа оценки отображается только если не выбрано задание */}
+                {!selectedAssignment && (
+                  <FormField
+                    control={gradeForm.control}
+                    name="gradeType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Тип оценки</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Выберите тип оценки" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Текущая">Текущая оценка</SelectItem>
+                            <SelectItem value="test">Контрольная работа</SelectItem>
+                            <SelectItem value="exam">Экзамен</SelectItem>
+                            <SelectItem value="classwork">Классная работа</SelectItem>
+                            <SelectItem value="homework">Домашняя работа</SelectItem>
+                            <SelectItem value="project">Проект</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 
                 <FormField
                   control={gradeForm.control}
