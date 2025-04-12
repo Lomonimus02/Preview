@@ -303,17 +303,30 @@ export default function StudentGrades() {
     const scheduleForDate = (() => {
       const scheduleDate = date.toISOString().split('T')[0];
       
-      return assignments
-        .filter(a => {
-          const schedule = a.scheduleDate ? new Date(a.scheduleDate) : null;
-          if (!schedule) return false;
+      // Возможная проблема: в assignments нет scheduleDate, нужно получить его из schedules
+      // Получим из API-запроса к /api/schedules
+      // Для наших целей можем взять scheduleId из assignment и проверить, привязан ли он к нужной дате
+      
+      // Для каждого assignment найдем оценки, которые имеют scheduleId для урока на эту дату
+      return grades
+        .filter(g => {
+          // Проверяем, что оценка относится к текущему предмету
+          if (g.subjectId !== subjectId) return false;
           
-          const scheduleStr = schedule.toISOString().split('T')[0];
-          return scheduleStr === scheduleDate && 
-                 a.subjectId === subjectId && 
-                 (subgroupId === null || a.subgroupId === subgroupId);
+          // Проверяем, что дата оценки совпадает с выбранной датой
+          const gradeDate = new Date(g.createdAt);
+          const gradeStr = gradeDate.toISOString().split('T')[0];
+          if (gradeStr !== scheduleDate) return false;
+          
+          // Проверяем, что подгруппа совпадает (если указана)
+          if (subgroupId !== null && g.subgroupId !== subgroupId) return false;
+          if (subgroupId === null && g.subgroupId) return false;
+          
+          // Считаем, что эта оценка относится к нужному уроку
+          return g.scheduleId !== null && g.scheduleId !== undefined;
         })
-        .map(a => a.scheduleId);
+        .map(g => g.scheduleId)
+        .filter((id): id is number => id !== null && id !== undefined);
     })();
     
     // Получаем оценки для указанного предмета и даты, с учетом расписания
