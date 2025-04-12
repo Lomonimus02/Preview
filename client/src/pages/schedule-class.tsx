@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
 import { TimeSlotsManager } from "@/components/schedule/time-slots-manager";
@@ -9,6 +9,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
 import { Loader2 } from "lucide-react";
 import { Schedule, Class, Subject, User, Grade, Homework } from "@shared/schema";
+import { ScheduleForm } from "@/components/schedule/schedule-form";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function ClassSchedulePage() {
@@ -16,6 +19,13 @@ export default function ClassSchedulePage() {
   const classId = parseInt(params.classId);
   const { user } = useAuth();
   const { isSchoolAdmin } = useRoleCheck();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Состояния для управления формой расписания
+  const [isScheduleFormOpen, setIsScheduleFormOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [scheduleToEdit, setScheduleToEdit] = useState<Schedule | null>(null);
   
   // Проверка доступа (только администраторы школы должны иметь доступ)
   if (!isSchoolAdmin()) {
@@ -107,6 +117,120 @@ export default function ClassSchedulePage() {
     enabled: !!user && !isNaN(classId)
   });
   
+  // Мутация для создания расписания
+  const createScheduleMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest({
+        url: '/api/schedules',
+        method: 'POST',
+        data
+      });
+    },
+    onSuccess: () => {
+      // Инвалидируем кэш расписаний для перезагрузки данных
+      queryClient.invalidateQueries({ queryKey: ['/api/schedules', { classId }] });
+      setIsScheduleFormOpen(false);
+      toast({
+        title: 'Урок добавлен',
+        description: 'Урок успешно добавлен в расписание',
+        variant: 'default'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось добавить урок в расписание',
+        variant: 'destructive'
+      });
+    }
+  });
+  
+  // Мутация для обновления расписания
+  const updateScheduleMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number, data: any }) => {
+      return await apiRequest({
+        url: `/api/schedules/${id}`,
+        method: 'PATCH',
+        data
+      });
+    },
+    onSuccess: () => {
+      // Инвалидируем кэш расписаний для перезагрузки данных
+      queryClient.invalidateQueries({ queryKey: ['/api/schedules', { classId }] });
+      setIsScheduleFormOpen(false);
+      setScheduleToEdit(null);
+      toast({
+        title: 'Урок обновлен',
+        description: 'Урок успешно обновлен в расписании',
+        variant: 'default'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось обновить урок в расписании',
+        variant: 'destructive'
+      });
+    }
+  });
+  
+  // Мутация для удаления расписания
+  const deleteScheduleMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest({
+        url: `/api/schedules/${id}`,
+        method: 'DELETE'
+      });
+    },
+    onSuccess: () => {
+      // Инвалидируем кэш расписаний для перезагрузки данных
+      queryClient.invalidateQueries({ queryKey: ['/api/schedules', { classId }] });
+      toast({
+        title: 'Урок удален',
+        description: 'Урок успешно удален из расписания',
+        variant: 'default'
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Ошибка',
+        description: error.message || 'Не удалось удалить урок из расписания',
+        variant: 'destructive'
+      });
+    }
+  });
+  
+  // Обработчик отправки формы расписания
+  const handleScheduleFormSubmit = (data: any) => {
+    if (scheduleToEdit) {
+      // Редактирование существующего расписания
+      updateScheduleMutation.mutate({ id: scheduleToEdit.id, data: { ...data, classId } });
+    } else {
+      // Создание нового расписания
+      createScheduleMutation.mutate({ ...data, classId });
+    }
+  };
+  
+  // Обработчик открытия формы создания расписания
+  const handleAddSchedule = (date: Date) => {
+    setSelectedDate(date);
+    setScheduleToEdit(null);
+    setIsScheduleFormOpen(true);
+  };
+  
+  // Обработчик открытия формы редактирования расписания
+  const handleEditSchedule = (schedule: Schedule) => {
+    setScheduleToEdit(schedule);
+    setIsScheduleFormOpen(true);
+  };
+  
+  // Обработчик удаления расписания
+  const handleDeleteSchedule = (schedule: Schedule) => {
+    if (confirm('Вы уверены, что хотите удалить этот урок из расписания?')) {
+      deleteScheduleMutation.mutate(schedule.id);
+    }
+  };
+  
   const isLoading = classLoading || schedulesLoading || subjectsLoading || 
                     teachersLoading || classesLoading || homeworkLoading || 
                     gradesLoading || subgroupsLoading;
@@ -146,7 +270,9 @@ export default function ClassSchedulePage() {
                     isAdmin={isSchoolAdmin()}
                     subgroups={subgroups}
                     showClassNames={false} // В расписании класса не показываем название класса для каждого урока
-                    onAddSchedule={() => {}} // Пустая функция, т.к. не используем добавление расписания на этой странице
+                    onAddSchedule={handleAddSchedule} // Обработчик добавления урока
+                    onEditSchedule={handleEditSchedule} // Обработчик редактирования урока
+                    onDeleteSchedule={handleDeleteSchedule} // Обработчик удаления урока
                   />
                 ) : (
                   <Alert>
