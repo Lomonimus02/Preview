@@ -20,6 +20,12 @@ export function useRoleCheck() {
   // Функция для проверки, является ли пользователь админом (суперадмин или школьный админ)
   const isAdmin = () => {
     if (!activeRole) return false;
+    return [UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL].includes(activeRole);
+  };
+  
+  // Функция для проверки, может ли пользователь редактировать данные (суперадмин или школьный админ)
+  const canEdit = () => {
+    if (!activeRole) return false;
     return [UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN].includes(activeRole);
   };
   
@@ -33,6 +39,18 @@ export function useRoleCheck() {
   const isSchoolAdmin = () => {
     if (!activeRole) return false;
     return activeRole === UserRoleEnum.SCHOOL_ADMIN;
+  };
+  
+  // Функция для проверки, является ли пользователь директором
+  const isPrincipal = () => {
+    if (!activeRole) return false;
+    return activeRole === UserRoleEnum.PRINCIPAL;
+  };
+  
+  // Функция для проверки, является ли пользователь завучем
+  const isVicePrincipal = () => {
+    if (!activeRole) return false;
+    return activeRole === UserRoleEnum.VICE_PRINCIPAL;
   };
   
   // Функция для проверки, является ли пользователь учителем
@@ -59,18 +77,28 @@ export function useRoleCheck() {
     return activeRole === UserRoleEnum.PARENT;
   };
   
+  // Функция для проверки, может ли пользователь видеть выпадающий список с расписанием
+  const canViewScheduleDropdown = () => {
+    if (!activeRole) return false;
+    return [UserRoleEnum.SUPER_ADMIN, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(activeRole);
+  };
+  
   // Получаем текущую активную роль
   const currentRole = () => activeRole;
   
   return {
     hasRole,
     isAdmin,
+    canEdit,
     isSuperAdmin,
     isSchoolAdmin,
+    isPrincipal,
+    isVicePrincipal,
     isTeacher,
-    isClassTeacher, // Добавлена новая функция проверки
+    isClassTeacher,
     isStudent,
     isParent,
+    canViewScheduleDropdown,
     currentRole
   };
 }

@@ -102,7 +102,7 @@ export default function UsersPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Only Super admin and School admin can access this page
+  // Only Super admin, School admin and Principal can access this page
   if (!isAdmin()) {
     return (
       <MainLayout>
