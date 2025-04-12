@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 export default function ClassSchedulePage() {
   const params = useParams<{ classId: string }>();
   const classId = parseInt(params.classId);
+  const [location] = useLocation();
   const { user } = useAuth();
   const { isSchoolAdmin } = useRoleCheck();
   const { toast } = useToast();
@@ -253,10 +254,10 @@ export default function ClassSchedulePage() {
             </div>
             
             <div className="flex flex-wrap items-center gap-4 mb-8">
-              <Link href={`/schedule-class/${classId}`} className={`px-4 py-2 rounded-md font-medium ${!location.includes('/time-slots') ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}>
+              <Link href={`/schedule-class/${classId}`} className={`px-4 py-2 rounded-md font-medium ${!location.includes('time-slots') ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}>
                 Расписание
               </Link>
-              <Link href={`/schedule-class/${classId}/time-slots`} className={`px-4 py-2 rounded-md font-medium ${location.includes('/time-slots') ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}>
+              <Link href={`/schedule-class/${classId}/time-slots`} className={`px-4 py-2 rounded-md font-medium ${location.includes('time-slots') ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}>
                 Настройка временных слотов
               </Link>
             </div>
