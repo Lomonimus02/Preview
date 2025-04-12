@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
 import {
@@ -31,7 +31,9 @@ export const SchoolAdminScheduleMenu: React.FC = () => {
     if (user.schoolId) return user.schoolId;
     
     // Если у пользователя есть роль школьного администратора с привязкой к школе
-    const schoolAdminRole = user.userRoles?.find((roleObj: any) => 
+    // Получаем roles из user или используем пустой массив
+    const roles = user.roles || user.userRoles || [];
+    const schoolAdminRole = roles.find((roleObj: any) => 
       roleObj.role === "school_admin" && roleObj.schoolId
     );
     
@@ -120,18 +122,19 @@ export const SchoolAdminScheduleMenu: React.FC = () => {
       {isExpanded && (
         <div className="mt-1 pl-2 space-y-1 transition-all duration-200">
           <div>
-            <Link to="/schedule-overall">
-              <div 
-                className={cn(
-                  "flex items-center text-sm py-1.5 px-3 rounded-md w-full cursor-pointer",
-                  isItemActive('/schedule-overall') 
-                    ? "bg-accent/50 text-accent-foreground" 
-                    : "hover:bg-muted text-foreground/80"
-                )}
-              >
-                <span className="truncate">Общее расписание</span>
-              </div>
-            </Link>
+            <div
+              className={cn(
+                "flex items-center text-sm py-1.5 px-3 rounded-md w-full cursor-pointer",
+                isItemActive('/schedule-overall') 
+                  ? "bg-accent/50 text-accent-foreground" 
+                  : "hover:bg-muted text-foreground/80"
+              )}
+              onClick={() => {
+                window.location.href = "/schedule-overall";
+              }}
+            >
+              <span className="truncate">Общее расписание</span>
+            </div>
           </div>
           
           <div className="pt-1 pb-1">
@@ -142,18 +145,19 @@ export const SchoolAdminScheduleMenu: React.FC = () => {
             ) : (
               schoolClasses.sort((a, b) => a.name.localeCompare(b.name)).map(cls => (
                 <div key={cls.id}>
-                  <Link href={`/schedule-class/${cls.id}`}>
-                    <div 
-                      className={cn(
-                        "flex items-center text-sm py-1.5 px-3 rounded-md w-full cursor-pointer",
-                        isItemActive(`/schedule-class/${cls.id}`) 
-                          ? "bg-accent/50 text-accent-foreground" 
-                          : "hover:bg-muted text-foreground/80"
-                      )}
-                    >
-                      <span className="truncate">{cls.name}</span>
-                    </div>
-                  </Link>
+                  <div 
+                    className={cn(
+                      "flex items-center text-sm py-1.5 px-3 rounded-md w-full cursor-pointer",
+                      isItemActive(`/schedule-class/${cls.id}`) 
+                        ? "bg-accent/50 text-accent-foreground" 
+                        : "hover:bg-muted text-foreground/80"
+                    )}
+                    onClick={() => {
+                      window.location.href = `/schedule-class/${cls.id}`;
+                    }}
+                  >
+                    <span className="truncate">{cls.name}</span>
+                  </div>
                 </div>
               ))
             )}
