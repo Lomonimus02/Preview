@@ -60,6 +60,13 @@ import { Badge } from "@/components/ui/badge";
 import {
   Progress
 } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Интерфейс для отображения оценок в гриде по дням
 interface GradesByDate {
@@ -471,7 +478,7 @@ export default function StudentGrades() {
         <TabsContent value="table">
           <Card>
             <CardHeader>
-              <CardTitle>Успеваемость за {format(currentMonth, 'LLLL yyyy', { locale: ru })}</CardTitle>
+              <CardTitle>Успеваемость за {periodLabel}</CardTitle>
             </CardHeader>
             <CardContent>
               {gradesLoading ? (
@@ -486,7 +493,7 @@ export default function StudentGrades() {
                     <TableHeader className="sticky top-0 bg-white">
                       <TableRow>
                         <TableHead className="min-w-[180px] sticky left-0 bg-white z-10">Предмет</TableHead>
-                        {daysInMonth.map((day) => (
+                        {daysInPeriod.map((day) => (
                           <TableHead key={day.toString()} className="text-center min-w-[60px]">
                             <div className="flex flex-col items-center">
                               <div className="font-normal text-xs text-gray-500">
@@ -512,7 +519,7 @@ export default function StudentGrades() {
                           <TableCell className="font-medium sticky left-0 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)] z-10">
                             {subject.name}
                           </TableCell>
-                          {daysInMonth.map((day) => (
+                          {daysInPeriod.map((day) => (
                             <TableCell key={day.toString()} className="text-center">
                               {renderGradeCell(subject.id, day)}
                             </TableCell>
@@ -534,7 +541,7 @@ export default function StudentGrades() {
         <TabsContent value="list">
           <Card>
             <CardHeader>
-              <CardTitle>Список оценок за {format(currentMonth, 'LLLL yyyy', { locale: ru })}</CardTitle>
+              <CardTitle>Список оценок за {periodLabel}</CardTitle>
             </CardHeader>
             <CardContent>
               {gradesLoading ? (
@@ -559,8 +566,8 @@ export default function StudentGrades() {
                       {grades
                         .filter(grade => {
                           const gradeDate = new Date(grade.createdAt);
-                          const start = startOfMonth(currentMonth);
-                          const end = endOfMonth(currentMonth);
+                          const start = startOfPeriod;
+                          const end = endOfPeriod;
                           return gradeDate >= start && gradeDate <= end;
                         })
                         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
