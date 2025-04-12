@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 import { useLocation } from "wouter";
 import { useRoleCheck } from "@/hooks/use-role-check";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import { 
   Card, 
   CardContent, 
@@ -30,9 +31,10 @@ import {
   FiList, 
   FiEdit3, 
   FiTrash2, 
-  FiAlertCircle 
+  FiAlertCircle,
+  FiSettings
 } from "react-icons/fi";
-import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum, Assignment } from "@shared/schema";
+import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum, Assignment, TimeSlot, ClassTimeSlot } from "@shared/schema";
 import { HomeworkForm } from "./homework-form";
 import { AssignmentForm } from "../assignments/assignment-form";
 
@@ -277,8 +279,29 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | undefined>(undefined);
   const [, navigate] = useLocation();
-  const { isTeacher } = useRoleCheck();
+  const { isTeacher, isSchoolAdmin } = useRoleCheck();
   const { toast } = useToast();
+  
+  // Получение временных слотов для отображения в сетке расписания
+  const { data: timeSlots = [] } = useQuery<TimeSlot[]>({
+    queryKey: ['/api/time-slots/defaults'],
+  });
+  
+  // Получение настроенных слотов для класса (если это страница расписания класса)
+  const [classId, setClassId] = useState<number | undefined>(undefined);
+  
+  // Определяем classId из первого расписания
+  useEffect(() => {
+    if (schedules.length > 0 && !showClassNames) {
+      setClassId(schedules[0].classId);
+    }
+  }, [schedules, showClassNames]);
+  
+  // Получаем настроенные временные слоты для класса, если classId известен
+  const { data: classTimeSlots = [] } = useQuery<ClassTimeSlot[]>({
+    queryKey: ['/api/class', classId, 'time-slots'],
+    enabled: !!classId && !showClassNames, // Только если это расписание для конкретного класса
+  });
   
   const formattedDate = format(date, "dd.MM", { locale: ru });
   const sortedSchedules = [...schedules].sort((a, b) => {
@@ -288,6 +311,44 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     if (timeA[0] !== timeB[0]) return timeA[0] - timeB[0];
     return timeA[1] - timeB[1];
   });
+
+  // Функция для получения эффективного слота (настроенный для класса или по умолчанию)
+  const getEffectiveSlot = (slotNumber: number): TimeSlot | ClassTimeSlot | undefined => {
+    const classSlot = classTimeSlots.find(slot => slot.slotNumber === slotNumber);
+    if (classSlot) return classSlot;
+    
+    return timeSlots.find(slot => slot.slotNumber === slotNumber);
+  };
+  
+  // Получаем максимальный номер слота, который нужно отобразить
+  const getMaxDisplayedSlot = (): number => {
+    if (sortedSchedules.length === 0) return -1;
+    
+    // Находим максимальный слот из имеющихся уроков
+    let maxSlot = 0;
+    sortedSchedules.forEach(schedule => {
+      // Определяем номер слота по времени начала
+      const startHour = parseInt(schedule.startTime.split(':')[0]);
+      const startMin = parseInt(schedule.startTime.split(':')[1]);
+      
+      // Ищем соответствующий слот
+      timeSlots.forEach(slot => {
+        const slotStartHour = parseInt(slot.startTime.split(':')[0]);
+        const slotStartMin = parseInt(slot.startTime.split(':')[1]);
+        
+        if (startHour === slotStartHour && startMin === slotStartMin) {
+          maxSlot = Math.max(maxSlot, slot.slotNumber);
+        } else if (Math.abs(startHour - slotStartHour) <= 1) {
+          // Приближённое сопоставление (в пределах часа)
+          if (Math.abs((startHour * 60 + startMin) - (slotStartHour * 60 + slotStartMin)) <= 20) {
+            maxSlot = Math.max(maxSlot, slot.slotNumber);
+          }
+        }
+      });
+    });
+    
+    return maxSlot;
+  };
 
   const getSubject = (subjectId: number) => {
     return subjects.find(s => s.id === subjectId);
@@ -404,23 +465,108 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
               )}
             </div>
           ) : (
-            <>
-              {sortedSchedules.map((schedule) => (
-                <ScheduleItem
-                  key={schedule.id}
-                  schedule={schedule}
-                  subject={getSubject(schedule.subjectId)}
-                  teacherName={getTeacherName(schedule.teacherId)}
-                  room={schedule.room || ""}
-                  grades={getScheduleGrades(schedule)}
-                  homework={getScheduleHomework(schedule)}
-                  isCompleted={getScheduleHomework(schedule) !== undefined} // Урок считается выполненным, если есть домашнее задание
-                  subgroups={subgroups}
-                  className={getClassName(schedule.classId)}
-                  showClass={showClassNames}
-                  onClick={(e, actionType, assignment) => handleScheduleClick(schedule, actionType, assignment)}
-                />
-              ))}
+            <div className="grid grid-cols-1 gap-2">
+              {/* Администратор школы может настроить временные слоты */}
+              {isSchoolAdmin && classId && !showClassNames && (
+                <div className="mb-2 flex justify-end">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs inline-flex items-center gap-1 text-gray-500 hover:text-gray-700"
+                    onClick={() => {
+                      if (classId) {
+                        navigate(`/schedule-class/${classId}/time-slots`);
+                      }
+                    }}
+                  >
+                    <FiSettings size={14} />
+                    <span>Настроить слоты</span>
+                  </Button>
+                </div>
+              )}
+              
+              {/* Сетка с временными слотами */}
+              {timeSlots.length > 0 && (
+                <>
+                  {/* Определяем максимальный номер слота для отображения */}
+                  {(() => {
+                    // Получаем мин. и макс. номера слотов
+                    const maxSlot = getMaxDisplayedSlot();
+                    const minSlot = 0; // Слот "0 урок" должен отображаться всегда
+                    
+                    if (maxSlot < 0) return null; // Если нет уроков, не отображаем сетку
+                    
+                    // Создаем массив слотов для отображения
+                    const slotsToShow = [];
+                    for (let slotNum = minSlot; slotNum <= maxSlot; slotNum++) {
+                      const slot = getEffectiveSlot(slotNum);
+                      if (!slot) continue; // Пропускаем, если нет настроек для слота
+                      
+                      // Ищем расписание для этого слота
+                      const slotSchedules = sortedSchedules.filter(schedule => {
+                        // Проверяем совпадение времени начала
+                        const scheduleStartTime = schedule.startTime.split(':').map(Number);
+                        const slotStartTime = slot.startTime.split(':').map(Number);
+                        
+                        const scheduleTimeMinutes = scheduleStartTime[0] * 60 + scheduleStartTime[1];
+                        const slotTimeMinutes = slotStartTime[0] * 60 + slotStartTime[1];
+                        
+                        // Допускаем небольшую погрешность (до 10 минут)
+                        return Math.abs(scheduleTimeMinutes - slotTimeMinutes) <= 10;
+                      });
+                      
+                      slotsToShow.push({
+                        slot,
+                        schedules: slotSchedules,
+                        isEmpty: slotSchedules.length === 0
+                      });
+                    }
+                    
+                    return (
+                      <div className="space-y-2">
+                        {slotsToShow.map(({ slot, schedules, isEmpty }) => (
+                          <div key={slot.slotNumber} className="time-slot rounded-lg border border-gray-100">
+                            {/* Заголовок слота */}
+                            <div className="p-2 bg-gray-50 rounded-t-lg border-b border-gray-100 flex items-center justify-between">
+                              <div className="font-medium text-gray-800">{slot.slotNumber} урок</div>
+                              <div className="text-sm text-gray-600">{slot.startTime} - {slot.endTime}</div>
+                            </div>
+                            
+                            {/* Содержимое слота */}
+                            <div className="p-2">
+                              {isEmpty ? (
+                                <div className="h-12 flex items-center justify-center text-sm text-gray-400">
+                                  Нет уроков в это время
+                                </div>
+                              ) : (
+                                <div className="space-y-2">
+                                  {schedules.map(schedule => (
+                                    <ScheduleItem
+                                      key={schedule.id}
+                                      schedule={schedule}
+                                      subject={getSubject(schedule.subjectId)}
+                                      teacherName={getTeacherName(schedule.teacherId)}
+                                      room={schedule.room || ""}
+                                      grades={getScheduleGrades(schedule)}
+                                      homework={getScheduleHomework(schedule)}
+                                      isCompleted={getScheduleHomework(schedule) !== undefined}
+                                      subgroups={subgroups}
+                                      className={getClassName(schedule.classId)}
+                                      showClass={showClassNames}
+                                      onClick={(e, actionType, assignment) => handleScheduleClick(schedule, actionType, assignment)}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+              
               {isAdmin && (
                 <div className="flex justify-center mt-4">
                   <Button 
@@ -431,7 +577,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   </Button>
                 </div>
               )}
-            </>
+            </div>
           )}
         </CardContent>
       </Card>
