@@ -77,13 +77,13 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
 
   // Загрузка учителей
   const { data: teachers = [], isLoading: teachersLoading } = useQuery<any[]>({
-    queryKey: ["/api/users", { role: "teacher" }],
+    queryKey: ["/api/users", { role: "TEACHER" }],
     enabled: isOpen,
   });
 
   // Загрузка временных слотов
   const { data: timeSlots = [], isLoading: timeSlotsLoading } = useQuery<any[]>({
-    queryKey: ["/api/time-slots/class", classId],
+    queryKey: ["/api/time-slots/defaults"],
     enabled: isOpen,
   });
 
