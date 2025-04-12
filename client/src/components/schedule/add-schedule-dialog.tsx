@@ -27,6 +27,8 @@ interface AddScheduleDialogProps {
   subjects: Subject[];
   teachers: User[];
   onSuccess: () => void;
+  classes?: { id: number; name: string }[];
+  showClassSelect?: boolean;
 }
 
 // Схема валидации для формы добавления расписания
@@ -38,6 +40,7 @@ const scheduleFormSchema = z.object({
   teacherId: z.number().positive("Выберите учителя"),
   room: z.string().min(1, "Укажите кабинет"),
   subgroupId: z.number().optional().nullable(),
+  classId: z.number().optional(),
   status: z.string().default("not_conducted")
 });
 
@@ -51,7 +54,9 @@ export function AddScheduleDialog({
   schedule,
   subjects,
   teachers,
-  onSuccess
+  onSuccess,
+  classes,
+  showClassSelect
 }: AddScheduleDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -77,6 +82,7 @@ export function AddScheduleDialog({
     teacherId: schedule?.teacherId || 0,
     room: schedule?.room || "",
     subgroupId: schedule?.subgroupId || null,
+    classId: schedule?.classId || classId,
     status: schedule?.status || "not_conducted"
   };
 
@@ -216,6 +222,38 @@ export function AddScheduleDialog({
                 </span>
               </div>
               
+              {/* Поле выбора класса, если показываем выбор класса */}
+              {showClassSelect && classes && classes.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="classId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Класс</FormLabel>
+                      <Select 
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                        defaultValue={field.value !== 0 ? field.value?.toString() : undefined}
+                        value={field.value !== 0 ? field.value?.toString() : undefined}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите класс" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {classes.map((cls) => (
+                            <SelectItem key={cls.id} value={cls.id.toString()}>
+                              {cls.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
               {/* Поле выбора предмета */}
               <FormField
                 control={form.control}

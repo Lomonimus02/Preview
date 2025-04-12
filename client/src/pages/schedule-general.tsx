@@ -265,6 +265,8 @@ export default function GeneralSchedulePage() {
           subjects={subjects}
           teachers={teachers}
           onSuccess={handleScheduleSuccess}
+          classes={classes}
+          showClassSelect={true}
         />
       )}
     </MainLayout>

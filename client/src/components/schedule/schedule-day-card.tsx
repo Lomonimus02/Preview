@@ -120,25 +120,19 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   // Получаем название предмета
   const getSubjectName = () => {
-    let subjectName = "";
-    
-    // Пытаемся найти предмет в списке
-    const subject = subjects?.find(s => s.id === schedule.subjectId);
-    subjectName = subject?.name || "Предмет";
-    
-    // Проверяем, есть ли подгруппа
-    if (schedule.subgroupId) {
-      // Если у расписания есть готовые данные подгруппы, используем их
-      if (schedule.subgroupName) {
-        return `${subjectName} (${schedule.subgroupName})`;
-      }
-      
-      // Если подгруппа есть в расписании, но названия нет, пытаемся найти ее в других данных
-      // Это может потребовать дополнительных запросов или пропсов, возможно, потребуется получать подгруппы
-      return `${subjectName} (Подгруппа ${schedule.subgroupId})`;
+    // Если у урока есть подгруппа и её название, показываем только название подгруппы
+    if (schedule.subgroupId && schedule.subgroupName) {
+      return schedule.subgroupName;
     }
     
-    return subjectName;
+    // Если подгруппа есть, но названия нет, пытаемся найти её имя (в реальном приложении здесь мог бы быть запрос к API)
+    if (schedule.subgroupId) {
+      return `Подгруппа ${schedule.subgroupId}`;
+    }
+    
+    // В остальных случаях показываем название предмета
+    const subject = subjects?.find(s => s.id === schedule.subjectId);
+    return subject?.name || "Предмет";
   };
 
   // Получаем имя учителя
