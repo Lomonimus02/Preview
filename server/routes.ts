@@ -803,7 +803,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ message: "Cannot change user role" });
     }
     
+    // Проверяем, меняется ли класс пользователя
+    const classIdChanged = req.body.classId && parseInt(req.body.classId) !== user.classId;
+    const oldClassId = user.classId;
+    
+    // Обновляем базовую информацию пользователя
     const updatedUser = await dataStorage.updateUser(id, req.body);
+    
+    // Если пользователь студент и его класс изменился, обновляем связанные записи
+    if (updatedUser && (user.role === UserRoleEnum.STUDENT || updatedUser.role === UserRoleEnum.STUDENT) && classIdChanged) {
+      try {
+        // Получаем все роли пользователя
+        const userRoles = await dataStorage.getUserRoles(id);
+        
+        // Находим роль студента и обновляем classId
+        for (const role of userRoles) {
+          if (role.role === UserRoleEnum.STUDENT) {
+            // Обновляем classId в записи роли
+            if (role.id > 0) { // Не обновляем дефолтную роль с id = -1
+              await dataStorage.removeUserRole(role.id);
+              await dataStorage.addUserRole({
+                userId: id,
+                role: UserRoleEnum.STUDENT,
+                classId: parseInt(req.body.classId),
+                schoolId: role.schoolId
+              });
+            }
+          }
+        }
+        
+        // Находим подгруппы старого класса и удаляем ученика из них
+        if (oldClassId) {
+          const oldClassSubgroups = await dataStorage.getSubgroupsByClass(oldClassId);
+          for (const subgroup of oldClassSubgroups) {
+            // Получаем всех студентов подгруппы
+            const subgroupStudents = await dataStorage.getSubgroupStudents(subgroup.id);
+            // Если студент находится в этой подгруппе, удаляем его
+            if (subgroupStudents.some(s => s.id === id)) {
+              await dataStorage.removeStudentFromSubgroup(id, subgroup.id);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error updating user associations:", error);
+        // Продолжаем выполнение, не прерываем запрос из-за этой ошибки
+      }
+    }
     
     // Log the action
     await dataStorage.createSystemLog({
