@@ -12,7 +12,7 @@ import {
   Subgroup 
 } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, addMonths, subMonths, isSameDay, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 import { 
   ChevronLeft, 
@@ -316,7 +316,7 @@ export default function StudentGrades() {
           return (
             <span 
               key={grade.id}
-              onClick={() => handleGradeClick(grade, assignment)}
+              onClick={() => handleGradeClick(grade, assignment || null)}
               className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium cursor-pointer ${getColorClass()}`}
               title={hasAssignment ? getAssignmentTypeName(assignment.assignmentType) : (grade.gradeType ? getGradeTypeName(grade.gradeType) : "")}
             >
@@ -566,9 +566,7 @@ export default function StudentGrades() {
                       {grades
                         .filter(grade => {
                           const gradeDate = new Date(grade.createdAt);
-                          const start = startOfPeriod;
-                          const end = endOfPeriod;
-                          return gradeDate >= start && gradeDate <= end;
+                          return gradeDate >= startDate && gradeDate <= endDate;
                         })
                         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                         .map(grade => {
