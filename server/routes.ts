@@ -656,26 +656,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const users = await dataStorage.getUsers();
           return res.json(users);
         } 
-        // Школьный администратор получает пользователей своей школы
-        else if (activeRole === UserRoleEnum.SCHOOL_ADMIN) {
+        // Школьный администратор или директор получает пользователей своей школы
+        else if (activeRole === UserRoleEnum.SCHOOL_ADMIN || activeRole === UserRoleEnum.PRINCIPAL) {
           // Получаем ID школы из профиля пользователя или из роли
           const userRoles = await dataStorage.getUserRoles(req.user.id);
-          const schoolAdminRole = userRoles.find(role => 
-            role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
+          const schoolRole = userRoles.find(role => 
+            (role.role === UserRoleEnum.SCHOOL_ADMIN || role.role === UserRoleEnum.PRINCIPAL) && role.schoolId
           );
           
           // Используем ID школы из профиля пользователя или из роли
-          let schoolId = req.user.schoolId || (schoolAdminRole ? schoolAdminRole.schoolId : null);
+          let schoolId = req.user.schoolId || (schoolRole ? schoolRole.schoolId : null);
           
           // Логирование для отладки
-          console.log("Проверка роли администратора школы...");
+          console.log(`Проверка роли ${activeRole === UserRoleEnum.PRINCIPAL ? 'директора' : 'администратора школы'}...`);
           console.log("schoolId из профиля:", req.user.schoolId);
-          console.log("schoolId из роли:", schoolAdminRole?.schoolId);
+          console.log("schoolId из роли:", schoolRole?.schoolId);
           console.log("Используемый schoolId:", schoolId);
           
           // Если школа не найдена даже в роли, ищем любую доступную
           if (!schoolId) {
-            console.log("Не найден ID школы для администратора");
+            console.log(`Не найден ID школы для ${activeRole === UserRoleEnum.PRINCIPAL ? 'директора' : 'администратора'}`);
             
             // Пробуем найти первую школу
             const schools = await dataStorage.getSchools();
@@ -689,12 +689,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Если нашли ID школы, получаем пользователей
           if (schoolId) {
-            console.log("Получение пользователей школы для SCHOOL_ADMIN, ID школы:", schoolId);
+            console.log(`Получение пользователей школы для ${activeRole}, ID школы:`, schoolId);
             const users = await dataStorage.getUsersBySchool(schoolId);
             console.log("Найдено пользователей:", users.length);
             return res.json(users);
           } else {
-            return res.status(400).json({ message: "Не найдена школа администратора" });
+            return res.status(400).json({ message: `Не найдена школа для ${activeRole}` });
           }
         } 
         // Для других ролей (учитель, ученик) не разрешаем доступ к полному списку пользователей
