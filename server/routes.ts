@@ -1872,15 +1872,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Получаем оценки ученика по предмету
       const allGrades = await dataStorage.getGradesByStudent(parsedStudentId);
-      let studentSubjectGrades = allGrades.filter(g => g.subjectId === parsedSubjectId);
+      let studentSubjectGrades;
       
-      // Если указана подгруппа, дополнительно фильтруем по ней
+      // Если указана подгруппа, фильтруем оценки по предмету и подгруппе
       if (parsedSubgroupId) {
-        studentSubjectGrades = studentSubjectGrades.filter(g => g.subgroupId === parsedSubgroupId);
+        studentSubjectGrades = allGrades.filter(g => 
+          g.subjectId === parsedSubjectId && g.subgroupId === parsedSubgroupId);
+        console.log(`Фильтрация по предмету ${parsedSubjectId} и подгруппе ${parsedSubgroupId}`);
       } else {
-        // Если подгруппа не указана, берем только оценки без подгрупп
-        studentSubjectGrades = studentSubjectGrades.filter(g => !g.subgroupId);
+        // Если подгруппа не указана, находим все оценки по предмету (с подгруппами и без)
+        // Изменение: теперь берем ВСЕ оценки для предмета, включая те, что в подгруппах
+        studentSubjectGrades = allGrades.filter(g => g.subjectId === parsedSubjectId);
+        console.log(`Фильтрация только по предмету ${parsedSubjectId}, всего оценок: ${studentSubjectGrades.length}`);
       }
+      
+      console.log(`Найдено оценок: ${studentSubjectGrades.length}`);
       
       // Получаем класс ученика для определения системы оценивания
       const studentClasses = await dataStorage.getStudentClasses(parsedStudentId);
@@ -1893,9 +1899,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Информация о классе не найдена" });
       }
       
+      // Получаем список подгрупп ученика
+      const studentSubgroups = await dataStorage.getStudentSubgroups(parsedStudentId);
+      console.log("Подгруппы ученика:", studentSubgroups.map(sg => sg.id));
+      
       // Получаем задания для этого предмета, если используется накопительная система
-      const assignments = classInfo.gradingSystem === 'cumulative' ? 
-        await dataStorage.getAssignmentsBySubject(parsedSubjectId) : [];
+      let assignments = [];
+      if (classInfo.gradingSystem === 'cumulative') {
+        assignments = await dataStorage.getAssignmentsBySubject(parsedSubjectId);
+        console.log(`Найдено ${assignments.length} заданий для предмета ${parsedSubjectId}`);
+      }
       
       // Рассчитываем средний балл по той же логике, что и в журнале учителя
       let result;
@@ -1908,10 +1921,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Оценки студента по предмету:", studentSubjectGrades);
         console.log("Задания по предмету:", assignments);
         
-        // Проходим по всем оценкам с привязкой к расписанию
+        // Проходим по всем оценкам
         for (const grade of studentSubjectGrades) {
-          console.log(`Обработка оценки: ${grade.id}, значение: ${grade.grade}, scheduleId: ${grade.scheduleId}`);
+          console.log(`Обработка оценки: ${grade.id}, значение: ${grade.grade}, scheduleId: ${grade.scheduleId}, subgroupId: ${grade.subgroupId}`);
           
+          // Проверяем, имеет ли студент доступ к оценке подгруппы
+          if (grade.subgroupId) {
+            const studentIsInSubgroup = studentSubgroups.some(sg => sg.id === grade.subgroupId);
+            console.log(`Оценка принадлежит подгруппе ${grade.subgroupId}, студент в подгруппе: ${studentIsInSubgroup}`);
+            
+            if (!studentIsInSubgroup && !parsedSubgroupId) {
+              console.log(`Пропускаем оценку ${grade.id}, т.к. студент не в этой подгруппе`);
+              continue; // Пропускаем оценки подгрупп, к которым студент не принадлежит
+            }
+          }
+          
+          // Обрабатываем оценки с привязкой к расписанию
           if (grade.scheduleId) {
             const relatedAssignments = assignments.filter(a => a.scheduleId === grade.scheduleId);
             console.log(`Найдено связанных заданий: ${relatedAssignments.length} для scheduleId=${grade.scheduleId}`);
@@ -1937,8 +1962,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 const assignment = scheduleAssignments[0]; // Используем первое задание для этого урока
                 totalEarnedScore += grade.grade;
                 totalMaxScore += Number(assignment.maxScore);
+              } else {
+                // Если для урока нет заданий, но есть оценка, создаем virtual maxScore = 10.0
+                console.log(`Нет заданий для урока, создаем виртуальный maxScore = 10.0`);
+                totalEarnedScore += grade.grade;
+                totalMaxScore += 10.0; // Виртуальный maxScore для оценок без задания
               }
             }
+          } else {
+            // Для оценок без привязки к расписанию также создаем virtual maxScore = 10.0
+            console.log(`Оценка без scheduleId, создаем виртуальный maxScore = 10.0`);
+            totalEarnedScore += grade.grade;
+            totalMaxScore += 10.0;
           }
         }
         
