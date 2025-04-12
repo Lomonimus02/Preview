@@ -390,6 +390,28 @@ export default function StudentGrades() {
     }
   };
   
+  // Получение цвета для среднего балла
+  const getAverageGradeColor = (average: string) => {
+    if (average === "-") return "";
+    
+    if (gradingSystem === GradingSystemEnum.CUMULATIVE) {
+      // Для накопительной системы оцениваем процент
+      const percent = parseFloat(average.replace('%', ''));
+      
+      if (percent >= 80) return "text-green-600";
+      if (percent >= 60) return "text-yellow-600";
+      return "text-red-600";
+    } else {
+      // Для пятибалльной системы оцениваем средний балл
+      const avgGrade = parseFloat(average);
+      
+      if (avgGrade >= 4.5) return "text-green-600";
+      if (avgGrade >= 3.5) return "text-green-500";
+      if (avgGrade >= 2.5) return "text-yellow-600";
+      return "text-red-600";
+    }
+  };
+  
   // Переключение на предыдущий месяц
   const goToPreviousMonth = () => {
     setCurrentMonth(prevMonth => subMonths(prevMonth, 1));
@@ -534,7 +556,7 @@ export default function StudentGrades() {
                               {renderGradeCell(subject.id, day)}
                             </TableCell>
                           ))}
-                          <TableCell className="text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
+                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(calculateAverageForSubject(subject.id))}`}>
                             {calculateAverageForSubject(subject.id)}
                           </TableCell>
                         </TableRow>
