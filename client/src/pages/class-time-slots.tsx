@@ -47,7 +47,7 @@ const ClassTimeSlotsPage: React.FC = () => {
 
   // Получение временных слотов класса
   const { data: classTimeSlots = [], isLoading: isClassSlotsLoading } = useQuery<ClassTimeSlot[]>({
-    queryKey: ['/api/class', classId, 'time-slots'],
+    queryKey: ['/api/class-time-slots', classId],
     enabled: !isNaN(classId),
   });
 
@@ -61,9 +61,16 @@ const ClassTimeSlotsPage: React.FC = () => {
       });
     },
     onSuccess: () => {
+      // Инвалидируем запросы к временным слотам (для обновления текущей страницы)
       queryClient.invalidateQueries({
-        queryKey: ['/api/class', classId, 'time-slots']
+        queryKey: ['/api/class-time-slots', classId]
       });
+      
+      // Инвалидируем запросы к расписанию, чтобы обновить отображение в ScheduleDayCard
+      queryClient.invalidateQueries({
+        queryKey: ['/api/schedules']
+      });
+      
       setIsDialogOpen(false);
       toast({
         title: "Успешно",
@@ -86,9 +93,16 @@ const ClassTimeSlotsPage: React.FC = () => {
       return apiRequest(`/api/class-time-slots/${slotId}`, 'DELETE');
     },
     onSuccess: () => {
+      // Инвалидируем запросы к временным слотам (для обновления текущей страницы)
       queryClient.invalidateQueries({
-        queryKey: ['/api/class', classId, 'time-slots']
+        queryKey: ['/api/class-time-slots', classId]
       });
+      
+      // Инвалидируем запросы к расписанию, чтобы обновить отображение в ScheduleDayCard
+      queryClient.invalidateQueries({
+        queryKey: ['/api/schedules']
+      });
+      
       toast({
         title: "Успешно",
         description: "Временной слот удален",
@@ -110,9 +124,16 @@ const ClassTimeSlotsPage: React.FC = () => {
       return apiRequest(`/api/class/${classId}/time-slots/reset`, 'POST');
     },
     onSuccess: () => {
+      // Инвалидируем запросы к временным слотам (для обновления текущей страницы)
       queryClient.invalidateQueries({
-        queryKey: ['/api/class', classId, 'time-slots']
+        queryKey: ['/api/class-time-slots', classId]
       });
+      
+      // Инвалидируем запросы к расписанию, чтобы обновить отображение в ScheduleDayCard
+      queryClient.invalidateQueries({
+        queryKey: ['/api/schedules']
+      });
+      
       toast({
         title: "Успешно",
         description: "Все настройки временных слотов сброшены",
