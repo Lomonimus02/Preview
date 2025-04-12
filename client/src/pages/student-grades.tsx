@@ -246,8 +246,44 @@ export default function StudentGrades() {
     
     if (subjectGrades.length === 0) return "-";
     
-    const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
-    return (sum / subjectGrades.length).toFixed(1);
+    // Для накопительной системы оценивания рассчитываем средний процент
+    if (gradingSystem === GradingSystemEnum.CUMULATIVE) {
+      // Получаем оценки, у которых есть связь с заданиями
+      const gradesWithAssignments = subjectGrades.filter(g => g.scheduleId);
+      
+      if (gradesWithAssignments.length === 0) {
+        // Если нет связи с заданиями, отображаем обычный средний балл
+        const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
+        return (sum / subjectGrades.length).toFixed(1);
+      }
+      
+      // Рассчитываем процент успеваемости на основе заданий
+      let totalPoints = 0;
+      let maxTotalPoints = 0;
+      
+      gradesWithAssignments.forEach(grade => {
+        const relatedAssignment = assignments.find(a => a.scheduleId === grade.scheduleId);
+        
+        if (relatedAssignment) {
+          totalPoints += grade.grade;
+          maxTotalPoints += parseFloat(relatedAssignment.maxScore.toString());
+        }
+      });
+      
+      if (maxTotalPoints === 0) {
+        // Если нет максимального балла, отображаем обычный средний балл
+        const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
+        return (sum / subjectGrades.length).toFixed(1);
+      }
+      
+      // Вычисляем процент успеваемости
+      const percentScore = (totalPoints / maxTotalPoints) * 100;
+      return `${percentScore.toFixed(1)}%`;
+    } else {
+      // Для пятибалльной системы просто рассчитываем средний балл
+      const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
+      return (sum / subjectGrades.length).toFixed(1);
+    }
   };
   
   // Переключение на предыдущий месяц
@@ -498,14 +534,64 @@ export default function StudentGrades() {
               
               <div>
                 <div className="text-sm text-gray-500">Оценка</div>
-                <div className="mt-1">
-                  <Badge className={`text-lg px-3 py-1 ${
-                    selectedGrade.grade >= 4 ? 'bg-green-100 text-green-800' : 
-                    selectedGrade.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {selectedGrade.grade}
-                  </Badge>
+                <div className="mt-1 flex flex-col space-y-2">
+                  {/* Отображение оценки для пятибалльной системы */}
+                  {gradingSystem === GradingSystemEnum.FIVE_POINT && (
+                    <Badge className={`text-lg px-3 py-1 ${
+                      selectedGrade.grade >= 4 ? 'bg-green-100 text-green-800' : 
+                      selectedGrade.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {selectedGrade.grade}
+                    </Badge>
+                  )}
+                  
+                  {/* Отображение для накопительной системы */}
+                  {gradingSystem === GradingSystemEnum.CUMULATIVE && selectedAssignment && (
+                    <div className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Badge className={`text-lg px-3 py-1 ${
+                          (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.8 ? 'bg-green-100 text-green-800' : 
+                          (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.6 ? 'bg-yellow-100 text-yellow-800' : 
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {selectedGrade.grade}
+                        </Badge>
+                        <span className="text-gray-600">из {selectedAssignment.maxScore}</span>
+                      </div>
+                      
+                      {/* Процентное соотношение */}
+                      <div className="text-sm text-gray-700">
+                        Процент выполнения: <span className="font-medium">
+                          {((selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      
+                      {/* Индикатор прогресса */}
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${
+                            (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.8 ? 'bg-green-600' : 
+                            (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.6 ? 'bg-yellow-500' : 
+                            'bg-red-600'
+                          }`}
+                          style={{ width: `${(selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) * 100}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Для накопительной системы, но без связанного задания */}
+                  {gradingSystem === GradingSystemEnum.CUMULATIVE && !selectedAssignment && (
+                    <div>
+                      <Badge className="text-lg px-3 py-1 bg-gray-100 text-gray-800">
+                        {selectedGrade.grade}
+                      </Badge>
+                      <div className="mt-1 text-sm text-gray-500 italic">
+                        Отсутствует информация о максимальном балле
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               
