@@ -482,7 +482,11 @@ export default function StudentGrades() {
       
       // Вычисляем процент успеваемости (сумма полученных баллов / сумма максимальных баллов)
       const percentScore = (totalEarnedPoints / totalMaxPoints) * 100;
-      return `${percentScore.toFixed(1)}%`;
+      
+      // Ограничиваем максимальный процент до 100%
+      const cappedPercentScore = Math.min(percentScore, 100);
+      
+      return `${cappedPercentScore.toFixed(1)}%`;
     } else {
       // Для пятибалльной системы рассчитываем процент от максимальной оценки (5.0)
       if (subjectGrades.length === 0) return "-";
@@ -490,7 +494,11 @@ export default function StudentGrades() {
       const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
       const avgGrade = sum / subjectGrades.length;
       const percentScore = (avgGrade / 5) * 100; // Считаем процент от максимальной оценки (5.0)
-      return `${percentScore.toFixed(1)}%`;
+      
+      // Ограничиваем максимальный процент до 100%
+      const cappedPercentScore = Math.min(percentScore, 100);
+      
+      return `${cappedPercentScore.toFixed(1)}%`;
     }
   };
   
