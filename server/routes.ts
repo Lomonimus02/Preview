@@ -752,8 +752,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Если создается студент и указан класс - добавляем запись в таблицу student_classes
-      if (newUserRole === UserRoleEnum.STUDENT && req.body.classId) {
+      // Если создается студент и указаны классы - добавляем записи в таблицу student_classes
+      if (newUserRole === UserRoleEnum.STUDENT && req.body.classIds && req.body.classIds.length > 0) {
+        // Обрабатываем все классы, в которые нужно добавить студента
+        for (const classId of req.body.classIds) {
+          console.log(`Создан новый студент id=${user.id}, добавляем его в класс id=${classId}`);
+          try {
+            // Добавляем запись в таблицу связи студентов с классами
+            await dataStorage.addStudentToClass(user.id, classId);
+            console.log(`Студент id=${user.id} успешно добавлен в класс id=${classId}`);
+          } catch (error) {
+            console.error(`Ошибка при добавлении студента id=${user.id} в класс id=${classId}:`, error);
+            // Продолжаем выполнение, не прерываем запрос из-за этой ошибки
+          }
+        }
+      } 
+      // Обратная совместимость с предыдущим API (если передается classId вместо classIds)
+      else if (newUserRole === UserRoleEnum.STUDENT && req.body.classId) {
         console.log(`Создан новый студент id=${user.id}, добавляем его в класс id=${req.body.classId}`);
         try {
           // Добавляем запись в таблицу связи студентов с классами
