@@ -285,11 +285,18 @@ export default function StudentGrades() {
   // Функция для отображения оценок для конкретного предмета/подгруппы и даты
   const renderGradeCell = (subject: any, date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
-    // Получаем ID предмета и подгруппы из customId или из объекта предмета
-    const subjectKey = subject.customId || `${subject.id}`;
-    const [subjectId, subgroupId] = typeof subjectKey === 'string' 
-      ? subjectKey.split('-').map(id => id ? parseInt(id) : null) 
-      : [subject.id, subject.subgroupId];
+    
+    // Получаем ID предмета и подгруппы из customId, строки или из объекта предмета
+    let subjectId, subgroupId;
+    
+    if (typeof subject === 'string') {
+      // Если передан customId в виде строки (subjectId-subgroupId)
+      [subjectId, subgroupId] = subject.split('-').map(id => id ? parseInt(id) : null);
+    } else {
+      // Если передан объект
+      subjectId = subject.id;
+      subgroupId = subject.subgroupId || null;
+    }
     
     // Получаем все оценки для указанного предмета и даты
     const cellGrades = grades.filter(grade => {
@@ -660,7 +667,7 @@ export default function StudentGrades() {
                           </TableCell>
                           {daysInPeriod.map((day) => (
                             <TableCell key={day.toString()} className="text-center">
-                              {renderGradeCell(subject.customId, day)}
+                              {renderGradeCell(subject, day)}
                             </TableCell>
                           ))}
                           <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(calculateAverageForSubject(subject))}`}>
@@ -720,7 +727,7 @@ export default function StudentGrades() {
                                 {format(new Date(grade.createdAt), 'dd.MM.yyyy')}
                               </TableCell>
                               <TableCell className="font-medium">
-                                {getSubjectName(grade.subjectId)}
+                                {getSubjectName(grade.subjectId, grade.subgroupId)}
                               </TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={`${
@@ -770,7 +777,7 @@ export default function StudentGrades() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-sm text-gray-500">Предмет</div>
-                  <div className="font-medium">{getSubjectName(selectedGrade.subjectId)}</div>
+                  <div className="font-medium">{getSubjectName(selectedGrade.subjectId, selectedGrade.subgroupId)}</div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-500">Дата</div>
