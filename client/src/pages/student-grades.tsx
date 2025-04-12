@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { 
@@ -76,6 +76,13 @@ interface GradesByDate {
       assignments?: Assignment[];
     }
   }
+}
+
+// Расширенный интерфейс для предмета с информацией о подгруппе и произвольным ID
+interface ExtendedSubject extends Subject {
+  subgroupId?: number | null;
+  subgroupName?: string | null;
+  customId?: string;
 }
 
 // Типы работ и их цвета
