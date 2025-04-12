@@ -456,7 +456,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <FiClock className="w-12 h-12 mb-4" />
               <p className="text-center">На этот день уроки не запланированы</p>
-              {isAdmin && (
+              {isAdmin && !canView && (
                 <Button 
                   className="mt-4" 
                   variant="outline" 
@@ -569,7 +569,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                 </>
               )}
               
-              {isAdmin && (
+              {isAdmin && !canView && (
                 <div className="flex justify-center mt-4">
                   <Button 
                     variant="outline" 
@@ -715,7 +715,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
               )}
               
               <DialogFooter className="flex flex-wrap justify-between gap-2 sm:justify-between">
-                {isAdmin && (
+                {isAdmin && !canView && (
                   <>
                     <Button 
                       variant="destructive" 
