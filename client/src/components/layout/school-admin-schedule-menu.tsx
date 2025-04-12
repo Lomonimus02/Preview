@@ -20,26 +20,26 @@ import { FiCalendar } from "react-icons/fi";
  */
 export const SchoolAdminScheduleMenu: React.FC = () => {
   const { user } = useAuth();
-  const { isSchoolAdmin } = useRoleCheck();
+  const { isSchoolAdmin, isPrincipal, canViewScheduleDropdown } = useRoleCheck();
   const [schoolId, setSchoolId] = useState<number | null>(null);
 
-  // Получаем ID школы администратора
+  // Получаем ID школы администратора или директора
   const getSchoolId = () => {
     if (!user) return null;
     
     // Если у пользователя есть явно указанная школа в профиле
     if (user.schoolId) return user.schoolId;
     
-    // Если у пользователя есть роль школьного администратора с привязкой к школе
+    // Если у пользователя есть роль школьного администратора или директора с привязкой к школе
     // Получаем my-roles через API напрямую, не используя roles из user
     const userRoles = Array.isArray((user as any).roles) ? (user as any).roles : 
                      Array.isArray((user as any).userRoles) ? (user as any).userRoles : [];
     
-    const schoolAdminRole = userRoles.find((roleObj: any) => 
-      roleObj.role === "school_admin" && roleObj.schoolId
+    const schoolRole = userRoles.find((roleObj: any) => 
+      (roleObj.role === "school_admin" || roleObj.role === "principal") && roleObj.schoolId
     );
     
-    if (schoolAdminRole?.schoolId) return schoolAdminRole.schoolId;
+    if (schoolRole?.schoolId) return schoolRole.schoolId;
     
     // Если школа не найдена в профиле и ролях, проверяем доступные школы
     // и берем первую
@@ -49,13 +49,13 @@ export const SchoolAdminScheduleMenu: React.FC = () => {
   // Загрузка списка школ
   const { data: schools = [] } = useQuery<any[]>({
     queryKey: ["/api/schools"],
-    enabled: !!user && isSchoolAdmin()
+    enabled: !!user && (isSchoolAdmin() || isPrincipal())
   });
 
-  // Загрузка списка классов школы администратора
+  // Загрузка списка классов школы администратора или директора
   const { data: classes = [] } = useQuery<any[]>({
     queryKey: ["/api/classes"],
-    enabled: !!user && isSchoolAdmin()
+    enabled: !!user && (isSchoolAdmin() || isPrincipal())
   });
 
   useEffect(() => {
