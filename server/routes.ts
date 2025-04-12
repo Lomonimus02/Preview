@@ -1905,16 +1905,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let totalEarnedScore = 0;
         let totalMaxScore = 0;
         
+        console.log("Оценки студента по предмету:", studentSubjectGrades);
+        console.log("Задания по предмету:", assignments);
+        
         // Проходим по всем оценкам с привязкой к расписанию
         for (const grade of studentSubjectGrades) {
+          console.log(`Обработка оценки: ${grade.id}, значение: ${grade.grade}, scheduleId: ${grade.scheduleId}`);
+          
           if (grade.scheduleId) {
             const relatedAssignments = assignments.filter(a => a.scheduleId === grade.scheduleId);
+            console.log(`Найдено связанных заданий: ${relatedAssignments.length} для scheduleId=${grade.scheduleId}`);
+            
             if (relatedAssignments.length > 0) {
               const assignment = grade.assignmentId ? 
                 relatedAssignments.find(a => a.id === grade.assignmentId) : 
                 relatedAssignments[0];
               
               if (assignment) {
+                console.log(`Использую задание: ${assignment.id}, maxScore: ${assignment.maxScore}`);
+                totalEarnedScore += grade.grade;
+                totalMaxScore += Number(assignment.maxScore);
+              }
+            } else {
+              // Если не найдено связанных заданий, но известен scheduleId,
+              // попробуем получить задания напрямую для этого урока
+              console.log(`Поиск заданий напрямую для урока ${grade.scheduleId}`);
+              const scheduleAssignments = await dataStorage.getAssignmentsBySchedule(grade.scheduleId);
+              
+              if (scheduleAssignments && scheduleAssignments.length > 0) {
+                console.log(`Найдено ${scheduleAssignments.length} заданий для урока`);
+                const assignment = scheduleAssignments[0]; // Используем первое задание для этого урока
                 totalEarnedScore += grade.grade;
                 totalMaxScore += Number(assignment.maxScore);
               }
@@ -1922,11 +1942,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
+        console.log(`Итоговые баллы: earned=${totalEarnedScore}, max=${totalMaxScore}`);
+        
         if (totalMaxScore === 0) {
-          result = { average: "-", percentage: "-" };
+          console.log("Нет максимального балла, возвращаем дефолтные значения");
+          result = { average: "0", percentage: "0%" };
         } else {
           const percentage = (totalEarnedScore / totalMaxScore) * 100;
           const cappedPercentage = Math.min(percentage, 100);
+          console.log(`Рассчитанный процент: ${percentage}, ограниченный: ${cappedPercentage}`);
           result = { 
             average: totalEarnedScore.toFixed(1),
             maxScore: totalMaxScore.toFixed(1),
