@@ -253,38 +253,44 @@ export default function StudentGrades() {
     
     if (subjectGrades.length === 0) return "-";
     
-    // Для накопительной системы оценивания рассчитываем средний процент
+    // Для накопительной системы оценивания рассчитываем процентное соотношение суммы полученных баллов к сумме максимально возможных
     if (gradingSystem === GradingSystemEnum.CUMULATIVE) {
       // Получаем оценки, у которых есть связь с заданиями
       const gradesWithAssignments = subjectGrades.filter(g => g.scheduleId);
       
-      if (gradesWithAssignments.length === 0) {
-        // Если нет связи с заданиями, отображаем обычный средний балл
-        const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
-        return (sum / subjectGrades.length).toFixed(1);
-      }
-      
       // Рассчитываем процент успеваемости на основе заданий
-      let totalPoints = 0;
-      let maxTotalPoints = 0;
+      let totalEarnedPoints = 0;
+      let totalMaxPoints = 0;
       
+      // Обрабатываем оценки, связанные с заданиями
       gradesWithAssignments.forEach(grade => {
         const relatedAssignment = assignments.find(a => a.scheduleId === grade.scheduleId);
         
         if (relatedAssignment) {
-          totalPoints += grade.grade;
-          maxTotalPoints += parseFloat(relatedAssignment.maxScore.toString());
+          totalEarnedPoints += grade.grade;
+          totalMaxPoints += parseFloat(relatedAssignment.maxScore.toString());
         }
       });
       
-      if (maxTotalPoints === 0) {
-        // Если нет максимального балла, отображаем обычный средний балл
-        const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
-        return (sum / subjectGrades.length).toFixed(1);
+      // Обрабатываем оценки без связи с заданиями (если есть)
+      const gradesWithoutAssignments = subjectGrades.filter(g => !g.scheduleId || !assignments.some(a => a.scheduleId === g.scheduleId));
+      if (gradesWithoutAssignments.length > 0) {
+        // Примечание: оценки без связи с заданиями не участвуют в расчете процентного соотношения,
+        // так как для них нет информации о максимальном балле
+        console.log(`${gradesWithoutAssignments.length} оценок без связи с заданиями по предмету ${subjectId}`);
       }
       
-      // Вычисляем процент успеваемости
-      const percentScore = (totalPoints / maxTotalPoints) * 100;
+      if (totalMaxPoints === 0) {
+        // Если нет максимального балла, просто показываем средний балл
+        if (subjectGrades.length > 0) {
+          const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
+          return (sum / subjectGrades.length).toFixed(1);
+        }
+        return "-";
+      }
+      
+      // Вычисляем процент успеваемости (сумма полученных баллов / сумма максимальных баллов)
+      const percentScore = (totalEarnedPoints / totalMaxPoints) * 100;
       return `${percentScore.toFixed(1)}%`;
     } else {
       // Для пятибалльной системы просто рассчитываем средний балл
@@ -390,7 +396,7 @@ export default function StudentGrades() {
                             </div>
                           </TableHead>
                         ))}
-                        <TableHead className="text-center bg-gray-50 min-w-[80px]">
+                        <TableHead className="text-center bg-gray-50 min-w-[80px] sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
                           <div className="flex items-center justify-center">
                             <Calculator className="h-4 w-4 mr-1 text-gray-500" />
                             <span>Ср. балл</span>
@@ -401,7 +407,7 @@ export default function StudentGrades() {
                     <TableBody>
                       {subjectsWithGrades.map((subject) => (
                         <TableRow key={subject.id}>
-                          <TableCell className="font-medium sticky left-0 bg-white">
+                          <TableCell className="font-medium sticky left-0 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)] z-10">
                             {subject.name}
                           </TableCell>
                           {daysInMonth.map((day) => (
@@ -409,7 +415,7 @@ export default function StudentGrades() {
                               {renderGradeCell(subject.id, day)}
                             </TableCell>
                           ))}
-                          <TableCell className="text-center bg-gray-50 font-semibold">
+                          <TableCell className="text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
                             {calculateAverageForSubject(subject.id)}
                           </TableCell>
                         </TableRow>
@@ -555,29 +561,40 @@ export default function StudentGrades() {
                   
                   {/* Отображение для накопительной системы */}
                   {gradingSystem === GradingSystemEnum.CUMULATIVE && selectedAssignment && (
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Badge className={`text-lg px-3 py-1 ${
-                          (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.8 ? 'bg-green-100 text-green-800' : 
-                          (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.6 ? 'bg-yellow-100 text-yellow-800' : 
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {selectedGrade.grade}
-                        </Badge>
-                        <span className="text-gray-600">из {selectedAssignment.maxScore}</span>
-                      </div>
-                      
-                      {/* Процентное соотношение */}
-                      <div className="text-sm text-gray-700">
-                        Процент выполнения: <span className="font-medium">
-                          {((selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) * 100).toFixed(1)}%
-                        </span>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-2 items-center">
+                        <div className="bg-gray-50 p-3 rounded-lg text-center">
+                          <div className="text-xs text-gray-500 mb-1">Получено</div>
+                          <Badge className={`text-lg px-3 py-1 ${
+                            (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.8 ? 'bg-green-100 text-green-800' : 
+                            (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.6 ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {selectedGrade.grade}
+                          </Badge>
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded-lg text-center">
+                          <div className="text-xs text-gray-500 mb-1">Максимум</div>
+                          <Badge variant="outline" className="text-lg px-3 py-1">
+                            {selectedAssignment.maxScore}
+                          </Badge>
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded-lg text-center">
+                          <div className="text-xs text-gray-500 mb-1">Процент</div>
+                          <Badge className={`text-lg px-3 py-1 ${
+                            (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.8 ? 'bg-green-100 text-green-800' : 
+                            (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.6 ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {((selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) * 100).toFixed(1)}%
+                          </Badge>
+                        </div>
                       </div>
                       
                       {/* Индикатор прогресса */}
-                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div className="w-full bg-gray-200 rounded-full h-3">
                         <div 
-                          className={`h-2.5 rounded-full ${
+                          className={`h-3 rounded-full ${
                             (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.8 ? 'bg-green-600' : 
                             (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.6 ? 'bg-yellow-500' : 
                             'bg-red-600'
