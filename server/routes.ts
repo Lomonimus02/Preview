@@ -1052,6 +1052,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Subjects API
+  // API для расчета среднего балла для студента по предмету (используется одинаковая логика с оценками учителя)
+  app.get("/api/student-subject-average", isAuthenticated, async (req, res) => {
+    try {
+      const { studentId, subjectId, subgroupId } = req.query;
+      
+      if (!studentId || !subjectId) {
+        return res.status(400).json({ message: 'Необходимо указать studentId и subjectId' });
+      }
+      
+      const student = await dbStorage.getUser(Number(studentId));
+      if (!student) {
+        return res.status(404).json({ message: 'Студент не найден' });
+      }
+      
+      // Проверка, что текущий пользователь имеет право на просмотр оценок студента
+      if (Number(studentId) !== req.user?.id && req.user?.role !== UserRoleEnum.TEACHER && req.user?.role !== UserRoleEnum.SCHOOL_ADMIN && req.user?.role !== UserRoleEnum.SUPER_ADMIN) {
+        return res.status(403).json({ message: 'Недостаточно прав для просмотра оценок этого студента' });
+      }
+      
+      // Получаем оценки студента по предмету
+      const grades = await dbStorage.getGradesByStudent(Number(studentId));
+      
+      // Фильтруем оценки по предмету и подгруппе (если указана)
+      let subjectGrades = grades.filter(g => {
+        if (g.subjectId !== Number(subjectId)) return false;
+        
+        // Если указана подгруппа, проверяем соответствие
+        if (subgroupId) {
+          return g.subgroupId === Number(subgroupId);
+        }
+        
+        // Если подгруппа не указана, включаем только оценки без подгрупп
+        return !g.subgroupId;
+      });
+      
+      // Фильтруем оценки, оставляя только те, что привязаны к конкретным урокам
+      const uniqueGrades = subjectGrades.filter(grade => {
+        return grade.scheduleId !== null && grade.scheduleId !== undefined;
+      });
+      
+      // Используем уникальные оценки для расчёта, если они есть
+      subjectGrades = uniqueGrades.length > 0 ? uniqueGrades : subjectGrades;
+      
+      if (subjectGrades.length === 0) {
+        return res.json({ 
+          average: "0", 
+          percentage: "0%",
+          maxScore: "0" 
+        });
+      }
+      
+      // Получаем класс студента для определения системы оценивания
+      const studentClasses = await dbStorage.getStudentClasses(Number(studentId));
+      const studentClass = studentClasses.length > 0 ? studentClasses[0] : null;
+      
+      // Определяем систему оценивания класса
+      const gradingSystem = studentClass?.gradingSystem || GradingSystemEnum.FIVE_POINT;
+      
+      // Получаем все задания, связанные с оценками
+      const assignments = [];
+      for (const grade of subjectGrades) {
+        if (grade.scheduleId) {
+          const scheduleAssignments = await dbStorage.getAssignmentsBySchedule(grade.scheduleId);
+          assignments.push(...scheduleAssignments);
+        }
+      }
+      
+      // Для накопительной системы оценивания
+      if (gradingSystem === GradingSystemEnum.CUMULATIVE) {
+        // Для каждой оценки ищем соответствующее задание
+        let totalEarnedScore = 0;
+        let totalMaxScore = 0;
+        
+        // Обрабатываем оценки, связанные с заданиями
+        for (const grade of subjectGrades) {
+          if (grade.scheduleId) {
+            const relatedAssignment = assignments.find(a => a.scheduleId === grade.scheduleId);
+            
+            if (relatedAssignment) {
+              // Если нашли задание, добавляем баллы
+              totalEarnedScore += grade.grade;
+              totalMaxScore += Number(relatedAssignment.maxScore);
+            }
+          }
+        }
+        
+        // Если нет максимального балла, возвращаем прочерк
+        if (totalMaxScore === 0) {
+          return res.json({ 
+            average: "0", 
+            percentage: "0%",
+            maxScore: "0" 
+          });
+        }
+        
+        // Вычисляем процент выполнения и форматируем его
+        const percentage = (totalEarnedScore / totalMaxScore) * 100;
+        
+        // Ограничиваем максимальный процент до 100%
+        const cappedPercentage = Math.min(percentage, 100);
+        
+        return res.json({
+          average: totalEarnedScore.toString(),
+          percentage: `${cappedPercentage.toFixed(1)}%`,
+          maxScore: totalMaxScore.toString()
+        });
+      } else {
+        // Для пятибалльной системы оценивания - используем алгоритм с весами
+        
+        // Весовые коэффициенты для разных типов оценок
+        const weights = {
+          'test': 2,
+          'exam': 3,
+          'homework': 1,
+          'project': 2,
+          'classwork': 1,
+          'Текущая': 1,
+          'Контрольная': 2,
+          'Экзамен': 3,
+          'Практическая': 1.5,
+          'Домашняя': 1
+        };
+        
+        let weightedSum = 0;
+        let totalWeight = 0;
+        
+        subjectGrades.forEach(grade => {
+          const weight = weights[grade.gradeType] || 1;
+          weightedSum += grade.grade * weight;
+          totalWeight += weight;
+        });
+        
+        // Если нет оценок с весами, возвращаем "0"
+        if (totalWeight === 0) {
+          return res.json({ 
+            average: "0", 
+            percentage: "0%",
+            maxScore: "5" 
+          });
+        }
+        
+        const average = weightedSum / totalWeight;
+        
+        // Переводим в проценты от максимальной оценки (5.0) для согласованности отображения
+        const percentScore = (average / 5) * 100;
+        const cappedPercentScore = Math.min(percentScore, 100);
+        
+        return res.json({
+          average: average.toFixed(1),
+          percentage: `${cappedPercentScore.toFixed(1)}%`,
+          maxScore: "5"
+        });
+      }
+    } catch (error) {
+      console.error('Error calculating student subject average:', error);
+      res.status(500).json({ message: 'Не удалось рассчитать средний балл' });
+    }
+  });
+
   app.get("/api/subjects", isAuthenticated, async (req, res) => {
     let subjects = [];
     

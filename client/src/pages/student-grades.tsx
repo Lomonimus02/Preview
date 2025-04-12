@@ -170,6 +170,28 @@ export default function StudentGrades() {
     enabled: !!user && user.role === UserRoleEnum.STUDENT && studentClass && studentClass.length > 0
   });
   
+  // Интерфейс для данных о средних оценках из журнала учителя
+  interface SubjectAverage {
+    average: string;
+    percentage: string;
+    maxScore?: string;
+  }
+  
+  // Объект для хранения средних оценок по предметам из API
+  const [subjectAverages, setSubjectAverages] = useState<Record<string, SubjectAverage>>({});
+  
+  // Получение средних оценок из API
+  useQuery({
+    queryKey: ['/api/student-subject-average', user?.id],
+    enabled: !!user && user.role === UserRoleEnum.STUDENT && subjects.length > 0,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    onSuccess: (data) => {
+      // При успешной загрузке средних оценок сохраняем их
+      // Временно не используем данные, будем получать данные отдельно для каждого предмета
+    }
+  });
+  
   // Определяем систему оценивания класса
   const gradingSystem = useMemo(() => {
     if (studentClass && studentClass.length > 0) {
@@ -405,13 +427,65 @@ export default function StudentGrades() {
     setIsGradeDialogOpen(true);
   };
   
+  // Функция для загрузки среднего балла из API
+  const loadSubjectAverage = async (subjectId: number, subgroupId?: number) => {
+    try {
+      if (!user) return null;
+      
+      let url = `/api/student-subject-average?studentId=${user.id}&subjectId=${subjectId}`;
+      if (subgroupId) {
+        url += `&subgroupId=${subgroupId}`;
+      }
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error('Failed to fetch subject average:', response.statusText);
+        return null;
+      }
+      
+      const data = await response.json();
+      return data as SubjectAverage;
+    } catch (error) {
+      console.error('Error fetching subject average:', error);
+      return null;
+    }
+  };
+  
   // Расчет среднего балла по предмету или предмету+подгруппе
-  const calculateAverageForSubject = (subject: any) => {
+  const calculateAverageForSubject = async (subject: any) => {
     // Получаем ID предмета и подгруппы из customId или из объекта предмета
     const subjectKey = typeof subject === 'string' ? subject : (subject.customId || `${subject.id}`);
     const [subjectId, subgroupId] = typeof subjectKey === 'string' 
       ? subjectKey.split('-').map(id => id ? parseInt(id) : null) 
       : [subject.id, subject.subgroupId];
+    
+    // Проверяем, есть ли уже загруженные данные в состоянии subjectAverages
+    const cacheKey = subgroupId ? `${subjectId}-${subgroupId}` : `${subjectId}`;
+    
+    if (!subjectAverages[cacheKey]) {
+      // Если нет в кэше, загружаем данные из API
+      try {
+        const apiAverage = await loadSubjectAverage(subjectId, subgroupId || undefined);
+        
+        if (apiAverage) {
+          // Сохраняем в кэш для последующих использований
+          setSubjectAverages(prev => ({
+            ...prev,
+            [cacheKey]: apiAverage
+          }));
+          
+          // Возвращаем процент из API
+          return apiAverage.percentage;
+        }
+      } catch (error) {
+        console.error("Ошибка при загрузке средних оценок:", error);
+      }
+    } else {
+      // Если данные уже есть в кэше, возвращаем их
+      return subjectAverages[cacheKey].percentage;
+    }
+    
+    // Если не удалось получить данные из API, используем локальный расчет (обратная совместимость)
     
     // Фильтруем оценки по предмету и подгруппе (если указана)
     let subjectGrades = grades.filter(g => {
@@ -732,8 +806,8 @@ export default function StudentGrades() {
                               {renderGradeCell(subject, day)}
                             </TableCell>
                           ))}
-                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(calculateAverageForSubject(subject))}`}>
-                            {calculateAverageForSubject(subject)}
+                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(subjectAverages[subject.customId || subject.id]?.percentage || "-")}`}>
+                            {subjectAverages[subject.customId || subject.id]?.percentage || "-"}
                           </TableCell>
                         </TableRow>
                       ))}
