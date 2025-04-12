@@ -813,6 +813,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Если пользователь студент и его класс изменился, обновляем связанные записи
     if (updatedUser && (user.role === UserRoleEnum.STUDENT || updatedUser.role === UserRoleEnum.STUDENT) && classIdChanged) {
       try {
+        console.log(`Обновление связей ученика id=${id} при смене класса с ${oldClassId} на ${req.body.classId}`);
+        
         // Получаем все роли пользователя
         const userRoles = await dataStorage.getUserRoles(id);
         
@@ -821,7 +823,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (role.role === UserRoleEnum.STUDENT) {
             // Обновляем classId в записи роли
             if (role.id > 0) { // Не обновляем дефолтную роль с id = -1
+              console.log(`Удаляем запись о роли студента id=${role.id}`);
               await dataStorage.removeUserRole(role.id);
+              
+              console.log(`Создаем новую запись о роли студента с classId=${parseInt(req.body.classId)}`);
               await dataStorage.addUserRole({
                 userId: id,
                 role: UserRoleEnum.STUDENT,
@@ -840,8 +845,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const subgroupStudents = await dataStorage.getSubgroupStudents(subgroup.id);
             // Если студент находится в этой подгруппе, удаляем его
             if (subgroupStudents.some(s => s.id === id)) {
+              console.log(`Удаляем студента id=${id} из подгруппы id=${subgroup.id}`);
               await dataStorage.removeStudentFromSubgroup(id, subgroup.id);
             }
+          }
+        }
+        
+        // Важно: явно добавляем студента в новый класс
+        if (parseInt(req.body.classId)) {
+          console.log(`Явно добавляем студента id=${id} в класс id=${parseInt(req.body.classId)}`);
+          
+          // Проверяем, существует ли уже связь студента с классом
+          const studentClasses = await dataStorage.getStudentClasses(id);
+          const isAlreadyInClass = studentClasses.some(c => c.id === parseInt(req.body.classId));
+          
+          if (!isAlreadyInClass) {
+            // Добавляем запись в таблицу связи студентов с классами
+            await dataStorage.addStudentToClass(id, parseInt(req.body.classId));
+          } else {
+            console.log(`Студент id=${id} уже состоит в классе id=${parseInt(req.body.classId)}`);
           }
         }
       } catch (error) {
@@ -3040,10 +3062,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Invalid class ID" });
     }
     
+    console.log(`Запрос списка студентов для класса с ID=${classId} от пользователя ${req.user.username} (${req.user.role})`);
+    
     try {
+      // Получаем информацию о классе для отладки
+      const classObj = await dataStorage.getClass(classId);
+      console.log(`Информация о классе: ${JSON.stringify(classObj)}`);
+      
       // Проверяем, имеет ли пользователь доступ к классу
       if (req.user.role === UserRoleEnum.SCHOOL_ADMIN) {
-        const classObj = await dataStorage.getClass(classId);
         if (!classObj || classObj.schoolId !== req.user.schoolId) {
           return res.status(403).json({ message: "You can only view students in classes of your school" });
         }
@@ -3051,6 +3078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Учитель может видеть только учеников тех классов, где преподает
         const schedules = await dataStorage.getSchedulesByTeacher(req.user.id);
         const teacherClassIds = [...new Set(schedules.map(s => s.classId))];
+        console.log(`Классы, где преподает учитель: ${JSON.stringify(teacherClassIds)}`);
         
         if (!teacherClassIds.includes(classId)) {
           return res.status(403).json({ message: "You can only view students in classes you teach" });
@@ -3062,6 +3090,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const classTeacherRole = userRoles.find(r => 
           r.role === UserRoleEnum.CLASS_TEACHER && r.classId === classId
         );
+        console.log(`Роль классного руководителя: ${JSON.stringify(classTeacherRole)}`);
         
         if (!classTeacherRole) {
           return res.status(403).json({ message: "You can only view students in your assigned class" });
@@ -3072,6 +3101,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Получаем студентов этого класса
       const students = await dataStorage.getClassStudents(classId);
+      console.log(`Получено ${students.length} студентов для класса ${classId}: ${JSON.stringify(students.map(s => ({ id: s.id, username: s.username })))}`);
+      
+      // Отладка: проверяем записи в таблице student_classes
+      if (students.length === 0) {
+        if (typeof db !== 'undefined') {
+          try {
+            // Только если используется реальная БД
+            const dbStudentClasses = await db.select().from(studentClasses).where(eq(studentClasses.classId, classId));
+            console.log(`Записи в таблице student_classes для класса ${classId}: ${JSON.stringify(dbStudentClasses)}`);
+          } catch (error) {
+            console.log(`Ошибка при проверке таблицы student_classes: ${error.message}`);
+          }
+        }
+        
+        // Проверяем, есть ли студенты с этим classId в поле classId
+        const usersWithClassId = Array.from(dataStorage.users.values())
+          .filter(user => user.role === UserRoleEnum.STUDENT && user.classId === classId);
+        console.log(`Студенты с classId=${classId} в поле classId: ${JSON.stringify(usersWithClassId.map(u => ({ id: u.id, username: u.username })))}`);
+      }
+      
       res.json(students);
     } catch (error) {
       console.error("Error fetching students by class:", error);
