@@ -467,7 +467,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
           ) : (
             <div className="grid grid-cols-1 gap-2">
               {/* Администратор школы может настроить временные слоты */}
-              {isSchoolAdmin && classId && !showClassNames && (
+              {isSchoolAdmin() && classId && !showClassNames && (
                 <div className="mb-2 flex justify-end">
                   <Button 
                     variant="ghost" 

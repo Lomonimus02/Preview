@@ -12,6 +12,7 @@ import SchedulePage from "@/pages/schedule";
 import ClassSchedulePage from "@/pages/schedule-class";
 import OverallSchedulePage from "@/pages/schedule-overall";
 import ClassGradeDetailsPage from "@/pages/class-grade-details";
+import ClassTimeSlotsPage from "@/pages/class-time-slots";
 import Grades from "@/pages/grades";
 import GradingSystems from "@/pages/grading-systems";
 import Homework from "@/pages/homework";
@@ -41,6 +42,7 @@ function Router() {
       <ProtectedRoute path="/user-roles" component={UserRoles} />
       <ProtectedRoute path="/schedule" component={SchedulePage} />
       <ProtectedRoute path="/schedule-class/:classId" component={ClassSchedulePage} />
+      <ProtectedRoute path="/schedule-class/:classId/time-slots" component={ClassTimeSlotsPage} />
       <ProtectedRoute path="/schedule-overall" component={OverallSchedulePage} />
       <ProtectedRoute path="/class-grade-details/:classId/:subjectId/:subgroupId?" component={ClassGradeDetailsPage} />
       <ProtectedRoute path="/grades" component={Grades} />

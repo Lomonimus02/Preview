@@ -35,7 +35,7 @@ const ClassTimeSlotsPage: React.FC = () => {
   const [editingSlotId, setEditingSlotId] = useState<number | null>(null);
 
   // Получение информации о классе
-  const { data: classData, isLoading: isClassLoading } = useQuery({
+  const { data: classData = {name: ""}, isLoading: isClassLoading } = useQuery({
     queryKey: ['/api/classes', classId],
     enabled: !isNaN(classId),
   });
