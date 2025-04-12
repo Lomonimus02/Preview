@@ -31,9 +31,11 @@ export const SchoolAdminScheduleMenu: React.FC = () => {
     if (user.schoolId) return user.schoolId;
     
     // Если у пользователя есть роль школьного администратора с привязкой к школе
-    // Получаем roles из user или используем пустой массив
-    const roles = user.roles || user.userRoles || [];
-    const schoolAdminRole = roles.find((roleObj: any) => 
+    // Получаем my-roles через API напрямую, не используя roles из user
+    const userRoles = Array.isArray((user as any).roles) ? (user as any).roles : 
+                     Array.isArray((user as any).userRoles) ? (user as any).userRoles : [];
+    
+    const schoolAdminRole = userRoles.find((roleObj: any) => 
       roleObj.role === "school_admin" && roleObj.schoolId
     );
     
@@ -71,7 +73,7 @@ export const SchoolAdminScheduleMenu: React.FC = () => {
   const schoolClasses = classes.filter(cls => cls.schoolId === schoolId);
 
   // Проверка активного маршрута для выделения активного пункта меню
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   
   // Определяем, активна ли страница расписания
   const isActive = location.startsWith('/schedule-') || location === '/schedule';
@@ -130,7 +132,8 @@ export const SchoolAdminScheduleMenu: React.FC = () => {
                   : "hover:bg-muted text-foreground/80"
               )}
               onClick={() => {
-                window.location.href = "/schedule-overall";
+                navigate("/schedule-overall");
+                setIsExpanded(false);
               }}
             >
               <span className="truncate">Общее расписание</span>
@@ -153,7 +156,8 @@ export const SchoolAdminScheduleMenu: React.FC = () => {
                         : "hover:bg-muted text-foreground/80"
                     )}
                     onClick={() => {
-                      window.location.href = `/schedule-class/${cls.id}`;
+                      navigate(`/schedule-class/${cls.id}`);
+                      setIsExpanded(false);
                     }}
                   >
                     <span className="truncate">{cls.name}</span>
