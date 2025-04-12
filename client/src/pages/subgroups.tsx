@@ -134,7 +134,7 @@ export default function SubgroupsPage() {
     }
   });
   
-  // Fetch classes for dropdown - используем глобальный выбор школы
+  // Fetch classes for dropdown
   const { data: classes = [], isLoading: isLoadingClasses } = useQuery<Class[]>({
     queryKey: ['/api/classes', selectedSchool],
     queryFn: async () => {
