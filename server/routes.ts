@@ -7,7 +7,8 @@ import { db } from "./db";
 const dataStorage = dbStorage;
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { UserRoleEnum } from "@shared/schema";
+import { UserRoleEnum, studentClasses } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -749,6 +750,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: UserRoleEnum.CLASS_TEACHER,
           classId: req.body.classIds[0]
         });
+      }
+      
+      // Если создается студент и указан класс - добавляем запись в таблицу student_classes
+      if (newUserRole === UserRoleEnum.STUDENT && req.body.classId) {
+        console.log(`Создан новый студент id=${user.id}, добавляем его в класс id=${req.body.classId}`);
+        try {
+          // Добавляем запись в таблицу связи студентов с классами
+          await dataStorage.addStudentToClass(user.id, req.body.classId);
+          console.log(`Студент id=${user.id} успешно добавлен в класс id=${req.body.classId}`);
+        } catch (error) {
+          console.error(`Ошибка при добавлении студента id=${user.id} в класс id=${req.body.classId}:`, error);
+          // Продолжаем выполнение, не прерываем запрос из-за этой ошибки
+        }
       }
 
       // Log the new user creation
