@@ -62,10 +62,7 @@ export const TimeSlotsManager: React.FC<TimeSlotsManagerProps> = ({ classId }) =
   // Создание или обновление временного слота для класса
   const createOrUpdateMutation = useMutation({
     mutationFn: async (data: TimeSlotFormData) => {
-      return apiRequest(`/api/class/${classId}/time-slots`, {
-        method: 'POST',
-        body: data
-      });
+      return apiRequest(`/api/class/${classId}/time-slots`, 'POST', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -90,10 +87,7 @@ export const TimeSlotsManager: React.FC<TimeSlotsManagerProps> = ({ classId }) =
   // Удаление временного слота для класса
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/class-time-slots/${id}`, {
-        method: 'DELETE',
-        body: {}
-      });
+      return apiRequest(`/api/class-time-slots/${id}`, 'DELETE');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -117,10 +111,7 @@ export const TimeSlotsManager: React.FC<TimeSlotsManagerProps> = ({ classId }) =
   // Сброс всех настроек временных слотов для класса
   const resetAllMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/class/${classId}/time-slots/reset`, {
-        method: 'POST',
-        body: {}
-      });
+      return apiRequest(`/api/class/${classId}/time-slots/reset`, 'POST');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
