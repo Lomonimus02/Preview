@@ -29,8 +29,11 @@ export default function ClassSchedulePage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [scheduleToEdit, setScheduleToEdit] = useState<Schedule | null>(null);
   
-  // Проверка доступа (только администраторы школы должны иметь доступ)
-  if (!isSchoolAdmin()) {
+  // Проверка доступа (администраторы школы имеют полный доступ, директора - только просмотр)
+  const isPrincipal = user?.role === 'principal';
+  const canView = isPrincipal;
+  
+  if (!isSchoolAdmin() && !canView) {
     return (
       <MainLayout>
         <div className="container mx-auto py-8">
@@ -240,26 +243,30 @@ export default function ClassSchedulePage() {
               <h1 className="text-3xl font-bold">
                 Расписание класса: {classData?.name || `#${classId}`}
               </h1>
-              <Button 
-                onClick={() => {
-                  setSelectedDate(new Date());
-                  setScheduleToEdit(null);
-                  setIsScheduleFormOpen(true);
-                }}
-                className="flex items-center gap-2"
-              >
-                <Plus size={16} />
-                Добавить урок
-              </Button>
+              {!canView && (
+                <Button 
+                  onClick={() => {
+                    setSelectedDate(new Date());
+                    setScheduleToEdit(null);
+                    setIsScheduleFormOpen(true);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Plus size={16} />
+                  Добавить урок
+                </Button>
+              )}
             </div>
             
             <div className="flex flex-wrap items-center gap-4 mb-8">
               <Link href={`/schedule-class/${classId}`} className={`px-4 py-2 rounded-md font-medium ${!location.includes('time-slots') ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}>
                 Расписание
               </Link>
-              <Link href={`/schedule-class/${classId}/time-slots`} className={`px-4 py-2 rounded-md font-medium ${location.includes('time-slots') ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}>
-                Настройка временных слотов
-              </Link>
+              {!canView && (
+                <Link href={`/schedule-class/${classId}/time-slots`} className={`px-4 py-2 rounded-md font-medium ${location.includes('time-slots') ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}>
+                  Настройка временных слотов
+                </Link>
+              )}
             </div>
             
             {schedules.length > 0 ? (
@@ -277,6 +284,7 @@ export default function ClassSchedulePage() {
                 onAddSchedule={handleAddSchedule} // Обработчик добавления урока
                 onEditSchedule={handleEditSchedule} // Обработчик редактирования урока
                 onDeleteSchedule={handleDeleteSchedule} // Обработчик удаления урока
+                canView={canView} // Передаем флаг режима просмотра для директора
               />
             ) : (
               <Alert>

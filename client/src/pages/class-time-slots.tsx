@@ -13,6 +13,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FiClock, FiEdit, FiTrash2, FiArrowLeft, FiCheck, FiRotateCcw } from 'react-icons/fi';
 import { TimeSlot, ClassTimeSlot } from '@shared/schema';
+import { MainLayout } from '@/components/layout/main-layout';
 
 interface TimeSlotFormData {
   slotNumber: number;
@@ -26,7 +27,7 @@ const ClassTimeSlotsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { isPrincipal, canEdit } = useRoleCheck();
+  const { isPrincipal } = useRoleCheck();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState<TimeSlotFormData>({
@@ -208,81 +209,86 @@ const ClassTimeSlotsPage: React.FC = () => {
     );
   }
 
-  return (
-    <div className="container mx-auto py-8">
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <Button 
-            variant="outline" 
-            onClick={() => navigate(`/schedule-class/${classId}`)}
-            className="mb-2"
-          >
-            <FiArrowLeft className="mr-2" /> Вернуться к расписанию
-          </Button>
-          <h1 className="text-2xl font-bold">
-            Настройка временных слотов для класса {classData?.name || ''}
-          </h1>
-          <p className="text-gray-600 mt-1">
-            Здесь вы можете настроить индивидуальные временные слоты для уроков этого класса.
-          </p>
-        </div>
-        {!isPrincipal() && (
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (window.confirm("Вы уверены, что хотите сбросить все настройки?")) {
-                resetAllMutation.mutate();
-              }
-            }}
-            className="flex items-center"
-          >
-            <FiRotateCcw className="mr-2" />
-            Сбросить настройки
-          </Button>
-        )}
-      </div>
+  // Определяем, может ли пользователь редактировать
+  const canEdit = !isPrincipal();
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Временные слоты для уроков</CardTitle>
-          <CardDescription>
-            Эти настройки будут применяться только к данному классу и переопределят стандартные временные интервалы.
-            Если слот не настроен, будет использоваться время по умолчанию.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Номер урока</TableHead>
-                <TableHead>Время по умолчанию</TableHead>
-                <TableHead>Настроенное время</TableHead>
-                <TableHead>Действия</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {defaultSlots.map((defaultSlot) => {
-                const classSlot = classTimeSlots.find(cs => cs.slotNumber === defaultSlot.slotNumber);
-                return (
-                  <TableRow key={defaultSlot.slotNumber}>
-                    <TableCell className="font-medium">{defaultSlot.slotNumber} урок</TableCell>
-                    <TableCell>
-                      {defaultSlot.startTime} - {defaultSlot.endTime}
-                    </TableCell>
-                    <TableCell>
-                      {classSlot ? (
-                        <span className="text-primary-600 font-medium">
-                          {classSlot.startTime} - {classSlot.endTime}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 italic">Используется время по умолчанию</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {classSlot ? (
-                        <div className="flex gap-2">
-                          {!isPrincipal() && (
-                            <>
+  return (
+    <MainLayout>
+      <div className="container mx-auto py-8">
+        <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate(`/schedule-class/${classId}`)}
+              className="mb-2"
+            >
+              <FiArrowLeft className="mr-2" /> Вернуться к расписанию
+            </Button>
+            <h1 className="text-2xl font-bold">
+              {canEdit ? "Настройка" : "Просмотр"} временных слотов для класса {classData?.name || ''}
+            </h1>
+            <p className="text-gray-600 mt-1">
+              {canEdit 
+                ? "Здесь вы можете настроить индивидуальные временные слоты для уроков этого класса." 
+                : "Здесь отображаются настроенные временные слоты для уроков этого класса."}
+            </p>
+          </div>
+          {canEdit && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (window.confirm("Вы уверены, что хотите сбросить все настройки?")) {
+                  resetAllMutation.mutate();
+                }
+              }}
+              className="flex items-center"
+            >
+              <FiRotateCcw className="mr-2" />
+              Сбросить настройки
+            </Button>
+          )}
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Временные слоты для уроков</CardTitle>
+            <CardDescription>
+              Эти настройки будут применяться только к данному классу и переопределят стандартные временные интервалы.
+              Если слот не настроен, будет использоваться время по умолчанию.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Номер урока</TableHead>
+                  <TableHead>Время по умолчанию</TableHead>
+                  <TableHead>Настроенное время</TableHead>
+                  {canEdit && <TableHead>Действия</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {defaultSlots.map((defaultSlot) => {
+                  const classSlot = classTimeSlots.find(cs => cs.slotNumber === defaultSlot.slotNumber);
+                  return (
+                    <TableRow key={defaultSlot.slotNumber}>
+                      <TableCell className="font-medium">{defaultSlot.slotNumber} урок</TableCell>
+                      <TableCell>
+                        {defaultSlot.startTime} - {defaultSlot.endTime}
+                      </TableCell>
+                      <TableCell>
+                        {classSlot ? (
+                          <span className="text-primary-600 font-medium">
+                            {classSlot.startTime} - {classSlot.endTime}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">Используется время по умолчанию</span>
+                        )}
+                      </TableCell>
+                      {canEdit && (
+                        <TableCell>
+                          {classSlot ? (
+                            <div className="flex gap-2">
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -301,97 +307,97 @@ const ClassTimeSlotsPage: React.FC = () => {
                               >
                                 <FiTrash2 size={16} />
                               </Button>
-                            </>
+                            </div>
+                          ) : (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => openCreateDialog(defaultSlot.slotNumber)}
+                            >
+                              Настроить
+                            </Button>
                           )}
-                        </div>
-                      ) : (
-                        !isPrincipal() && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => openCreateDialog(defaultSlot.slotNumber)}
-                          >
-                            Настроить
-                          </Button>
-                        )
+                        </TableCell>
                       )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
-      {/* Диалог для создания или редактирования временного слота */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>
-              {editingSlotId ? "Редактирование временного слота" : "Настройка временного слота"}
-            </DialogTitle>
-            <DialogDescription>
-              Укажите время начала и окончания для урока #{formData.slotNumber}
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startTime">Время начала</Label>
-                  <Input
-                    id="startTime"
-                    name="startTime"
-                    type="time"
-                    value={formData.startTime}
-                    onChange={handleInputChange}
-                    required
-                  />
+        {/* Диалог для создания или редактирования временного слота */}
+        {canEdit && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingSlotId ? "Редактирование временного слота" : "Настройка временного слота"}
+                </DialogTitle>
+                <DialogDescription>
+                  Укажите время начала и окончания для урока #{formData.slotNumber}
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit}>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="startTime">Время начала</Label>
+                      <Input
+                        id="startTime"
+                        name="startTime"
+                        type="time"
+                        value={formData.startTime}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endTime">Время окончания</Label>
+                      <Input
+                        id="endTime"
+                        name="endTime"
+                        type="time"
+                        value={formData.endTime}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endTime">Время окончания</Label>
-                  <Input
-                    id="endTime"
-                    name="endTime"
-                    type="time"
-                    value={formData.endTime}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit" disabled={createOrUpdateMutation.isPending}>
-                {createOrUpdateMutation.isPending && (
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"></div>
-                )}
-                {editingSlotId ? "Сохранить" : "Создать"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                <DialogFooter>
+                  <Button type="submit" disabled={createOrUpdateMutation.isPending}>
+                    {createOrUpdateMutation.isPending && (
+                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"></div>
+                    )}
+                    {editingSlotId ? "Сохранить" : "Создать"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
 
-      <div className="mt-8">
-        <Alert>
-          <FiClock className="h-4 w-4" />
-          <AlertTitle>Как это работает</AlertTitle>
-          <AlertDescription>
-            <p className="mt-2">
-              При создании расписания для класса, преподаватели будут выбирать номер урока
-              (например, "1 урок"), а система автоматически подставит настроенное для этого
-              класса время начала и окончания.
-            </p>
-            <p className="mt-2">
-              Если для класса не настроено индивидуальное время, будет использоваться
-              стандартное расписание звонков.
-            </p>
-          </AlertDescription>
-        </Alert>
+        <div className="mt-8">
+          <Alert>
+            <FiClock className="h-4 w-4" />
+            <AlertTitle>Как это работает</AlertTitle>
+            <AlertDescription>
+              <p className="mt-2">
+                При создании расписания для класса, преподаватели будут выбирать номер урока
+                (например, "1 урок"), а система автоматически подставит настроенное для этого
+                класса время начала и окончания.
+              </p>
+              <p className="mt-2">
+                Если для класса не настроено индивидуальное время, будет использоваться
+                стандартное расписание звонков.
+              </p>
+            </AlertDescription>
+          </Alert>
+        </div>
       </div>
-    </div>
+    </MainLayout>
   );
 };
 
