@@ -24,7 +24,7 @@ interface ScheduleCarouselProps {
   homework?: Homework[];
   currentUser?: User | null;
   isAdmin?: boolean;
-  onAddSchedule: (date: Date) => void;
+  onAddSchedule?: (date: Date) => void;
   onDeleteSchedule?: (scheduleId: number) => void;
 }
 
