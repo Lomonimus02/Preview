@@ -7,7 +7,8 @@ import { TimeSlotsManager } from "@/components/schedule/time-slots-manager";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Schedule, Class, Subject, User, Grade, Homework } from "@shared/schema";
 import { ScheduleForm } from "@/components/schedule/schedule-form";
 import { apiRequest } from "@/lib/queryClient";
@@ -249,6 +250,17 @@ export default function ClassSchedulePage() {
               <h1 className="text-3xl font-bold">
                 Расписание класса: {classData?.name || `#${classId}`}
               </h1>
+              <Button 
+                onClick={() => {
+                  setSelectedDate(new Date());
+                  setScheduleToEdit(null);
+                  setIsScheduleFormOpen(true);
+                }}
+                className="flex items-center gap-2"
+              >
+                <Plus size={16} />
+                Добавить урок
+              </Button>
             </div>
             
             <Tabs defaultValue="schedule" className="w-full mb-8">
@@ -291,6 +303,20 @@ export default function ClassSchedulePage() {
           </>
         )}
       </div>
+      
+      {/* Модальное окно формы расписания */}
+      <ScheduleForm
+        isOpen={isScheduleFormOpen}
+        onClose={() => {
+          setIsScheduleFormOpen(false);
+          setScheduleToEdit(null);
+        }}
+        onSubmit={handleScheduleFormSubmit}
+        classId={classId}
+        initialValues={scheduleToEdit}
+        selectedDate={selectedDate}
+        loading={createScheduleMutation.isPending || updateScheduleMutation.isPending}
+      />
     </MainLayout>
   );
 }
