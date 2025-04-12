@@ -282,20 +282,43 @@ export default function StudentGrades() {
     return result;
   }, [grades, subjects, assignments]);
   
-  // Функция для отображения оценок для конкретного предмета и даты
-  const renderGradeCell = (subjectId: number, date: Date) => {
+  // Функция для отображения оценок для конкретного предмета/подгруппы и даты
+  const renderGradeCell = (subject: any, date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
-    const cell = gradesBySubjectAndDate[subjectId]?.[dateStr];
+    // Получаем ID предмета и подгруппы из customId или из объекта предмета
+    const subjectKey = subject.customId || `${subject.id}`;
+    const [subjectId, subgroupId] = typeof subjectKey === 'string' 
+      ? subjectKey.split('-').map(id => id ? parseInt(id) : null) 
+      : [subject.id, subject.subgroupId];
     
-    if (!cell || cell.grades.length === 0) {
+    // Получаем все оценки для указанного предмета и даты
+    const cellGrades = grades.filter(grade => {
+      // Проверяем предмет и дату
+      if (grade.subjectId !== subjectId) return false;
+      
+      // Проверяем соответствие дате
+      const gradeDate = new Date(grade.createdAt);
+      const gradeStr = gradeDate.toISOString().split('T')[0];
+      if (gradeStr !== dateStr) return false;
+      
+      // Проверяем подгруппу (если указана)
+      if (subgroupId !== null) {
+        return grade.subgroupId === subgroupId;
+      }
+      
+      // Если подгруппа не указана в ключе, включаем только оценки без подгрупп
+      return !grade.subgroupId;
+    });
+    
+    if (cellGrades.length === 0) {
       return null;
     }
     
     return (
       <div className="flex flex-wrap gap-1 justify-center">
-        {cell.grades.map((grade) => {
+        {cellGrades.map((grade) => {
           // Определяем, связано ли с заданием
-          const assignment = cell.assignments?.find(a => a.scheduleId === grade.scheduleId);
+          const assignment = assignments.find(a => a.scheduleId === grade.scheduleId);
           const hasAssignment = !!assignment;
           
           // Определяем цвет в зависимости от типа задания или оценки
@@ -338,9 +361,26 @@ export default function StudentGrades() {
     setIsGradeDialogOpen(true);
   };
   
-  // Расчет среднего балла по предмету
-  const calculateAverageForSubject = (subjectId: number) => {
-    const subjectGrades = grades.filter(g => g.subjectId === subjectId);
+  // Расчет среднего балла по предмету или предмету+подгруппе
+  const calculateAverageForSubject = (subject: any) => {
+    // Получаем ID предмета и подгруппы из customId или из объекта предмета
+    const subjectKey = typeof subject === 'string' ? subject : (subject.customId || `${subject.id}`);
+    const [subjectId, subgroupId] = typeof subjectKey === 'string' 
+      ? subjectKey.split('-').map(id => id ? parseInt(id) : null) 
+      : [subject.id, subject.subgroupId];
+    
+    // Фильтруем оценки по предмету и подгруппе (если указана)
+    const subjectGrades = grades.filter(g => {
+      if (g.subjectId !== subjectId) return false;
+      
+      // Если указана подгруппа, проверяем соответствие
+      if (subgroupId !== null) {
+        return g.subgroupId === subgroupId;
+      }
+      
+      // Если подгруппа не указана в ключе, включаем только оценки без подгрупп
+      return !g.subgroupId;
+    });
     
     if (subjectGrades.length === 0) return "-";
     
@@ -438,10 +478,31 @@ export default function StudentGrades() {
     return subject ? subject.name : `Предмет ${subjectId}`;
   };
   
-  // Фильтруем предметы, по которым есть оценки
+  // Получаем предметы и подгруппы с оценками
   const subjectsWithGrades = useMemo(() => {
-    const subjectIds = [...new Set(grades.map(g => g.subjectId))];
-    return subjects.filter(subject => subjectIds.includes(subject.id));
+    // Создаем комбинации предмет+подгруппа
+    const subjectSubgroupMap = new Map();
+    
+    grades.forEach(grade => {
+      const key = grade.subgroupId 
+        ? `${grade.subjectId}-${grade.subgroupId}` 
+        : `${grade.subjectId}`;
+      
+      if (!subjectSubgroupMap.has(key)) {
+        const subject = subjects.find(s => s.id === grade.subjectId);
+        if (subject) {
+          // Сохраняем копию предмета с информацией о подгруппе
+          subjectSubgroupMap.set(key, {
+            ...subject, 
+            subgroupId: grade.subgroupId,
+            // Используем customId для сравнения в дальнейшем
+            customId: key
+          });
+        }
+      }
+    });
+    
+    return Array.from(subjectSubgroupMap.values());
   }, [grades, subjects]);
   
   return (
@@ -553,11 +614,11 @@ export default function StudentGrades() {
                           </TableCell>
                           {daysInPeriod.map((day) => (
                             <TableCell key={day.toString()} className="text-center">
-                              {renderGradeCell(subject.id, day)}
+                              {renderGradeCell(subject.customId, day)}
                             </TableCell>
                           ))}
-                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(calculateAverageForSubject(subject.id))}`}>
-                            {calculateAverageForSubject(subject.id)}
+                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(calculateAverageForSubject(subject.customId))}`}>
+                            {calculateAverageForSubject(subject.customId)}
                           </TableCell>
                         </TableRow>
                       ))}
