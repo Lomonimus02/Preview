@@ -3278,33 +3278,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Удаление конкретного временного слота для класса по номеру слота
-  app.delete("/api/class/:classId/time-slots/:slotNumber", isAuthenticated, hasRole([UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
-    try {
-      const classId = parseInt(req.params.classId);
-      const slotNumber = parseInt(req.params.slotNumber);
-      
-      // Находим слот по номеру и ID класса
-      const slot = await dataStorage.getClassTimeSlotByNumber(classId, slotNumber);
-      
-      if (!slot) {
-        return res.status(404).json({ message: "Class time slot not found" });
-      }
-      
-      // Удаляем найденный слот по его ID
-      const deletedSlot = await dataStorage.deleteClassTimeSlot(slot.id);
-      
-      if (!deletedSlot) {
-        return res.status(404).json({ message: "Failed to delete time slot" });
-      }
-      
-      res.json({ message: "Class time slot deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting class time slot:", error);
-      res.status(500).json({ message: "Failed to delete class time slot" });
-    }
-  });
-
   // Сброс всех настроек временных слотов для класса
   // Старый метод DELETE - оставлен для обратной совместимости
   app.delete("/api/class/:classId/time-slots", isAuthenticated, hasRole([UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {

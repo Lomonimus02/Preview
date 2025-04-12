@@ -1,345 +1,349 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { apiRequest } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { TimeSlot, ClassTimeSlot } from '@shared/schema';
-import { Loader2, Clock, Save, Trash2, RefreshCw, Check } from 'lucide-react';
-import { 
-  Table, 
-  TableBody, 
-  TableCaption, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+
+interface TimeSlot {
+  id: number;
+  slotNumber: number;
+  startTime: string;
+  endTime: string;
+  isDefault?: boolean;
+  schoolId?: number;
+}
+
+interface ClassTimeSlot {
+  id: number;
+  classId: number;
+  slotNumber: number;
+  startTime: string;
+  endTime: string;
+}
+
+interface TimeSlotFormData {
+  slotNumber: number;
+  startTime: string;
+  endTime: string;
+}
 
 interface TimeSlotsManagerProps {
   classId: number;
 }
 
-// Задержка для автосохранения (в мс)
-const AUTO_SAVE_DELAY = 800;
-
-export function TimeSlotsManager({ classId }: TimeSlotsManagerProps) {
+export const TimeSlotsManager: React.FC<TimeSlotsManagerProps> = ({ classId }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [editingSlots, setEditingSlots] = useState<Record<number, boolean>>({});
-  const [slotData, setSlotData] = useState<Record<number, { startTime: string, endTime: string }>>({});
-  const [autoSaveTimers, setAutoSaveTimers] = useState<Record<number, NodeJS.Timeout>>({});
-  const [saveStatus, setSaveStatus] = useState<Record<number, 'idle' | 'saving' | 'saved' | 'error'>>({});
-
-  // Мутация для создания/обновления временного слота для класса
-  const updateClassTimeSlotMutation = useMutation({
-    mutationFn: async ({ slotNumber, startTime, endTime }: { slotNumber: number, startTime: string, endTime: string }) => {
-      return await apiRequest({
-        url: `/api/class/${classId}/time-slots`,
-        method: 'POST',
-        data: { slotNumber, startTime, endTime }
-      });
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/class', classId, 'time-slots'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules', { classId }] });
-      
-      setSaveStatus(prev => ({
-        ...prev,
-        [variables.slotNumber]: 'saved'
-      }));
-      
-      // Автоматически сбрасываем статус "сохранено" через 2 секунды
-      setTimeout(() => {
-        setSaveStatus(prev => ({
-          ...prev,
-          [variables.slotNumber]: 'idle'
-        }));
-      }, 2000);
-      
-      toast({
-        title: 'Временной слот обновлен',
-        description: 'Настройки временного слота успешно сохранены',
-        variant: 'default'
-      });
-    },
-    onError: (error: any, variables) => {
-      setSaveStatus(prev => ({
-        ...prev,
-        [variables.slotNumber]: 'error'
-      }));
-      
-      toast({
-        title: 'Ошибка',
-        description: error.message || 'Не удалось сохранить настройки временного слота',
-        variant: 'destructive'
-      });
-    }
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [formData, setFormData] = useState<TimeSlotFormData>({
+    slotNumber: 0,
+    startTime: '08:00',
+    endTime: '08:45'
   });
+  const [editingSlotId, setEditingSlotId] = useState<number | null>(null);
 
-  // Мутация для удаления настроенного временного слота (возврат к значениям по умолчанию)
-  const deleteClassTimeSlotMutation = useMutation({
-    mutationFn: async (slotNumber: number) => {
-      return await apiRequest({
-        url: `/api/class/${classId}/time-slots/${slotNumber}`,
-        method: 'DELETE'
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/class', classId, 'time-slots'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules', { classId }] });
-      toast({
-        title: 'Временной слот сброшен',
-        description: 'Настройки временного слота сброшены к значениям по умолчанию',
-        variant: 'default'
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Ошибка',
-        description: error.message || 'Не удалось сбросить настройки временного слота',
-        variant: 'destructive'
-      });
-    }
-  });
-
-  // Получение слотов по умолчанию
-  const { data: defaultSlots = [], isLoading: defaultSlotsLoading } = useQuery<TimeSlot[]>({
+  // Инициализация слотов по умолчанию
+  const { data: defaultSlots = [] } = useQuery<TimeSlot[]>({
     queryKey: ['/api/time-slots/defaults'],
   });
 
   // Получение настроенных слотов для класса
-  const { data: classTimeSlots = [], isLoading: classTimeSlotsLoading } = useQuery<ClassTimeSlot[]>({
+  const { data: classTimeSlots = [], isLoading: isLoadingClassSlots } = useQuery<ClassTimeSlot[]>({
     queryKey: ['/api/class', classId, 'time-slots'],
     enabled: !!classId,
   });
 
-  // Функция для форматирования времени в формат HH:MM
-  const formatTime = (timeString: string) => {
-    return timeString.substring(0, 5); // Обрезаем до формата HH:MM
+  // Создание или обновление временного слота для класса
+  const createOrUpdateMutation = useMutation({
+    mutationFn: async (data: TimeSlotFormData) => {
+      return apiRequest(`/api/class/${classId}/time-slots`, 'POST', data);
+    },
+    onSuccess: (data) => {
+      // Явно обновляем кэш запроса
+      queryClient.invalidateQueries({
+        queryKey: ['/api/class', classId, 'time-slots']
+      });
+      // Обновляем также стандартные слоты для обеспечения согласованности
+      queryClient.invalidateQueries({
+        queryKey: ['/api/time-slots/defaults']
+      });
+      setIsDialogOpen(false);
+      toast({
+        title: "Успешно",
+        description: "Временной слот сохранен",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось сохранить временной слот",
+        variant: "destructive",
+      });
+      console.error("Error saving time slot:", error);
+    }
+  });
+
+  // Удаление временного слота для класса
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest(`/api/class-time-slots/${id}`, 'DELETE');
+    },
+    onSuccess: () => {
+      // Явно обновляем кэш запроса
+      queryClient.invalidateQueries({
+        queryKey: ['/api/class', classId, 'time-slots']
+      });
+      // Обновляем также все связанные запросы для расписания
+      queryClient.invalidateQueries({
+        queryKey: ['/api/time-slots/defaults']
+      });
+      toast({
+        title: "Успешно",
+        description: "Временной слот удален",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось удалить временной слот",
+        variant: "destructive",
+      });
+      console.error("Error deleting time slot:", error);
+    }
+  });
+
+  // Сброс всех настроек временных слотов для класса
+  const resetAllMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest(`/api/class/${classId}/time-slots/reset`, 'POST');
+    },
+    onSuccess: () => {
+      // Явно обновляем кэш запроса
+      queryClient.invalidateQueries({
+        queryKey: ['/api/class', classId, 'time-slots']
+      });
+      // Обновляем также все связанные запросы для расписания
+      queryClient.invalidateQueries({
+        queryKey: ['/api/time-slots/defaults']
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/schedules']
+      });
+      toast({
+        title: "Успешно",
+        description: "Все настройки временных слотов сброшены",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось сбросить настройки временных слотов",
+        variant: "destructive",
+      });
+      console.error("Error resetting all time slots:", error);
+    }
+  });
+
+  // Открытие диалога для редактирования слота
+  const openEditDialog = (slot: ClassTimeSlot) => {
+    setFormData({
+      slotNumber: slot.slotNumber,
+      startTime: slot.startTime,
+      endTime: slot.endTime
+    });
+    setEditingSlotId(slot.id);
+    setIsDialogOpen(true);
   };
 
-  // Функция для получения эффективного значения слота времени (класс или по умолчанию)
-  const getEffectiveTimeSlot = (slotNumber: number) => {
+  // Открытие диалога для создания нового слота
+  const openCreateDialog = (slotNumber: number) => {
+    // Находим слот по умолчанию для этого номера
+    const defaultSlot = defaultSlots.find(slot => slot.slotNumber === slotNumber);
+    
+    setFormData({
+      slotNumber,
+      startTime: defaultSlot?.startTime || '08:00',
+      endTime: defaultSlot?.endTime || '08:45'
+    });
+    setEditingSlotId(null);
+    setIsDialogOpen(true);
+  };
+
+  // Обработка отправки формы
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createOrUpdateMutation.mutate(formData);
+  };
+
+  // Получение эффективного слота (настроенный для класса или по умолчанию)
+  const getEffectiveSlot = (slotNumber: number) => {
     const classSlot = classTimeSlots.find(slot => slot.slotNumber === slotNumber);
-    if (classSlot) {
-      return classSlot;
-    }
+    if (classSlot) return classSlot;
+    
     return defaultSlots.find(slot => slot.slotNumber === slotNumber);
   };
 
-  // Обработчик начала редактирования слота
-  const handleEditSlot = (slotNumber: number) => {
-    const slot = getEffectiveTimeSlot(slotNumber);
-    if (slot) {
-      setSlotData({
-        ...slotData,
-        [slotNumber]: {
-          startTime: formatTime(slot.startTime),
-          endTime: formatTime(slot.endTime)
-        }
-      });
-      setEditingSlots(prev => ({
-        ...prev,
-        [slotNumber]: true
-      }));
-    }
-  };
-
-  // Функция для автоматического сохранения слота
-  const autoSaveSlot = (slotNumber: number) => {
-    // Отменяем предыдущий таймер автосохранения для этого слота, если он существует
-    if (autoSaveTimers[slotNumber]) {
-      clearTimeout(autoSaveTimers[slotNumber]);
-    }
-    
-    const data = slotData[slotNumber];
-    if (!data) return;
-    
-    // Устанавливаем статус "сохранение"
-    setSaveStatus(prev => ({
-      ...prev,
-      [slotNumber]: 'saving'
-    }));
-    
-    // Создаем новый таймер автосохранения
-    const timer = setTimeout(() => {
-      updateClassTimeSlotMutation.mutate({
-        slotNumber,
-        startTime: data.startTime,
-        endTime: data.endTime
-      });
-    }, AUTO_SAVE_DELAY);
-    
-    // Сохраняем ссылку на таймер
-    setAutoSaveTimers(prev => ({
-      ...prev,
-      [slotNumber]: timer
-    }));
-  };
-
-  // Обработчик сброса настроек слота к значениям по умолчанию
-  const handleResetSlot = (slotNumber: number) => {
-    if (confirm('Вы уверены, что хотите сбросить настройки данного временного слота к значениям по умолчанию?')) {
-      deleteClassTimeSlotMutation.mutate(slotNumber);
-    }
-  };
-
-  // Обработчик изменения значений времени
-  const handleTimeChange = (slotNumber: number, field: 'startTime' | 'endTime', value: string) => {
-    setSlotData(prev => ({
-      ...prev,
-      [slotNumber]: {
-        ...prev[slotNumber],
-        [field]: value
-      }
-    }));
-    
-    // Запускаем автосохранение при изменении
-    autoSaveSlot(slotNumber);
-  };
-
-  // Очищаем таймеры автосохранения при размонтировании компонента
-  useEffect(() => {
-    return () => {
-      Object.values(autoSaveTimers).forEach(timer => clearTimeout(timer));
-    };
-  }, [autoSaveTimers]);
-
-  // Если данные загружаются, показываем индикатор загрузки
-  if (defaultSlotsLoading || classTimeSlotsLoading) {
-    return (
-      <div className="flex justify-center items-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-        <span>Загрузка временных слотов...</span>
-      </div>
-    );
-  }
-
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle>Настройка временных слотов уроков</CardTitle>
+        <CardTitle>Настройка временных слотов</CardTitle>
         <CardDescription>
-          Настройте время начала и окончания каждого урока для данного класса. 
-          Изменения сохраняются автоматически. Если не указано отдельное время для класса, 
-          будут использованы значения по умолчанию.
+          Настройте время начала и окончания уроков для этого класса.
+          Вы можете изменить стандартные временные интервалы для каждого урока.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableCaption>Временные слоты уроков</TableCaption>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[100px]">Урок</TableHead>
-              <TableHead>Время начала</TableHead>
-              <TableHead>Время окончания</TableHead>
-              <TableHead>Статус</TableHead>
-              <TableHead className="text-right">Действия</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {defaultSlots.sort((a, b) => a.slotNumber - b.slotNumber).map((defaultSlot) => {
-              const slotNumber = defaultSlot.slotNumber;
-              const classSlot = classTimeSlots.find(s => s.slotNumber === slotNumber);
-              const effectiveSlot = classSlot || defaultSlot;
-              const isCustomized = !!classSlot;
-              const isEditing = editingSlots[slotNumber];
-              const status = saveStatus[slotNumber];
-
-              return (
-                <TableRow key={slotNumber}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-1 text-muted-foreground" />
-                      {slotNumber}-й урок
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {isEditing ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="time"
-                          value={slotData[slotNumber]?.startTime || formatTime(effectiveSlot.startTime)}
-                          onChange={(e) => handleTimeChange(slotNumber, 'startTime', e.target.value)}
-                          className="w-32"
-                        />
-                        {status === 'saving' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                        {status === 'saved' && <Check className="h-3 w-3 text-green-500" />}
-                      </div>
-                    ) : (
-                      formatTime(effectiveSlot.startTime)
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {isEditing ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="time"
-                          value={slotData[slotNumber]?.endTime || formatTime(effectiveSlot.endTime)}
-                          onChange={(e) => handleTimeChange(slotNumber, 'endTime', e.target.value)}
-                          className="w-32"
-                        />
-                        {status === 'saving' && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
-                        {status === 'saved' && <Check className="h-3 w-3 text-green-500" />}
-                      </div>
-                    ) : (
-                      formatTime(effectiveSlot.endTime)
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {isCustomized ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        Настроено
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">
-                        По умолчанию
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end space-x-1">
-                      {!isEditing ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditSlot(slotNumber)}
-                        >
-                          Изменить
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditingSlots(prev => ({ ...prev, [slotNumber]: false }))}
-                        >
-                          Готово
-                        </Button>
-                      )}
-                      {isCustomized && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleResetSlot(slotNumber)}
-                          disabled={deleteClassTimeSlotMutation.isPending}
-                        >
-                          {deleteClassTimeSlotMutation.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4" />
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
+        {isLoadingClassSlots ? (
+          <div className="flex justify-center my-4">Загрузка...</div>
+        ) : (
+          <>
+            <Table>
+              <TableCaption>Временные слоты для уроков</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Номер урока</TableHead>
+                  <TableHead>Время начала</TableHead>
+                  <TableHead>Время окончания</TableHead>
+                  <TableHead>Тип настройки</TableHead>
+                  <TableHead>Действия</TableHead>
                 </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+              </TableHeader>
+              <TableBody>
+                {defaultSlots.map((defaultSlot) => {
+                  const effectiveSlot = getEffectiveSlot(defaultSlot.slotNumber);
+                  const isCustomized = classTimeSlots.some(slot => slot.slotNumber === defaultSlot.slotNumber);
+                  
+                  return (
+                    <TableRow key={defaultSlot.slotNumber}>
+                      <TableCell className="font-medium">{defaultSlot.slotNumber} урок</TableCell>
+                      <TableCell>{effectiveSlot?.startTime || defaultSlot.startTime}</TableCell>
+                      <TableCell>{effectiveSlot?.endTime || defaultSlot.endTime}</TableCell>
+                      <TableCell>
+                        {isCustomized ? (
+                          <span className="text-primary font-medium">Индивидуальный</span>
+                        ) : (
+                          <span className="text-muted-foreground">По умолчанию</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isCustomized ? (
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                const classSlot = classTimeSlots.find(slot => slot.slotNumber === defaultSlot.slotNumber);
+                                if (classSlot) openEditDialog(classSlot);
+                              }}
+                            >
+                              Изменить
+                            </Button>
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => {
+                                const classSlot = classTimeSlots.find(slot => slot.slotNumber === defaultSlot.slotNumber);
+                                if (classSlot) deleteMutation.mutate(classSlot.id);
+                              }}
+                            >
+                              Сбросить
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => openCreateDialog(defaultSlot.slotNumber)}
+                          >
+                            Настроить
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </>
+        )}
       </CardContent>
+      <CardFooter className="flex justify-between">
+        <Button variant="outline" onClick={() => resetAllMutation.mutate()}>
+          Сбросить все настройки
+        </Button>
+      </CardFooter>
+
+      {/* Диалог для редактирования слота */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingSlotId ? 'Изменение временного слота' : 'Создание временного слота'}
+            </DialogTitle>
+            <DialogDescription>
+              Укажите время начала и окончания урока.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="slotNumber" className="text-right">
+                  Номер урока
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="slotNumber"
+                    value={formData.slotNumber}
+                    onChange={(e) => setFormData({...formData, slotNumber: parseInt(e.target.value) || 0})}
+                    disabled
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="startTime" className="text-right">
+                  Время начала
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="startTime"
+                    type="time"
+                    value={formData.startTime}
+                    onChange={(e) => setFormData({...formData, startTime: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="endTime" className="text-right">
+                  Время окончания
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="endTime"
+                    type="time"
+                    value={formData.endTime}
+                    onChange={(e) => setFormData({...formData, endTime: e.target.value})}
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Отмена
+              </Button>
+              <Button type="submit">Сохранить</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
-}
+};
