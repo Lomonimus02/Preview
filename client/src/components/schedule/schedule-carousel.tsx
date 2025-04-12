@@ -27,7 +27,8 @@ interface ScheduleCarouselProps {
   subgroups?: any[]; // Добавляем подгруппы
   showClassNames?: boolean; // Флаг для отображения имен классов (для общего расписания)
   onAddSchedule?: (date: Date) => void;
-  onDeleteSchedule?: (scheduleId: number) => void;
+  onEditSchedule?: (schedule: Schedule) => void;
+  onDeleteSchedule?: (schedule: Schedule) => void;
 }
 
 export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
@@ -42,6 +43,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   subgroups = [],
   showClassNames = false,
   onAddSchedule,
+  onEditSchedule,
   onDeleteSchedule
 }) => {
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
@@ -157,6 +159,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
                 subgroups={subgroups}
                 showClassNames={showClassNames}
                 onAddSchedule={onAddSchedule}
+                onEditSchedule={onEditSchedule}
                 onDeleteSchedule={onDeleteSchedule}
               />
             </div>

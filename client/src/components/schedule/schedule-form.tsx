@@ -306,7 +306,7 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Весь класс</SelectItem>
+                          <SelectItem value="0">Весь класс</SelectItem>
                           {subgroups.map((subgroup) => (
                             <SelectItem key={subgroup.id} value={subgroup.id.toString()}>
                               {subgroup.name}
