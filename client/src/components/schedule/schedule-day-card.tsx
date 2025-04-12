@@ -127,12 +127,17 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     
     // Запрашиваем информацию о подгруппах с сервера, если есть ID подгруппы
     if (schedule.subgroupId) {
-      // Ищем информацию о подгруппе в кэше (у нас его пока нет, но можно добавить)
-      // Пока используем временное решение с загрузкой через GET-запрос
-      const subgroup = schedule.subgroups?.find((s: any) => s.id === schedule.subgroupId);
-      if (subgroup?.name) {
-        return subgroup.name; // Возвращаем полное название подгруппы
+      // Проверяем, есть ли массив подгрупп в расписании
+      if (schedule.subgroups && Array.isArray(schedule.subgroups)) {
+        // Ищем информацию о подгруппе в массиве подгрупп
+        const subgroup = schedule.subgroups.find((s: any) => s.id === schedule.subgroupId);
+        if (subgroup?.name) {
+          return subgroup.name; // Возвращаем полное название подгруппы
+        }
       }
+      
+      // Если подгруппа не найдена или нет массива подгрупп, отображаем ID подгруппы
+      return `Подгруппа ${schedule.subgroupId}`;
     }
     
     // В остальных случаях показываем название предмета
@@ -224,7 +229,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
       </Card>
       
       {/* Диалог редактирования расписания */}
-      {isEditDialogOpen && selectedDate && (
+      {isEditDialogOpen && selectedDate && schedule.classId && (
         <AddScheduleDialog
           isOpen={isEditDialogOpen}
           onClose={() => setIsEditDialogOpen(false)}
