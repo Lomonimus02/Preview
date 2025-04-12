@@ -111,6 +111,12 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
 }) => {
   // Функция для получения названия подгруппы
   const getSubgroupName = () => {
+    // Проверяем, есть ли уже готовое название подгруппы в объекте расписания
+    if ((schedule as any).subgroupName) {
+      return (schedule as any).subgroupName;
+    }
+    
+    // Если нет готового имени, ищем в массиве подгрупп
     if (schedule.subgroupId) {
       const subgroup = subgroups.find(sg => sg.id === schedule.subgroupId);
       if (subgroup) {
