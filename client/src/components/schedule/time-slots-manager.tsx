@@ -117,8 +117,8 @@ export const TimeSlotsManager: React.FC<TimeSlotsManagerProps> = ({ classId }) =
   // Сброс всех настроек временных слотов для класса
   const resetAllMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest<void>(`/api/class/${classId}/time-slots`, {
-        method: 'DELETE',
+      return apiRequest<void>(`/api/class/${classId}/time-slots/reset`, {
+        method: 'POST',
         body: {}
       });
     },
