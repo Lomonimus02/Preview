@@ -426,25 +426,18 @@ export default function StudentGrades() {
       return !g.subgroupId;
     });
     
-    // Избегаем дублирования оценок с одинаковыми scheduleId на разных уроках
-    // Группируем оценки по дням и оставляем только уникальные scheduleId
-    const uniqueGrades: Grade[] = [];
-    const processedSchedules = new Set<number>();
+    // Оценки должны быть привязаны к конкретным урокам через scheduleId
+    // Без этой привязки они могут дублироваться во всех уроках одного предмета
     
-    subjectGrades.forEach(grade => {
-      // Если у оценки есть scheduleId и мы его еще не обрабатывали
-      if (grade.scheduleId && !processedSchedules.has(grade.scheduleId)) {
-        processedSchedules.add(grade.scheduleId);
-        uniqueGrades.push(grade);
-      } 
-      // Если у оценки нет scheduleId (и это редкий случай), добавляем её как есть
-      else if (!grade.scheduleId) {
-        uniqueGrades.push(grade);
-      }
+    // Фильтруем оценки, оставляя только те, что привязаны к конкретным урокам
+    const uniqueGrades = subjectGrades.filter(grade => {
+      // Всегда используем оценки, которые имеют привязку к конкретному уроку
+      return grade.scheduleId !== null && grade.scheduleId !== undefined;
     });
     
-    // Используем уникальные оценки для расчёта
-    subjectGrades = uniqueGrades;
+    // Используем уникальные оценки для расчёта.
+    // Если нет привязанных к урокам оценок, используем все оценки (обратная совместимость)
+    subjectGrades = uniqueGrades.length > 0 ? uniqueGrades : subjectGrades;
     
     if (subjectGrades.length === 0) return "-";
     
