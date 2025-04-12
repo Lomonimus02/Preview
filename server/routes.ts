@@ -3279,6 +3279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Сброс всех настроек временных слотов для класса
+  // Старый метод DELETE - оставлен для обратной совместимости
   app.delete("/api/class/:classId/time-slots", isAuthenticated, hasRole([UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
     try {
       const classId = parseInt(req.params.classId);
@@ -3287,6 +3288,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting all class time slots:", error);
       res.status(500).json({ message: "Failed to delete all class time slots" });
+    }
+  });
+
+  // Новый метод POST для сброса временных слотов класса
+  app.post("/api/class/:classId/time-slots/reset", isAuthenticated, hasRole([UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      const classId = parseInt(req.params.classId);
+      await dataStorage.deleteClassTimeSlots(classId);
+      res.json({ message: "All class time slots reset successfully" });
+    } catch (error) {
+      console.error("Error resetting all class time slots:", error);
+      res.status(500).json({ message: "Failed to reset all class time slots" });
     }
   });
 
