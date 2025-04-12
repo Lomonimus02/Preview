@@ -400,8 +400,18 @@ export default function StudentGrades() {
     setCurrentMonth(prevMonth => addMonths(prevMonth, 1));
   };
   
-  // Получение названия предмета
-  const getSubjectName = (subjectId: number) => {
+  // Получение названия предмета или подгруппы
+  const getSubjectName = (subjectId: number, gradeSubgroupId?: number | null) => {
+    // Если указана подгруппа, отображаем её название
+    if (gradeSubgroupId) {
+      const subgroup = studentSubgroups.find(sg => sg.id === gradeSubgroupId);
+      if (subgroup) {
+        const subject = subjects.find(s => s.id === subjectId);
+        return `${subject?.name || `Предмет ${subjectId}`} (${subgroup.name})`;
+      }
+    }
+    
+    // Если подгруппа не указана, отображаем название предмета
     const subject = subjects.find(s => s.id === subjectId);
     return subject ? subject.name : `Предмет ${subjectId}`;
   };
