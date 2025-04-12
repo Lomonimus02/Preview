@@ -582,70 +582,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users", isAuthenticated, async (req, res) => {
     try {
       const activeRole = req.user?.activeRole || req.user?.role;
+      const requestedRole = req.query.role as string | undefined;
+
       console.log("Получение списка пользователей:");
       console.log("Роль пользователя:", activeRole);
       console.log("ID школы пользователя:", req.user?.schoolId);
+      console.log("Запрошенная роль:", requestedRole);
       
       // Проверяем роль пользователя
       if (!activeRole) {
         return res.status(403).json({ message: "Доступ запрещен - отсутствует роль пользователя" });
       }
       
-      // Пользователь имеет роль SUPER_ADMIN среди своих ролей?
-      const userRoles = await dataStorage.getUserRoles(req.user.id);
-      const isSuperAdmin = userRoles.some(role => role.role === UserRoleEnum.SUPER_ADMIN) || 
-                          activeRole === UserRoleEnum.SUPER_ADMIN;
-      
-      // Супер-админ получает всех пользователей
-      if (isSuperAdmin) {
-        console.log("Получение всех пользователей для SUPER_ADMIN");
-        const users = await dataStorage.getUsers();
-        return res.json(users);
-      } 
-      // Школьный администратор получает пользователей своей школы
-      else if (activeRole === UserRoleEnum.SCHOOL_ADMIN) {
-        // Получаем ID школы из профиля пользователя или из роли
+      // Если запрошена конкретная роль (например, учителя)
+      if (requestedRole) {
+        // Пользователь имеет роль SUPER_ADMIN или SCHOOL_ADMIN среди своих ролей
         const userRoles = await dataStorage.getUserRoles(req.user.id);
-        const schoolAdminRole = userRoles.find(role => 
-          role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
-        );
+        const isSuperAdmin = userRoles.some(role => role.role === UserRoleEnum.SUPER_ADMIN) || 
+                             activeRole === UserRoleEnum.SUPER_ADMIN;
+        const isSchoolAdmin = userRoles.some(role => role.role === UserRoleEnum.SCHOOL_ADMIN) ||
+                             activeRole === UserRoleEnum.SCHOOL_ADMIN;
         
-        // Используем ID школы из профиля пользователя или из роли
-        let schoolId = req.user.schoolId || (schoolAdminRole ? schoolAdminRole.schoolId : null);
-        
-        // Логирование для отладки
-        console.log("Проверка роли администратора школы...");
-        console.log("schoolId из профиля:", req.user.schoolId);
-        console.log("schoolId из роли:", schoolAdminRole?.schoolId);
-        console.log("Используемый schoolId:", schoolId);
-        
-        // Если школа не найдена даже в роли, ищем любую доступную
-        if (!schoolId) {
-          console.log("Не найден ID школы для администратора");
+        if (isSuperAdmin) {
+          // Супер-админ получает всех пользователей с запрошенной ролью из всех школ
+          console.log(`Получение всех пользователей с ролью ${requestedRole} для SUPER_ADMIN`);
+          const allUsers = await dataStorage.getUsers();
+          const filteredUsers = allUsers.filter(user => user.role === requestedRole);
+          return res.json(filteredUsers);
+        } 
+        else if (isSchoolAdmin) {
+          // Школьный администратор получает пользователей своей школы с запрошенной ролью
+          // Получаем ID школы 
+          const schoolAdminRole = userRoles.find(role => 
+            role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
+          );
           
-          // Пробуем найти первую школу
-          const schools = await dataStorage.getSchools();
-          console.log("Доступные школы:", schools.map(s => `${s.id}: ${s.name}`).join(", "));
+          let schoolId = req.user.schoolId || (schoolAdminRole ? schoolAdminRole.schoolId : null);
           
-          if (schools.length > 0) {
-            schoolId = schools[0].id;
-            console.log("Использование первой доступной школы:", schools[0].id, schools[0].name);
+          if (!schoolId) {
+            // Пробуем найти первую школу
+            const schools = await dataStorage.getSchools();
+            
+            if (schools.length > 0) {
+              schoolId = schools[0].id;
+              console.log("Использование первой доступной школы:", schools[0].id);
+            }
+          }
+          
+          if (schoolId) {
+            console.log(`Получение пользователей с ролью ${requestedRole} школы для SCHOOL_ADMIN, ID школы:`, schoolId);
+            const schoolUsers = await dataStorage.getUsersBySchool(schoolId);
+            const filteredUsers = schoolUsers.filter(user => user.role === requestedRole);
+            console.log(`Найдено пользователей с ролью ${requestedRole}:`, filteredUsers.length);
+            return res.json(filteredUsers);
+          } else {
+            return res.status(400).json({ message: "Не найдена школа администратора" });
           }
         }
-        
-        // Если нашли ID школы, получаем пользователей
-        if (schoolId) {
-          console.log("Получение пользователей школы для SCHOOL_ADMIN, ID школы:", schoolId);
-          const users = await dataStorage.getUsersBySchool(schoolId);
-          console.log("Найдено пользователей:", users.length);
-          return res.json(users);
-        } else {
-          return res.status(400).json({ message: "Не найдена школа администратора" });
+        else {
+          return res.status(403).json({ message: "Недостаточно прав для просмотра списка пользователей" });
         }
-      } 
-      // Для других ролей (учитель, ученик) не разрешаем доступ к полному списку пользователей
+      }
       else {
-        return res.status(403).json({ message: "Недостаточно прав для просмотра списка пользователей" });
+        // Стандартное поведение без фильтрации по роли
+        // Пользователь имеет роль SUPER_ADMIN среди своих ролей?
+        const userRoles = await dataStorage.getUserRoles(req.user.id);
+        const isSuperAdmin = userRoles.some(role => role.role === UserRoleEnum.SUPER_ADMIN) || 
+                            activeRole === UserRoleEnum.SUPER_ADMIN;
+        
+        // Супер-админ получает всех пользователей
+        if (isSuperAdmin) {
+          console.log("Получение всех пользователей для SUPER_ADMIN");
+          const users = await dataStorage.getUsers();
+          return res.json(users);
+        } 
+        // Школьный администратор получает пользователей своей школы
+        else if (activeRole === UserRoleEnum.SCHOOL_ADMIN) {
+          // Получаем ID школы из профиля пользователя или из роли
+          const userRoles = await dataStorage.getUserRoles(req.user.id);
+          const schoolAdminRole = userRoles.find(role => 
+            role.role === UserRoleEnum.SCHOOL_ADMIN && role.schoolId
+          );
+          
+          // Используем ID школы из профиля пользователя или из роли
+          let schoolId = req.user.schoolId || (schoolAdminRole ? schoolAdminRole.schoolId : null);
+          
+          // Логирование для отладки
+          console.log("Проверка роли администратора школы...");
+          console.log("schoolId из профиля:", req.user.schoolId);
+          console.log("schoolId из роли:", schoolAdminRole?.schoolId);
+          console.log("Используемый schoolId:", schoolId);
+          
+          // Если школа не найдена даже в роли, ищем любую доступную
+          if (!schoolId) {
+            console.log("Не найден ID школы для администратора");
+            
+            // Пробуем найти первую школу
+            const schools = await dataStorage.getSchools();
+            console.log("Доступные школы:", schools.map(s => `${s.id}: ${s.name}`).join(", "));
+            
+            if (schools.length > 0) {
+              schoolId = schools[0].id;
+              console.log("Использование первой доступной школы:", schools[0].id, schools[0].name);
+            }
+          }
+          
+          // Если нашли ID школы, получаем пользователей
+          if (schoolId) {
+            console.log("Получение пользователей школы для SCHOOL_ADMIN, ID школы:", schoolId);
+            const users = await dataStorage.getUsersBySchool(schoolId);
+            console.log("Найдено пользователей:", users.length);
+            return res.json(users);
+          } else {
+            return res.status(400).json({ message: "Не найдена школа администратора" });
+          }
+        } 
+        // Для других ролей (учитель, ученик) не разрешаем доступ к полному списку пользователей
+        else {
+          return res.status(403).json({ message: "Недостаточно прав для просмотра списка пользователей" });
+        }
       }
     } catch (error) {
       console.error("Ошибка при получении пользователей:", error);
