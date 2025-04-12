@@ -837,8 +837,8 @@ export default function StudentGrades() {
                               {renderGradeCell(subject, day)}
                             </TableCell>
                           ))}
-                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(subjectAverages[subject.customId || subject.id]?.percentage || "-")}`}>
-                            {subjectAverages[subject.customId || subject.id]?.percentage || "-"}
+                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(subjectAverages[String(subject.id)]?.percentage || "-")}`}>
+                            {subjectAverages[String(subject.id)]?.percentage || "-"}
                           </TableCell>
                         </TableRow>
                       ))}
