@@ -298,9 +298,27 @@ export default function StudentGrades() {
       subgroupId = subject.subgroupId || null;
     }
     
-    // Получаем все оценки для указанного предмета и даты
+    // Вначале найдем расписание на эту дату для данного предмета (и, возможно, подгруппы)
+    // Это нужно, чтобы привязать оценки только к конкретным урокам
+    const scheduleForDate = (() => {
+      const scheduleDate = date.toISOString().split('T')[0];
+      
+      return assignments
+        .filter(a => {
+          const schedule = a.scheduleDate ? new Date(a.scheduleDate) : null;
+          if (!schedule) return false;
+          
+          const scheduleStr = schedule.toISOString().split('T')[0];
+          return scheduleStr === scheduleDate && 
+                 a.subjectId === subjectId && 
+                 (subgroupId === null || a.subgroupId === subgroupId);
+        })
+        .map(a => a.scheduleId);
+    })();
+    
+    // Получаем оценки для указанного предмета и даты, с учетом расписания
     const cellGrades = grades.filter(grade => {
-      // Проверяем предмет и дату
+      // Проверяем предмет
       if (grade.subjectId !== subjectId) return false;
       
       // Проверяем соответствие дате
@@ -309,12 +327,18 @@ export default function StudentGrades() {
       if (gradeStr !== dateStr) return false;
       
       // Проверяем подгруппу (если указана)
-      if (subgroupId !== null) {
-        return grade.subgroupId === subgroupId;
+      if (subgroupId !== null && grade.subgroupId !== subgroupId) {
+        return false;
+      } else if (subgroupId === null && grade.subgroupId) {
+        return false;
       }
       
-      // Если подгруппа не указана в ключе, включаем только оценки без подгрупп
-      return !grade.subgroupId;
+      // Если найдены расписания на эту дату, показываем только оценки с соответствующим scheduleId
+      if (scheduleForDate.length > 0 && grade.scheduleId) {
+        return scheduleForDate.includes(grade.scheduleId);
+      }
+      
+      return true; // Показываем оценки без привязки к расписанию, если расписание не найдено
     });
     
     if (cellGrades.length === 0) {
@@ -377,7 +401,7 @@ export default function StudentGrades() {
       : [subject.id, subject.subgroupId];
     
     // Фильтруем оценки по предмету и подгруппе (если указана)
-    const subjectGrades = grades.filter(g => {
+    let subjectGrades = grades.filter(g => {
       if (g.subjectId !== subjectId) return false;
       
       // Если указана подгруппа, проверяем соответствие
@@ -388,6 +412,26 @@ export default function StudentGrades() {
       // Если подгруппа не указана в ключе, включаем только оценки без подгрупп
       return !g.subgroupId;
     });
+    
+    // Избегаем дублирования оценок с одинаковыми scheduleId на разных уроках
+    // Группируем оценки по дням и оставляем только уникальные scheduleId
+    const uniqueGrades: Grade[] = [];
+    const processedSchedules = new Set<number>();
+    
+    subjectGrades.forEach(grade => {
+      // Если у оценки есть scheduleId и мы его еще не обрабатывали
+      if (grade.scheduleId && !processedSchedules.has(grade.scheduleId)) {
+        processedSchedules.add(grade.scheduleId);
+        uniqueGrades.push(grade);
+      } 
+      // Если у оценки нет scheduleId (и это редкий случай), добавляем её как есть
+      else if (!grade.scheduleId) {
+        uniqueGrades.push(grade);
+      }
+    });
+    
+    // Используем уникальные оценки для расчёта
+    subjectGrades = uniqueGrades;
     
     if (subjectGrades.length === 0) return "-";
     
