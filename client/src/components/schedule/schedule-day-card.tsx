@@ -88,6 +88,9 @@ interface ScheduleItemProps {
   grades?: Grade[];
   homework?: Homework | undefined;
   isCompleted?: boolean;
+  subgroups?: any[]; // Добавляем список подгрупп
+  className?: string; // Добавляем имя класса для отображения в общем расписании
+  showClass?: boolean; // Флаг для отображения класса (только в общем расписании)
   onClick: (e?: React.MouseEvent, actionType?: string, assignment?: Assignment) => void;
 }
 
@@ -99,8 +102,23 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
   grades = [],
   homework,
   isCompleted = false,
+  subgroups = [],
+  className,
+  showClass = false,
   onClick,
 }) => {
+  // Функция для получения названия подгруппы
+  const getSubgroupName = () => {
+    if (schedule.subgroupId) {
+      const subgroup = subgroups.find(sg => sg.id === schedule.subgroupId);
+      if (subgroup) {
+        // Формируем полное название: "Предмет (профиль/подгруппа)"
+        return `${subject?.name || ''} (${subgroup.name})`;
+      }
+    }
+    return "Подгруппа";
+  };
+
   return (
     <div 
       className={`
@@ -117,9 +135,15 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           {schedule.startTime} - {schedule.endTime}
           <span className="ml-3 text-emerald-900">
             {schedule.subgroupId
-              ? (schedule.subgroupName || "Подгруппа") // Показываем название подгруппы вместо предмета
+              ? getSubgroupName() // Используем функцию для получения полного названия подгруппы
               : subject?.name || "Предмет"}
           </span>
+          {/* Отображаем класс для общего расписания */}
+          {showClass && className && (
+            <span className="ml-2 text-sm text-gray-600">
+              [{className}]
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Кнопка для создания задания (Отображается только для учетелей и если урок проведен) */}
