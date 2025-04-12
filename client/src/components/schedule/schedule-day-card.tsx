@@ -249,6 +249,7 @@ interface ScheduleDayCardProps {
   homework?: Homework[];
   currentUser?: User | null;
   isAdmin?: boolean;
+  canView?: boolean; // Флаг для разрешения просмотра (для директора)
   subgroups?: any[]; // Добавляем список подгрупп
   showClassNames?: boolean; // Флаг для отображения имен классов (для общего расписания)
   onAddSchedule?: (date: Date, scheduleToEdit?: Schedule) => void;
@@ -267,6 +268,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   homework = [],
   currentUser = null,
   isAdmin = false,
+  canView = false,
   subgroups = [],
   showClassNames = false,
   onAddSchedule,

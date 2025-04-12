@@ -24,6 +24,7 @@ interface ScheduleCarouselProps {
   homework?: Homework[];
   currentUser?: User | null;
   isAdmin?: boolean;
+  canView?: boolean; // Флаг для разрешения просмотра (для директора)
   subgroups?: any[]; // Добавляем подгруппы
   showClassNames?: boolean; // Флаг для отображения имен классов (для общего расписания)
   onAddSchedule?: (date: Date) => void;
@@ -40,6 +41,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   homework = [],
   currentUser = null,
   isAdmin = false,
+  canView = false,
   subgroups = [],
   showClassNames = false,
   onAddSchedule,
@@ -156,6 +158,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
                 homework={homework}
                 currentUser={currentUser}
                 isAdmin={isAdmin}
+                canView={canView}
                 subgroups={subgroups}
                 showClassNames={showClassNames}
                 onAddSchedule={onAddSchedule}
