@@ -65,6 +65,9 @@ const gradeFormSchema = insertGradeSchema.extend({
 
 type GradeFormValues = z.infer<typeof gradeFormSchema>;
 
+// Импортируем компонент для отображения оценок студента
+import StudentGrades from "./student-grades";
+
 export default function Grades() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -73,14 +76,16 @@ export default function Grades() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   
+  // Для студентов используем отдельный компонент с табличным интерфейсом оценок
+  if (user?.role === UserRoleEnum.STUDENT) {
+    return <StudentGrades />;
+  }
+  
   // Determine if the user can add grades (only teachers can)
   const canAddGrades = user?.role === UserRoleEnum.TEACHER;
   
-  // For students and parents, we only show their own grades or their children's grades
+  // For parents, we only show their children's grades
   let apiParams = "";
-  if (user?.role === UserRoleEnum.STUDENT) {
-    apiParams = `?studentId=${user.id}`;
-  }
   
   // Fetch grades
   const { data: grades = [], isLoading } = useQuery<Grade[]>({
