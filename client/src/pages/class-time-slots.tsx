@@ -90,7 +90,7 @@ const ClassTimeSlotsPage: React.FC = () => {
   // Мутация для удаления временного слота
   const deleteMutation = useMutation({
     mutationFn: async (slotId: number) => {
-      return apiRequest(`/api/class/${classId}/time-slots/${slotId}`, 'DELETE');
+      return apiRequest(`/api/class-time-slots/${slotId}`, 'DELETE');
     },
     onSuccess: () => {
       // Инвалидируем запросы к временным слотам (для обновления текущей страницы)
