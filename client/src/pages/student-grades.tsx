@@ -650,8 +650,8 @@ export default function StudentGrades() {
                         ))}
                         <TableHead className="text-center bg-gray-50 min-w-[80px] sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]">
                           <div className="flex items-center justify-center">
-                            <Calculator className="h-4 w-4 mr-1 text-gray-500" />
-                            <span>Ср. балл</span>
+                            <Percent className="h-4 w-4 mr-1 text-gray-500" />
+                            <span>Ср. процент</span>
                           </div>
                         </TableHead>
                       </TableRow>
