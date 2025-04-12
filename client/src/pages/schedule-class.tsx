@@ -5,7 +5,7 @@ import { Schedule, Class, Subject, User } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarIcon, ChevronLeft, ChevronRight, PlusCircle } from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScheduleDayCard } from "@/components/schedule/schedule-day-card";
 import { MainLayout } from "@/components/layout/main-layout";
@@ -160,24 +160,21 @@ export default function ClassSchedulePage() {
             <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
               {scheduleByDay.map((day) => (
                 <Card key={day.formattedDate} className="overflow-hidden">
-                  <CardHeader className="pb-2 pt-4 bg-muted">
-                    <CardTitle className="flex justify-between items-center text-base">
-                      <div className="text-center w-full">
-                        <div className="font-medium">{day.dayName}</div>
-                        <div className="text-sm text-muted-foreground mt-1">{day.formattedDate}</div>
-                      </div>
-                      
-                      {isSchoolAdmin() && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-7 w-7 absolute right-4 top-4"
-                          onClick={() => handleAddSchedule(day.date)}
-                        >
-                          <PlusCircle className="h-5 w-5" />
-                        </Button>
-                      )}
+                  <CardHeader className="pb-2 pt-4 bg-muted flex flex-row justify-between items-center">
+                    <CardTitle className="text-center text-base">
+                      <div className="font-medium">{day.dayName}</div>
+                      <div className="text-sm text-muted-foreground mt-1">{day.formattedDate}</div>
                     </CardTitle>
+                    {isSchoolAdmin() && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="px-1.5 h-7"
+                        onClick={() => handleAddSchedule(day.date)}
+                      >
+                        <CalendarIcon className="h-4 w-4" />
+                      </Button>
+                    )}
                   </CardHeader>
                   <CardContent className="p-3">
                     {day.schedules.length === 0 ? (

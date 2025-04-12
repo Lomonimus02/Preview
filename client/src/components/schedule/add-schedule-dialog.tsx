@@ -202,19 +202,8 @@ export function AddScheduleDialog({
       <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle className="flex justify-between items-center">
-              <span>{schedule ? "Редактирование" : "Добавление"} урока</span>
-              {schedule && (
-                <Button 
-                  variant="destructive" 
-                  size="icon" 
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                  disabled={isSubmitting}
-                  className="h-8 w-8"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
+            <DialogTitle>
+              {schedule ? "Редактирование" : "Добавление"} урока
             </DialogTitle>
           </DialogHeader>
           
@@ -396,25 +385,45 @@ export function AddScheduleDialog({
                 />
               )}
               
-              <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={onClose}
-                  disabled={isSubmitting}
-                >
-                  Отмена
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Сохранение...
-                    </>
-                  ) : (
-                    "Сохранить"
+              <DialogFooter className="flex justify-between w-full">
+                {/* Кнопка удаления слева */}
+                <div>
+                  {schedule && (
+                    <Button 
+                      variant="destructive"
+
+                      size="sm"
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                      disabled={isSubmitting}
+                      className="mr-2"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Удалить
+                    </Button>
                   )}
-                </Button>
+                </div>
+                
+                {/* Кнопки отмены и сохранения справа */}
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={onClose}
+                    disabled={isSubmitting}
+                  >
+                    Отмена
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Сохранение...
+                      </>
+                    ) : (
+                      "Сохранить"
+                    )}
+                  </Button>
+                </div>
               </DialogFooter>
             </form>
           </Form>

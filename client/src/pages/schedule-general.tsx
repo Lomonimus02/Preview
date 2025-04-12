@@ -220,7 +220,7 @@ export default function GeneralSchedulePage() {
                       className="px-1.5 h-7"
                       onClick={() => handleAddSchedule(day.date)}
                     >
-                      <Plus className="h-4 w-4" />
+                      <CalendarIcon className="h-4 w-4" />
                     </Button>
                   </CardHeader>
                   <CardContent className="p-3">
