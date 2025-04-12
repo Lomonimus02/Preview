@@ -121,11 +121,7 @@ export default function ClassSchedulePage() {
   // Мутация для создания расписания
   const createScheduleMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest({
-        url: '/api/schedules',
-        method: 'POST',
-        data
-      });
+      return await apiRequest('/api/schedules', 'POST', data);
     },
     onSuccess: () => {
       // Инвалидируем кэш расписаний для перезагрузки данных
@@ -149,11 +145,7 @@ export default function ClassSchedulePage() {
   // Мутация для обновления расписания
   const updateScheduleMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: any }) => {
-      return await apiRequest({
-        url: `/api/schedules/${id}`,
-        method: 'PATCH',
-        data
-      });
+      return await apiRequest(`/api/schedules/${id}`, 'PATCH', data);
     },
     onSuccess: () => {
       // Инвалидируем кэш расписаний для перезагрузки данных
@@ -178,10 +170,7 @@ export default function ClassSchedulePage() {
   // Мутация для удаления расписания
   const deleteScheduleMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest({
-        url: `/api/schedules/${id}`,
-        method: 'DELETE'
-      });
+      return await apiRequest(`/api/schedules/${id}`, 'DELETE');
     },
     onSuccess: () => {
       // Инвалидируем кэш расписаний для перезагрузки данных
