@@ -66,6 +66,7 @@ interface ScheduleDayCardProps {
   isTeacher?: boolean;
   variant?: 'vertical' | 'horizontal';
   showClassInfo?: boolean;
+  classInfo?: Class;
   classes?: Class[];
   subjects?: Subject[];
   teachers?: UserType[];
@@ -76,12 +77,13 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   isTeacher = false,
   variant = 'horizontal',
   showClassInfo = false,
+  classInfo,
   classes = [],
   subjects = [],
   teachers = []
 }) => {
-  // Получаем данные о классе
-  const classInfo = classes.find(c => c.id === schedule.classId);
+  // Получаем данные о классе, если они не были переданы напрямую
+  const classData = classInfo || classes.find(c => c.id === schedule.classId);
   
   // Определяем цвет статуса урока
   const getStatusColor = () => {
@@ -131,9 +133,9 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
             <div className="text-lg font-semibold">
               {getSubjectName()}
             </div>
-            {showClassInfo && classInfo && (
+            {showClassInfo && classData && (
               <Badge variant="outline" className="mt-1 max-w-fit">
-                {classInfo.name}
+                {classData.name}
               </Badge>
             )}
           </div>

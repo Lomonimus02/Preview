@@ -157,12 +157,12 @@ export function AdminScheduleMenu() {
               {sortedClasses.map((classItem) => (
                 <Link
                   key={classItem.id}
-                  href={`/schedule-class/${classItem.id}`}
+                  href={`/schedule/class/${classItem.id}`}
                 >
                   <div
                     className={cn(
                       "group flex items-center px-3 py-1.5 text-sm font-medium rounded-md",
-                      isLinkActive(`/schedule-class/${classItem.id}`)
+                      isLinkActive(`/schedule/class/${classItem.id}`)
                         ? "bg-primary/10 text-primary"
                         : "text-gray-700 hover:bg-primary-50 hover:text-gray-900"
                     )}
