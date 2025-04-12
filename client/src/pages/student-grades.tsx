@@ -419,10 +419,13 @@ export default function StudentGrades() {
       }
       
       if (totalMaxPoints === 0) {
-        // Если нет максимального балла, просто показываем средний балл
+        // Если нет максимального балла, просто показываем средний балл в процентах от максимума (5.0)
         if (subjectGrades.length > 0) {
           const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
-          return (sum / subjectGrades.length).toFixed(1);
+          const avgGrade = sum / subjectGrades.length;
+          // Переводим в проценты от максимальной оценки (5.0)
+          const percentScore = (avgGrade / 5) * 100;
+          return `${percentScore.toFixed(1)}%`;
         }
         return "-";
       }
@@ -431,32 +434,26 @@ export default function StudentGrades() {
       const percentScore = (totalEarnedPoints / totalMaxPoints) * 100;
       return `${percentScore.toFixed(1)}%`;
     } else {
-      // Для пятибалльной системы просто рассчитываем средний балл
+      // Для пятибалльной системы рассчитываем процент от максимальной оценки (5.0)
+      if (subjectGrades.length === 0) return "-";
+      
       const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
-      return (sum / subjectGrades.length).toFixed(1);
+      const avgGrade = sum / subjectGrades.length;
+      const percentScore = (avgGrade / 5) * 100; // Считаем процент от максимальной оценки (5.0)
+      return `${percentScore.toFixed(1)}%`;
     }
   };
   
-  // Получение цвета для среднего балла
+  // Получение цвета для среднего процента
   const getAverageGradeColor = (average: string) => {
     if (average === "-") return "";
     
-    if (gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      // Для накопительной системы оцениваем процент
-      const percent = parseFloat(average.replace('%', ''));
-      
-      if (percent >= 80) return "text-green-600";
-      if (percent >= 60) return "text-yellow-600";
-      return "text-red-600";
-    } else {
-      // Для пятибалльной системы оцениваем средний балл
-      const avgGrade = parseFloat(average);
-      
-      if (avgGrade >= 4.5) return "text-green-600";
-      if (avgGrade >= 3.5) return "text-green-500";
-      if (avgGrade >= 2.5) return "text-yellow-600";
-      return "text-red-600";
-    }
+    // Теперь всегда работаем с процентами
+    const percent = parseFloat(average.replace('%', ''));
+    
+    if (percent >= 80) return "text-green-600";
+    if (percent >= 60) return "text-yellow-600";
+    return "text-red-600";
   };
   
   // Переключение на предыдущий месяц
