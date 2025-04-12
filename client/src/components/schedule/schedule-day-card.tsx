@@ -416,7 +416,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   subgroups={subgroups}
                   className={getClassName(schedule.classId)}
                   showClass={showClassNames}
-                  onClick={(e, actionType) => handleScheduleClick(schedule, actionType)}
+                  onClick={(e, actionType, assignment) => handleScheduleClick(schedule, actionType, assignment)}
                 />
               ))}
               {isAdmin && (
