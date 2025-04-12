@@ -296,9 +296,9 @@ export function AddScheduleDialog({
                     <FormItem>
                       <FormLabel>Подгруппа (необязательно)</FormLabel>
                       <Select 
-                        onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
-                        defaultValue={field.value ? field.value.toString() : undefined}
-                        value={field.value ? field.value.toString() : undefined}
+                        onValueChange={(value) => field.onChange(value !== "0" ? parseInt(value) : null)}
+                        defaultValue={field.value ? field.value.toString() : "0"}
+                        value={field.value ? field.value.toString() : "0"}
                       >
                         <FormControl>
                           <SelectTrigger>
@@ -306,7 +306,7 @@ export function AddScheduleDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Без подгруппы</SelectItem>
+                          <SelectItem value="0">Без подгруппы</SelectItem>
                           {subgroups.map((subgroup) => (
                             <SelectItem key={subgroup.id} value={subgroup.id.toString()}>
                               {subgroup.name}

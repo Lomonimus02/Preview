@@ -6,17 +6,21 @@ import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScheduleDayCard } from "@/components/schedule/schedule-day-card";
 import { MainLayout } from "@/components/layout/main-layout";
 import { formatDate, getDayOfWeekName } from "@/lib/date-utils";
 import { Spinner } from "@/components/ui/spinner";
+import { AddScheduleDialog } from "@/components/schedule/add-schedule-dialog";
 
 export default function GeneralSchedulePage() {
   const { user } = useAuth();
   const { isSchoolAdmin } = useRoleCheck();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedClass, setSelectedClass] = useState<number | null>(null);
+  const [isAddScheduleDialogOpen, setIsAddScheduleDialogOpen] = useState(false);
   
   // Устанавливаем начало недели на понедельник
   useEffect(() => {
@@ -89,6 +93,30 @@ export default function GeneralSchedulePage() {
     queryKey: ["/api/classes"],
     enabled: isSchoolAdmin() && !!schoolId
   });
+  
+  // Загружаем учителей
+  const { data: teachers = [], isLoading: teachersLoading } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+    enabled: isSchoolAdmin() && !!schoolId
+  });
+  
+  // Загружаем предметы
+  const { data: subjects = [], isLoading: subjectsLoading } = useQuery<Subject[]>({
+    queryKey: ["/api/subjects"],
+    enabled: isSchoolAdmin() && !!schoolId
+  });
+  
+  // Обработчик открытия диалога добавления занятия
+  const handleAddSchedule = (date: Date, classId?: number) => {
+    setSelectedDate(date);
+    setSelectedClass(classId || null);
+    setIsAddScheduleDialogOpen(true);
+  };
+  
+  // Обработчик успешного добавления расписания
+  const handleScheduleSuccess = () => {
+    setIsAddScheduleDialogOpen(false);
+  };
 
   // Создаем массив дат для текущей недели
   const weekDates = Array.from({ length: 7 }, (_, i) => {
@@ -121,7 +149,7 @@ export default function GeneralSchedulePage() {
     };
   });
 
-  const isLoading = schoolsLoading || schedulesLoading || classesLoading;
+  const isLoading = schoolsLoading || schedulesLoading || classesLoading || teachersLoading || subjectsLoading;
 
   // Вспомогательная функция для получения информации о классе
   const getClassInfo = (classId: number) => {
@@ -181,11 +209,19 @@ export default function GeneralSchedulePage() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
               {scheduleByDay.map(day => (
                 <Card key={day.formattedDate} className="overflow-hidden">
-                  <CardHeader className="pb-2 pt-4 bg-muted">
+                  <CardHeader className="pb-2 pt-4 bg-muted flex flex-row justify-between items-center">
                     <CardTitle className="text-center text-base">
                       <div className="font-medium">{day.dayName}</div>
                       <div className="text-sm text-muted-foreground mt-1">{day.formattedDate}</div>
                     </CardTitle>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="px-1.5 h-7"
+                      onClick={() => handleAddSchedule(day.date)}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </CardHeader>
                   <CardContent className="p-3">
                     {day.schedules.length === 0 ? (
@@ -205,6 +241,8 @@ export default function GeneralSchedulePage() {
                               variant="vertical"
                               showClassInfo={true}
                               classInfo={classInfo}
+                              teachers={teachers}
+                              subjects={subjects}
                             />
                           );
                         })}
@@ -217,6 +255,18 @@ export default function GeneralSchedulePage() {
           )}
         </div>
       </div>
+      {/* Диалог добавления расписания */}
+      {isAddScheduleDialogOpen && selectedDate && (
+        <AddScheduleDialog
+          isOpen={isAddScheduleDialogOpen}
+          onClose={() => setIsAddScheduleDialogOpen(false)}
+          selectedDate={selectedDate}
+          classId={selectedClass || (classes.length > 0 ? classes[0].id : 0)}
+          subjects={subjects}
+          teachers={teachers}
+          onSuccess={handleScheduleSuccess}
+        />
+      )}
     </MainLayout>
   );
 }
