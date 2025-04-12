@@ -143,7 +143,14 @@ export default function StudentGrades() {
   
   // Получение заданий (для детальной информации об оценках)
   const { data: assignments = [] } = useQuery<Assignment[]>({
-    queryKey: [`/api/assignments`],
+    queryKey: ['/api/assignments', studentClass && studentClass.length > 0 ? studentClass[0].id : null],
+    queryFn: async ({ queryKey }) => {
+      const classId = queryKey[1];
+      if (!classId) return [];
+      const response = await fetch(`/api/assignments?classId=${classId}`);
+      if (!response.ok) throw new Error('Failed to fetch assignments');
+      return response.json();
+    },
     enabled: !!user && user.role === UserRoleEnum.STUDENT && studentClass && studentClass.length > 0
   });
   

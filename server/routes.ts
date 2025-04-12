@@ -2897,31 +2897,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let assignments = [];
       
+      // Проверка что параметры могут быть преобразованы в числа
+      let classIdNum = null;
+      let subjectIdNum = null;
+      let subgroupIdNum = null;
+      
+      // Безопасное преобразование строковых ID в числа
+      if (classId) {
+        const parsed = parseInt(String(classId), 10);
+        if (!isNaN(parsed)) {
+          classIdNum = parsed;
+        } else {
+          console.log(`Invalid classId: ${classId}`);
+          return res.json([]);
+        }
+      }
+      
+      if (subjectId) {
+        const parsed = parseInt(String(subjectId), 10);
+        if (!isNaN(parsed)) {
+          subjectIdNum = parsed;
+        } else {
+          console.log(`Invalid subjectId: ${subjectId}`);
+          return res.json([]);
+        }
+      }
+      
+      if (subgroupId) {
+        const parsed = parseInt(String(subgroupId), 10);
+        if (!isNaN(parsed)) {
+          subgroupIdNum = parsed;
+        } else {
+          console.log(`Invalid subgroupId: ${subgroupId}`);
+          return res.json([]);
+        }
+      }
+      
       // Если указан classId и subjectId, получаем задания для класса и предмета
-      if (classId && subjectId) {
+      if (classIdNum && subjectIdNum) {
         // Получаем задания для класса
-        const classAssignments = await dataStorage.getAssignmentsByClass(Number(classId));
+        const classAssignments = await dataStorage.getAssignmentsByClass(classIdNum);
         
         // Фильтруем по предмету
         assignments = classAssignments.filter(assignment => 
-          assignment.subjectId === Number(subjectId)
+          assignment.subjectId === subjectIdNum
         );
         
         // Если указан subgroupId, фильтруем дополнительно
-        if (subgroupId) {
+        if (subgroupIdNum) {
           assignments = assignments.filter(assignment => 
-            assignment.subgroupId === Number(subgroupId)
+            assignment.subgroupId === subgroupIdNum
           );
         }
-      } else if (classId) {
+      } else if (classIdNum) {
         // Если указан только classId
-        assignments = await dataStorage.getAssignmentsByClass(Number(classId));
-      } else if (subjectId) {
+        assignments = await dataStorage.getAssignmentsByClass(classIdNum);
+      } else if (subjectIdNum) {
         // Если указан только subjectId
-        assignments = await dataStorage.getAssignmentsBySubject(Number(subjectId));
-      } else if (subgroupId) {
+        assignments = await dataStorage.getAssignmentsBySubject(subjectIdNum);
+      } else if (subgroupIdNum) {
         // Если указан только subgroupId
-        assignments = await dataStorage.getAssignmentsBySubgroup(Number(subgroupId));
+        assignments = await dataStorage.getAssignmentsBySubgroup(subgroupIdNum);
       }
       
       console.log(`Assignments found: ${assignments.length} for query:`, req.query);
