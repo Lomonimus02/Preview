@@ -12,7 +12,7 @@ import {
   Subgroup 
 } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 import { 
   ChevronLeft, 
@@ -21,7 +21,10 @@ import {
   Calculator, 
   Book, 
   BookOpen, 
-  Info 
+  Info,
+  Award,
+  BarChart,
+  Percent 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,6 +48,7 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
+  CardDescription,
 } from "@/components/ui/card";
 import {
   Tabs,
@@ -53,6 +57,9 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import {
+  Progress
+} from "@/components/ui/progress";
 
 // Интерфейс для отображения оценок в гриде по дням
 interface GradesByDate {
@@ -116,6 +123,8 @@ export default function StudentGrades() {
   const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
+  // Период отображения: "неделя", "месяц", "семестр", "год"
+  const [displayPeriod, setDisplayPeriod] = useState<'week' | 'month' | 'semester' | 'year'>('month');
   
   // Получение данных студента
   const { data: studentClass } = useQuery<Class[]>({
@@ -162,12 +171,70 @@ export default function StudentGrades() {
     return GradingSystemEnum.FIVE_POINT; // По умолчанию пятибалльная система
   }, [studentClass]);
   
-  // Определяем дни текущего месяца
-  const daysInMonth = useMemo(() => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    return eachDayOfInterval({ start, end });
-  }, [currentMonth]);
+  // Получаем начало и конец периода просмотра в зависимости от выбранного периода
+  const { startDate, endDate, periodLabel } = useMemo(() => {
+    if (displayPeriod === 'week') {
+      const start = startOfWeek(currentMonth, { weekStartsOn: 1 }); // Неделя начинается с понедельника
+      const end = endOfWeek(currentMonth, { weekStartsOn: 1 });
+      return { 
+        startDate: start, 
+        endDate: end,
+        periodLabel: `${format(start, 'dd.MM.yyyy')} - ${format(end, 'dd.MM.yyyy')}` 
+      };
+    } else if (displayPeriod === 'month') {
+      const start = startOfMonth(currentMonth);
+      const end = endOfMonth(currentMonth);
+      return { 
+        startDate: start, 
+        endDate: end,
+        periodLabel: format(currentMonth, 'LLLL yyyy', { locale: ru }) 
+      };
+    } else if (displayPeriod === 'semester') {
+      // Примерное определение семестра (первый: сентябрь-декабрь, второй: январь-май)
+      const currentYear = currentMonth.getFullYear();
+      const currentMonthNum = currentMonth.getMonth();
+      
+      let start, end;
+      if (currentMonthNum >= 8 && currentMonthNum <= 11) { // Сентябрь-Декабрь
+        start = new Date(currentYear, 8, 1); // 1 сентября
+        end = new Date(currentYear, 11, 31); // 31 декабря
+        return { 
+          startDate: start, 
+          endDate: end,
+          periodLabel: `I семестр (сент.-дек. ${currentYear})` 
+        };
+      } else if (currentMonthNum >= 0 && currentMonthNum <= 4) { // Январь-Май
+        start = new Date(currentYear, 0, 1); // 1 января
+        end = new Date(currentYear, 4, 31); // 31 мая
+        return { 
+          startDate: start, 
+          endDate: end,
+          periodLabel: `II семестр (янв.-май ${currentYear})` 
+        };
+      } else { // Летние месяцы
+        start = new Date(currentYear, 5, 1); // 1 июня
+        end = new Date(currentYear, 7, 31); // 31 августа
+        return { 
+          startDate: start, 
+          endDate: end,
+          periodLabel: `Летний период (июнь-авг. ${currentYear})` 
+        };
+      }
+    } else { // год
+      const start = new Date(currentMonth.getFullYear(), 0, 1); // 1 января текущего года
+      const end = new Date(currentMonth.getFullYear(), 11, 31); // 31 декабря текущего года
+      return { 
+        startDate: start, 
+        endDate: end,
+        periodLabel: `${currentMonth.getFullYear()} год` 
+      };
+    }
+  }, [currentMonth, displayPeriod]);
+  
+  // Определяем дни текущего периода
+  const daysInPeriod = useMemo(() => {
+    return eachDayOfInterval({ start: startDate, end: endDate });
+  }, [startDate, endDate]);
   
   // Группируем оценки по предметам и датам
   const gradesBySubjectAndDate: GradesByDate = useMemo(() => {
@@ -218,24 +285,41 @@ export default function StudentGrades() {
     }
     
     return (
-      <div className="flex flex-wrap gap-1">
-        {cell.grades.map((grade) => (
-          <span 
-            key={grade.id}
-            onClick={() => handleGradeClick(grade, cell.assignments?.find(a => a.scheduleId === grade.scheduleId) || null)}
-            className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium cursor-pointer ${
-              grade.gradeType && gradeTypeColors[grade.gradeType] 
-                ? gradeTypeColors[grade.gradeType] 
-                : grade.grade >= 4 
-                  ? 'bg-green-100 text-green-800 hover:bg-green-200' 
-                  : grade.grade >= 3 
-                    ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
-                    : 'bg-red-100 text-red-800 hover:bg-red-200'
-            }`}
-          >
-            {grade.grade}
-          </span>
-        ))}
+      <div className="flex flex-wrap gap-1 justify-center">
+        {cell.grades.map((grade) => {
+          // Определяем, связано ли с заданием
+          const assignment = cell.assignments?.find(a => a.scheduleId === grade.scheduleId);
+          const hasAssignment = !!assignment;
+          
+          // Определяем цвет в зависимости от типа задания или оценки
+          const getColorClass = () => {
+            if (hasAssignment) {
+              return assignmentTypeColors[assignment.assignmentType] || 'bg-primary-100 text-primary-800 hover:bg-primary-200';
+            } else if (grade.gradeType && gradeTypeColors[grade.gradeType]) {
+              return gradeTypeColors[grade.gradeType];
+            } else {
+              return grade.grade >= 4 
+                ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                : grade.grade >= 3 
+                  ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
+                  : 'bg-red-100 text-red-800 hover:bg-red-200';
+            }
+          };
+          
+          return (
+            <span 
+              key={grade.id}
+              onClick={() => handleGradeClick(grade, assignment)}
+              className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium cursor-pointer ${getColorClass()}`}
+              title={hasAssignment ? getAssignmentTypeName(assignment.assignmentType) : (grade.gradeType ? getGradeTypeName(grade.gradeType) : "")}
+            >
+              {grade.grade}
+              {hasAssignment && (
+                <span className="w-1 h-1 ml-1 rounded-full bg-current"></span>
+              )}
+            </span>
+          );
+        })}
       </div>
     );
   };
@@ -326,30 +410,48 @@ export default function StudentGrades() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-heading font-bold text-gray-800">Оценки</h2>
         
-        {/* Переключатель месяца */}
-        <div className="flex items-center space-x-4">
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={goToPreviousMonth}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+        {/* Переключатели периодов */}
+        <div className="flex items-center space-x-2">
+          {/* Переключатель типа периода */}
+          <Select value={displayPeriod} onValueChange={(value) => setDisplayPeriod(value as 'week' | 'month' | 'semester' | 'year')}>
+            <SelectTrigger className="h-9 w-[140px]">
+              <SelectValue placeholder="Период" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">Неделя</SelectItem>
+              <SelectItem value="month">Месяц</SelectItem>
+              <SelectItem value="semester">Семестр</SelectItem>
+              <SelectItem value="year">Учебный год</SelectItem>
+            </SelectContent>
+          </Select>
           
-          <div className="flex items-center">
-            <Calendar className="mr-2 h-4 w-4 text-gray-500" />
-            <span className="font-medium">
-              {format(currentMonth, 'LLLL yyyy', { locale: ru })}
-            </span>
+          {/* Навигация по периодам */}
+          <div className="flex items-center space-x-2 border rounded-md p-1">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={goToPreviousMonth}
+              className="h-7 w-7"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            <div className="flex items-center px-2">
+              <Calendar className="mr-2 h-4 w-4 text-gray-500" />
+              <span className="text-sm font-medium">
+                {periodLabel}
+              </span>
+            </div>
+            
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={goToNextMonth}
+              className="h-7 w-7"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-          
-          <Button 
-            variant="outline" 
-            size="icon"
-            onClick={goToNextMonth}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
         </div>
       </div>
       
