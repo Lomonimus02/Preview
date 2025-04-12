@@ -441,61 +441,68 @@ export default function StudentGrades() {
     
     if (subjectGrades.length === 0) return "-";
     
-    // Для накопительной системы оценивания рассчитываем процентное соотношение суммы полученных баллов к сумме максимально возможных
+    // Для накопительной системы оценивания используем тот же алгоритм, что и в журнале учителя
     if (gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      // Получаем оценки, у которых есть связь с заданиями
-      const gradesWithAssignments = subjectGrades.filter(g => g.scheduleId);
-      
-      // Рассчитываем процент успеваемости на основе заданий
-      let totalEarnedPoints = 0;
-      let totalMaxPoints = 0;
+      // Для каждой оценки ищем соответствующее задание
+      let totalEarnedScore = 0;
+      let totalMaxScore = 0;
       
       // Обрабатываем оценки, связанные с заданиями
-      gradesWithAssignments.forEach(grade => {
-        const relatedAssignment = assignments.find(a => a.scheduleId === grade.scheduleId);
-        
-        if (relatedAssignment) {
-          totalEarnedPoints += grade.grade;
-          totalMaxPoints += parseFloat(relatedAssignment.maxScore.toString());
+      subjectGrades.forEach(grade => {
+        if (grade.scheduleId) {
+          const relatedAssignment = assignments.find(a => a.scheduleId === grade.scheduleId);
+          
+          if (relatedAssignment) {
+            // Если нашли задание, добавляем баллы
+            totalEarnedScore += grade.grade;
+            totalMaxScore += Number(relatedAssignment.maxScore);
+          }
         }
       });
       
-      // Обрабатываем оценки без связи с заданиями (если есть)
-      const gradesWithoutAssignments = subjectGrades.filter(g => !g.scheduleId || !assignments.some(a => a.scheduleId === g.scheduleId));
-      if (gradesWithoutAssignments.length > 0) {
-        // Примечание: оценки без связи с заданиями не участвуют в расчете процентного соотношения,
-        // так как для них нет информации о максимальном балле
-        console.log(`${gradesWithoutAssignments.length} оценок без связи с заданиями по предмету ${subjectId}`);
-      }
+      // Если нет максимального балла, возвращаем прочерк
+      if (totalMaxScore === 0) return "-";
       
-      if (totalMaxPoints === 0) {
-        // Если нет максимального балла, просто показываем средний балл в процентах от максимума (5.0)
-        if (subjectGrades.length > 0) {
-          const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
-          const avgGrade = sum / subjectGrades.length;
-          // Переводим в проценты от максимальной оценки (5.0)
-          const percentScore = (avgGrade / 5) * 100;
-          return `${percentScore.toFixed(1)}%`;
-        }
-        return "-";
-      }
-      
-      // Вычисляем процент успеваемости (сумма полученных баллов / сумма максимальных баллов)
-      const percentScore = (totalEarnedPoints / totalMaxPoints) * 100;
+      // Вычисляем процент выполнения и форматируем его
+      const percentage = (totalEarnedScore / totalMaxScore) * 100;
       
       // Ограничиваем максимальный процент до 100%
-      const cappedPercentScore = Math.min(percentScore, 100);
+      const cappedPercentage = Math.min(percentage, 100);
       
-      return `${cappedPercentScore.toFixed(1)}%`;
+      return `${cappedPercentage.toFixed(1)}%`;
     } else {
-      // Для пятибалльной системы рассчитываем процент от максимальной оценки (5.0)
-      if (subjectGrades.length === 0) return "-";
+      // Для пятибалльной системы оценивания - используем алгоритм с весами, как в журнале учителя
       
-      const sum = subjectGrades.reduce((acc, g) => acc + g.grade, 0);
-      const avgGrade = sum / subjectGrades.length;
-      const percentScore = (avgGrade / 5) * 100; // Считаем процент от максимальной оценки (5.0)
+      // Весовые коэффициенты для разных типов оценок
+      const weights: Record<string, number> = {
+        'test': 2,
+        'exam': 3,
+        'homework': 1,
+        'project': 2,
+        'classwork': 1,
+        'Текущая': 1,
+        'Контрольная': 2,
+        'Экзамен': 3,
+        'Практическая': 1.5,
+        'Домашняя': 1
+      };
       
-      // Ограничиваем максимальный процент до 100%
+      let weightedSum = 0;
+      let totalWeight = 0;
+      
+      subjectGrades.forEach(grade => {
+        const weight = weights[grade.gradeType] || 1;
+        weightedSum += grade.grade * weight;
+        totalWeight += weight;
+      });
+      
+      // Если нет оценок с весами, возвращаем "-"
+      if (totalWeight === 0) return "-";
+      
+      const average = weightedSum / totalWeight;
+      
+      // Переводим в проценты от максимальной оценки (5.0) для согласованности отображения
+      const percentScore = (average / 5) * 100;
       const cappedPercentScore = Math.min(percentScore, 100);
       
       return `${cappedPercentScore.toFixed(1)}%`;
