@@ -2272,36 +2272,25 @@ export default function ClassGradeDetailsPage() {
                   />
                 )}
                 
-                {/* Поле выбора типа оценки отображается только если не выбрано задание */}
+                {/* Скрытое поле для типа оценки, автоматически заполняется при выборе задания */}
+                <input 
+                  type="hidden" 
+                  name="gradeType" 
+                  value={gradeForm.getValues().gradeType || "Текущая"} 
+                />
+                
+                {/* Информационное поле о типе оценки */}
+                {selectedAssignment && (
+                  <div className="text-sm text-muted-foreground mb-2 rounded-md p-2 bg-muted">
+                    <p className="font-medium">Тип работы: {getAssignmentTypeName(selectedAssignment.assignmentType)}</p>
+                  </div>
+                )}
+                
                 {!selectedAssignment && (
-                  <FormField
-                    control={gradeForm.control}
-                    name="gradeType"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Тип оценки</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Выберите тип оценки" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="Текущая">Текущая оценка</SelectItem>
-                            <SelectItem value="test">Контрольная работа</SelectItem>
-                            <SelectItem value="exam">Экзамен</SelectItem>
-                            <SelectItem value="classwork">Классная работа</SelectItem>
-                            <SelectItem value="homework">Домашняя работа</SelectItem>
-                            <SelectItem value="project">Проект</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="text-sm text-muted-foreground mb-2 rounded-md p-2 bg-muted">
+                    <p className="font-medium">Тип оценки: Текущая</p>
+                    <p>Выберите задание чтобы изменить тип оценки</p>
+                  </div>
                 )}
                 
                 <FormField
