@@ -118,10 +118,19 @@ export function AddScheduleDialog({
       const method = schedule ? "PATCH" : "POST";
 
       // Подготавливаем данные для отправки на сервер
+      // Если пользователь выбрал класс через форму, используем его, иначе используем переданный classId
+      const selectedClassId = showClassSelect && data.classId ? data.classId : classId;
+      
       const scheduleData = {
         ...data,
-        classId: classId
+        classId: selectedClassId
       };
+
+      // Если выбран другой класс, может понадобиться обновить подгруппы
+      if (selectedClassId !== classId && data.subgroupId) {
+        // Убираем подгруппу, так как она может не существовать в выбранном классе
+        scheduleData.subgroupId = null;
+      }
 
       // Отправляем запрос
       const response = await apiRequest(endpoint, {

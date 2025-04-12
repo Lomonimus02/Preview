@@ -157,7 +157,7 @@ export default function ClassSchedulePage() {
               <Spinner size="lg" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
               {scheduleByDay.map((day) => (
                 <Card key={day.formattedDate} className="overflow-hidden">
                   <CardHeader className="pb-2 pt-4 bg-muted flex flex-row justify-between items-center">
