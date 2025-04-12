@@ -3,6 +3,7 @@ import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
+import { ScheduleGrid } from "@/components/schedule/schedule-grid";
 import { TimeSlotsManager } from "@/components/schedule/time-slots-manager";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/use-auth";
@@ -264,8 +265,9 @@ export default function ClassSchedulePage() {
             </div>
             
             <Tabs defaultValue="schedule" className="w-full mb-8">
-              <TabsList className="grid w-[400px] grid-cols-2">
-                <TabsTrigger value="schedule">Расписание</TabsTrigger>
+              <TabsList className="grid w-[600px] grid-cols-3">
+                <TabsTrigger value="schedule">Расписание (карточки)</TabsTrigger>
+                <TabsTrigger value="grid">Расписание (сетка)</TabsTrigger>
                 <TabsTrigger value="time-slots">Настройка временных слотов</TabsTrigger>
               </TabsList>
               
@@ -285,6 +287,29 @@ export default function ClassSchedulePage() {
                     onAddSchedule={handleAddSchedule} // Обработчик добавления урока
                     onEditSchedule={handleEditSchedule} // Обработчик редактирования урока
                     onDeleteSchedule={handleDeleteSchedule} // Обработчик удаления урока
+                  />
+                ) : (
+                  <Alert>
+                    <AlertTitle>Расписание отсутствует</AlertTitle>
+                    <AlertDescription>
+                      Для данного класса еще не создано расписание
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="grid" className="mt-4">
+                {schedules.length > 0 ? (
+                  <ScheduleGrid
+                    schedules={schedules}
+                    subjects={subjects}
+                    teachers={teachers}
+                    classId={classId}
+                    isAdmin={isSchoolAdmin()}
+                    subgroups={subgroups}
+                    onAddSchedule={handleAddSchedule}
+                    onEditSchedule={handleEditSchedule}
+                    onDeleteSchedule={handleDeleteSchedule}
                   />
                 ) : (
                   <Alert>
