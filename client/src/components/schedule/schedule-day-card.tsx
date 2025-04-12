@@ -120,14 +120,19 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   // Получаем название предмета
   const getSubjectName = () => {
-    // Если у урока есть подгруппа и её название, показываем только название подгруппы
+    // Если у объекта расписания уже есть поле с названием подгруппы, используем его
     if (schedule.subgroupId && schedule.subgroupName) {
       return schedule.subgroupName;
     }
     
-    // Если подгруппа есть, но названия нет, пытаемся найти её имя (в реальном приложении здесь мог бы быть запрос к API)
+    // Запрашиваем информацию о подгруппах с сервера, если есть ID подгруппы
     if (schedule.subgroupId) {
-      return `Подгруппа ${schedule.subgroupId}`;
+      // Ищем информацию о подгруппе в кэше (у нас его пока нет, но можно добавить)
+      // Пока используем временное решение с загрузкой через GET-запрос
+      const subgroup = schedule.subgroups?.find((s: any) => s.id === schedule.subgroupId);
+      if (subgroup?.name) {
+        return subgroup.name; // Возвращаем полное название подгруппы
+      }
     }
     
     // В остальных случаях показываем название предмета

@@ -106,6 +106,12 @@ export default function GeneralSchedulePage() {
     enabled: isSchoolAdmin() && !!schoolId
   });
   
+  // Загружаем все подгруппы школы
+  const { data: subgroups = [], isLoading: subgroupsLoading } = useQuery({
+    queryKey: ["/api/subgroups"],
+    enabled: isSchoolAdmin() && !!schoolId
+  });
+  
   // Обработчик открытия диалога добавления занятия
   const handleAddSchedule = (date: Date, classId?: number) => {
     setSelectedDate(date);
@@ -149,7 +155,7 @@ export default function GeneralSchedulePage() {
     };
   });
 
-  const isLoading = schoolsLoading || schedulesLoading || classesLoading || teachersLoading || subjectsLoading;
+  const isLoading = schoolsLoading || schedulesLoading || classesLoading || teachersLoading || subjectsLoading || subgroupsLoading;
 
   // Вспомогательная функция для получения информации о классе
   const getClassInfo = (classId: number) => {
@@ -233,10 +239,17 @@ export default function GeneralSchedulePage() {
                       <div className="space-y-3">
                         {day.schedules.map(schedule => {
                           const classInfo = getClassInfo(schedule.classId);
+                          
+                          // Добавляем подгруппы к каждому расписанию
+                          const scheduleWithSubgroups = {
+                            ...schedule,
+                            subgroups
+                          };
+                          
                           return (
                             <ScheduleDayCard
                               key={schedule.id}
-                              schedule={schedule}
+                              schedule={scheduleWithSubgroups}
                               isTeacher={false}
                               variant="vertical"
                               showClassInfo={true}

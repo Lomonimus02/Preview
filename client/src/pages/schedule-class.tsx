@@ -69,6 +69,12 @@ export default function ClassSchedulePage() {
     queryKey: ["/api/users"],
     enabled: !!classId
   });
+  
+  // Загружаем подгруппы класса
+  const { data: subgroups = [], isLoading: subgroupsLoading } = useQuery({
+    queryKey: ["/api/subgroups", { classId: parseInt(classId as string) }],
+    enabled: !!classId
+  });
 
   // Создаем массив дат для текущей недели
   const weekDates = getWeekDates(currentDate);
@@ -95,7 +101,7 @@ export default function ClassSchedulePage() {
     };
   });
 
-  const isLoading = classLoading || schedulesLoading || subjectsLoading || teachersLoading;
+  const isLoading = classLoading || schedulesLoading || subjectsLoading || teachersLoading || subgroupsLoading;
 
   const handleAddSchedule = (date: Date) => {
     setSelectedDate(date);
@@ -184,16 +190,24 @@ export default function ClassSchedulePage() {
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {day.schedules.map((schedule) => (
-                          <ScheduleDayCard
-                            key={schedule.id}
-                            schedule={schedule}
-                            isTeacher={false}
-                            variant="vertical"
-                            subjects={subjects}
-                            teachers={teachers}
-                          />
-                        ))}
+                        {day.schedules.map((schedule) => {
+                          // Добавляем подгруппы к каждому расписанию для отображения названий подгрупп
+                          const scheduleWithSubgroups = {
+                            ...schedule,
+                            subgroups
+                          };
+                          
+                          return (
+                            <ScheduleDayCard
+                              key={schedule.id}
+                              schedule={scheduleWithSubgroups}
+                              isTeacher={false}
+                              variant="vertical"
+                              subjects={subjects}
+                              teachers={teachers}
+                            />
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
