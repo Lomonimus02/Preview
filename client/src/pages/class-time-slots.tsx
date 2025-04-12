@@ -47,7 +47,7 @@ const ClassTimeSlotsPage: React.FC = () => {
 
   // Получение временных слотов класса
   const { data: classTimeSlots = [], isLoading: isClassSlotsLoading } = useQuery<ClassTimeSlot[]>({
-    queryKey: ['/api/class-time-slots', classId],
+    queryKey: [`/api/class/${classId}/time-slots`],
     enabled: !isNaN(classId),
   });
 
@@ -63,7 +63,7 @@ const ClassTimeSlotsPage: React.FC = () => {
     onSuccess: () => {
       // Инвалидируем запросы к временным слотам (для обновления текущей страницы)
       queryClient.invalidateQueries({
-        queryKey: ['/api/class-time-slots', classId]
+        queryKey: [`/api/class/${classId}/time-slots`]
       });
       
       // Инвалидируем запросы к расписанию, чтобы обновить отображение в ScheduleDayCard
@@ -90,12 +90,12 @@ const ClassTimeSlotsPage: React.FC = () => {
   // Мутация для удаления временного слота
   const deleteMutation = useMutation({
     mutationFn: async (slotId: number) => {
-      return apiRequest(`/api/class-time-slots/${slotId}`, 'DELETE');
+      return apiRequest(`/api/class/${classId}/time-slots/${slotId}`, 'DELETE');
     },
     onSuccess: () => {
       // Инвалидируем запросы к временным слотам (для обновления текущей страницы)
       queryClient.invalidateQueries({
-        queryKey: ['/api/class-time-slots', classId]
+        queryKey: [`/api/class/${classId}/time-slots`]
       });
       
       // Инвалидируем запросы к расписанию, чтобы обновить отображение в ScheduleDayCard
@@ -126,7 +126,7 @@ const ClassTimeSlotsPage: React.FC = () => {
     onSuccess: () => {
       // Инвалидируем запросы к временным слотам (для обновления текущей страницы)
       queryClient.invalidateQueries({
-        queryKey: ['/api/class-time-slots', classId]
+        queryKey: [`/api/class/${classId}/time-slots`]
       });
       
       // Инвалидируем запросы к расписанию, чтобы обновить отображение в ScheduleDayCard
