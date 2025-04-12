@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useRoleCheck } from '@/hooks/use-role-check';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +26,7 @@ const ClassTimeSlotsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { isPrincipal, canEdit } = useRoleCheck();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState<TimeSlotFormData>({
@@ -224,18 +226,20 @@ const ClassTimeSlotsPage: React.FC = () => {
             Здесь вы можете настроить индивидуальные временные слоты для уроков этого класса.
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => {
-            if (window.confirm("Вы уверены, что хотите сбросить все настройки?")) {
-              resetAllMutation.mutate();
-            }
-          }}
-          className="flex items-center"
-        >
-          <FiRotateCcw className="mr-2" />
-          Сбросить настройки
-        </Button>
+        {!isPrincipal() && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (window.confirm("Вы уверены, что хотите сбросить все настройки?")) {
+                resetAllMutation.mutate();
+              }
+            }}
+            className="flex items-center"
+          >
+            <FiRotateCcw className="mr-2" />
+            Сбросить настройки
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -277,33 +281,39 @@ const ClassTimeSlotsPage: React.FC = () => {
                     <TableCell>
                       {classSlot ? (
                         <div className="flex gap-2">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => openEditDialog(classSlot)}
-                          >
-                            <FiEdit size={16} />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={() => {
-                              if (window.confirm("Удалить настройку для этого слота?")) {
-                                deleteMutation.mutate(classSlot.id);
-                              }
-                            }}
-                          >
-                            <FiTrash2 size={16} />
-                          </Button>
+                          {!isPrincipal() && (
+                            <>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => openEditDialog(classSlot)}
+                              >
+                                <FiEdit size={16} />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => {
+                                  if (window.confirm("Удалить настройку для этого слота?")) {
+                                    deleteMutation.mutate(classSlot.id);
+                                  }
+                                }}
+                              >
+                                <FiTrash2 size={16} />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       ) : (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => openCreateDialog(defaultSlot.slotNumber)}
-                        >
-                          Настроить
-                        </Button>
+                        !isPrincipal() && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => openCreateDialog(defaultSlot.slotNumber)}
+                          >
+                            Настроить
+                          </Button>
+                        )
                       )}
                     </TableCell>
                   </TableRow>
