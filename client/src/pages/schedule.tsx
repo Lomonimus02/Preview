@@ -78,7 +78,7 @@ const gradeFormSchema = insertGradeSchema.extend({
 export default function SchedulePage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { isSuperAdmin, isSchoolAdmin, isTeacher } = useRoleCheck();
+  const { isSuperAdmin, isSchoolAdmin, isTeacher, isPrincipal } = useRoleCheck();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [isClassStudentsDialogOpen, setIsClassStudentsDialogOpen] = useState(false);
@@ -90,6 +90,7 @@ export default function SchedulePage() {
   
   // Check access permissions
   const canEditSchedule = isSuperAdmin() || isSchoolAdmin();
+  const canViewSchedule = canEditSchedule || isPrincipal();
   
   // Fetch schedules
   const { data: schedules = [], isLoading } = useQuery<ScheduleType[]>({
@@ -400,7 +401,12 @@ export default function SchedulePage() {
           )}
         </div>
         
-        {isLoading ? (
+        {!canViewSchedule && !isTeacher() && user?.role !== UserRoleEnum.STUDENT ? (
+          <div className="text-center py-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Доступ запрещен</h2>
+            <p className="text-gray-600">У вас нет прав для просмотра расписания</p>
+          </div>
+        ) : isLoading ? (
           <div className="text-center py-8">
             <CalendarIcon className="h-10 w-10 text-primary mx-auto mb-2" />
             <p>Загрузка расписания...</p>
@@ -461,6 +467,7 @@ export default function SchedulePage() {
             homework={homework}
             currentUser={user}
             isAdmin={canEditSchedule}
+            canView={canViewSchedule}
             onAddSchedule={handleAddSchedule}
             onDeleteSchedule={(scheduleId) => deleteScheduleMutation.mutate(scheduleId)}
           />
