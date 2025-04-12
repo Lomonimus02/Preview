@@ -77,7 +77,7 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
 
   // Загрузка учителей
   const { data: teachers = [], isLoading: teachersLoading } = useQuery<any[]>({
-    queryKey: ["/api/users", { role: "TEACHER" }],
+    queryKey: ["/api/users", { role: "teacher" }],
     enabled: isOpen,
   });
 
