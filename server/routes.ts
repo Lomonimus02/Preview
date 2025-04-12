@@ -2064,6 +2064,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Если указан scheduleId и assignmentId, проверяем наличие уже существующей оценки для этого задания и ученика
+      if (gradeData.scheduleId && gradeData.assignmentId) {
+        // Получаем все оценки для данного ученика
+        const studentGrades = await dataStorage.getGradesByStudent(gradeData.studentId);
+        
+        // Проверяем, есть ли уже оценка для этого задания
+        const existingGrade = studentGrades.find(g => 
+          g.scheduleId === gradeData.scheduleId && 
+          (g.assignmentId === gradeData.assignmentId || 
+           (gradeData.assignmentId === undefined && g.scheduleId === gradeData.scheduleId))
+        );
+        
+        if (existingGrade) {
+          return res.status(400).json({ 
+            message: 'На это задание уже выставлена оценка. Для выставления новой оценки, создайте новое задание или измените существующую оценку.',
+            existingGradeId: existingGrade.id
+          });
+        }
+      }
+      
       const grade = await dataStorage.createGrade(gradeData);
       
       // Notify the student

@@ -143,6 +143,34 @@ async function addClassGradingSystemColumn() {
   }
 }
 
+async function addGradeAssignmentIdColumn() {
+  try {
+    console.log('Проверяем наличие колонки assignment_id в таблице grades...');
+    const checkColumnExistsQuery = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'grades' AND column_name = 'assignment_id'
+    `;
+    
+    const result = await db.execute(sql.raw(checkColumnExistsQuery));
+    
+    if (result.length === 0) {
+      console.log('Колонка assignment_id не найдена, добавляем...');
+      const addColumnQuery = `
+        ALTER TABLE grades 
+        ADD COLUMN assignment_id INTEGER
+      `;
+      await db.execute(sql.raw(addColumnQuery));
+      console.log('Колонка assignment_id успешно добавлена');
+    } else {
+      console.log('Колонка assignment_id уже существует');
+    }
+  } catch (error) {
+    console.error('Ошибка при добавлении колонки assignment_id:', error);
+    throw error;
+  }
+}
+
 async function runMigrations() {
   try {
     console.log('Запуск миграций...');
@@ -151,6 +179,7 @@ async function runMigrations() {
     await addUserRolesClassIdColumn();
     await addGradeSubgroupIdColumn();
     await addClassGradingSystemColumn();
+    await addGradeAssignmentIdColumn();
     console.log('Миграции успешно выполнены');
   } catch (error) {
     console.error('Ошибка при выполнении миграций:', error);
