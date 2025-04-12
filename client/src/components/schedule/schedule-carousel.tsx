@@ -11,7 +11,7 @@ import {
 } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
-import { ScheduleDayCard } from "./schedule-day-card";
+import { CarouselDayCard } from "./carousel-day-card";
 import { Schedule, User, Subject, Class, Grade, UserRoleEnum, Homework } from "@shared/schema";
 import { FiChevronLeft, FiChevronRight, FiCalendar } from "react-icons/fi";
 
@@ -139,7 +139,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         <div className="flex gap-4">
           {weekDates.map((date) => (
             <div className="flex-shrink-0" key={format(date, "yyyy-MM-dd")}>
-              <ScheduleDayCard
+              <CarouselDayCard
                 date={date}
                 dayName={getDayName(date)}
                 schedules={getSchedulesForDate(date)}
