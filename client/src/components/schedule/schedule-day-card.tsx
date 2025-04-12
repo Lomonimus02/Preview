@@ -250,7 +250,8 @@ interface ScheduleDayCardProps {
   subgroups?: any[]; // Добавляем список подгрупп
   showClassNames?: boolean; // Флаг для отображения имен классов (для общего расписания)
   onAddSchedule?: (date: Date, scheduleToEdit?: Schedule) => void;
-  onDeleteSchedule?: (scheduleId: number) => void;
+  onEditSchedule?: (schedule: Schedule) => void; // Новый обработчик для редактирования расписания
+  onDeleteSchedule?: (schedule: Schedule) => void;
 }
 
 export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
@@ -267,6 +268,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   subgroups = [],
   showClassNames = false,
   onAddSchedule,
+  onEditSchedule,
   onDeleteSchedule,
 }) => {
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
@@ -566,18 +568,35 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
               
               <DialogFooter className="flex flex-wrap justify-between gap-2 sm:justify-between">
                 {isAdmin && (
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => {
-                      if (onDeleteSchedule) {
-                        onDeleteSchedule(selectedSchedule.id);
-                        setIsDetailsOpen(false);
-                      }
-                    }}
-                  >
-                    Удалить
-                  </Button>
+                  <>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => {
+                        if (onDeleteSchedule) {
+                          onDeleteSchedule(selectedSchedule);
+                          setIsDetailsOpen(false);
+                        }
+                      }}
+                    >
+                      <FiTrash2 className="mr-2" />
+                      Удалить
+                    </Button>
+
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        if (onEditSchedule) {
+                          onEditSchedule(selectedSchedule);
+                          setIsDetailsOpen(false);
+                        }
+                      }}
+                    >
+                      <FiEdit3 className="mr-2" />
+                      Изменить
+                    </Button>
+                  </>
                 )}
                 
                 {isTeacher() && (
@@ -646,21 +665,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   </>
                 )}
                 
-                {isAdmin && (
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={() => {
-                      setIsDetailsOpen(false);
-                      if (onAddSchedule && selectedSchedule) {
-                        onAddSchedule(date, selectedSchedule);
-                      }
-                    }}
-                  >
-                    <FiEdit3 className="mr-2" />
-                    Редактировать
-                  </Button>
-                )}
+                {/* Кнопка редактирования уже добавлена выше */}
               </DialogFooter>
             </div>
           )}
