@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { UserRoleEnum } from "@shared/schema";
 import { RoleSwitcher } from "@/components/role-switcher";
 import { TeacherClassesMenu } from "./teacher-classes-menu";
+import { AdminScheduleMenu } from "./admin-schedule-menu";
 import { ReactNode } from "react";
 
 interface LinkMenuItem {
@@ -51,13 +52,13 @@ export function Sidebar({ isOpen }: SidebarProps) {
   // Maps user roles to which menu items they can see
   const roleAccess = {
     [UserRoleEnum.SUPER_ADMIN]: ["dashboard", "schools", "users", "user-roles", "subgroups", "grading-systems", "analytics", "messages", "notifications", "settings", "support"],
-    [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "user-roles", "subgroups", "schedule", "homework", "grades", "grading-systems", "analytics", "messages", "notifications", "settings", "support"],
+    [UserRoleEnum.SCHOOL_ADMIN]: ["dashboard", "users", "user-roles", "subgroups", "admin-schedule-menu", "homework", "grades", "grading-systems", "analytics", "messages", "notifications", "settings", "support"],
     [UserRoleEnum.TEACHER]: ["dashboard", "teacher-classes-menu", "schedule", "homework", "messages", "documents", "support"],
     [UserRoleEnum.CLASS_TEACHER]: ["dashboard", "class-teacher-dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.STUDENT]: ["dashboard", "schedule", "homework", "grades", "messages", "documents", "support"],
     [UserRoleEnum.PARENT]: ["dashboard", "grades", "messages", "documents", "support"],
-    [UserRoleEnum.PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "grading-systems", "analytics", "messages", "documents", "settings", "support"],
-    [UserRoleEnum.VICE_PRINCIPAL]: ["dashboard", "users", "schedule", "grades", "grading-systems", "analytics", "messages", "documents", "settings", "support"]
+    [UserRoleEnum.PRINCIPAL]: ["dashboard", "users", "admin-schedule-menu", "grades", "grading-systems", "analytics", "messages", "documents", "settings", "support"],
+    [UserRoleEnum.VICE_PRINCIPAL]: ["dashboard", "users", "admin-schedule-menu", "grades", "grading-systems", "analytics", "messages", "documents", "settings", "support"]
   };
 
   // Navigation items
@@ -65,6 +66,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     { id: "dashboard", label: "Главная", icon: <HomeIcon className="h-4 w-4 mr-3" />, href: "/" },
     { id: "class-teacher-dashboard", label: "Панель классного руководителя", icon: <UsersIcon className="h-4 w-4 mr-3" />, href: "/class-teacher-dashboard" },
     { id: "teacher-classes-menu", component: <TeacherClassesMenu /> },
+    { id: "admin-schedule-menu", component: <AdminScheduleMenu /> },
     { id: "schools", label: "Школы", icon: <BuildingIcon className="h-4 w-4 mr-3" />, href: "/schools" },
     { id: "users", label: "Пользователи", icon: <Users2Icon className="h-4 w-4 mr-3" />, href: "/users" },
     { id: "user-roles", label: "Роли пользователей", icon: <UserCogIcon className="h-4 w-4 mr-3" />, href: "/user-roles" },
