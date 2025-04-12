@@ -119,7 +119,7 @@ export default function StudentGrades() {
   
   // Получение данных студента
   const { data: studentClass } = useQuery<Class[]>({
-    queryKey: ["/api/student-classes"],
+    queryKey: [`/api/student-classes?studentId=${user?.id}`],
     enabled: !!user && user.role === UserRoleEnum.STUDENT
   });
   
@@ -143,8 +143,8 @@ export default function StudentGrades() {
   
   // Получение заданий (для детальной информации об оценках)
   const { data: assignments = [] } = useQuery<Assignment[]>({
-    queryKey: ["/api/assignments"],
-    enabled: !!user && user.role === UserRoleEnum.STUDENT
+    queryKey: [`/api/assignments`],
+    enabled: !!user && user.role === UserRoleEnum.STUDENT && studentClass && studentClass.length > 0
   });
   
   // Определяем систему оценивания класса
