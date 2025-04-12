@@ -3156,6 +3156,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === API для работы с временными слотами ===
+
+  // Инициализация слотов по умолчанию при первичном запросе
+  app.get("/api/time-slots/defaults", isAuthenticated, async (req, res) => {
+    try {
+      // Проверяем наличие и инициализируем слоты по умолчанию, если их нет
+      const timeSlots = await dataStorage.initializeDefaultTimeSlots();
+      res.json(timeSlots);
+    } catch (error) {
+      console.error("Error initializing default time slots:", error);
+      res.status(500).json({ message: "Failed to initialize default time slots" });
+    }
+  });
+
+  // Получение всех временных слотов по умолчанию
+  app.get("/api/time-slots", isAuthenticated, async (req, res) => {
+    try {
+      const timeSlots = await dataStorage.getDefaultTimeSlots();
+      res.json(timeSlots);
+    } catch (error) {
+      console.error("Error getting time slots:", error);
+      res.status(500).json({ message: "Failed to get time slots" });
+    }
+  });
+
+  // Получение временных слотов для школы
+  app.get("/api/school/:schoolId/time-slots", isAuthenticated, async (req, res) => {
+    try {
+      const schoolId = parseInt(req.params.schoolId);
+      const timeSlots = await dataStorage.getSchoolTimeSlots(schoolId);
+      res.json(timeSlots);
+    } catch (error) {
+      console.error("Error getting school time slots:", error);
+      res.status(500).json({ message: "Failed to get school time slots" });
+    }
+  });
+
+  // Обновление временного слота по умолчанию
+  app.put("/api/time-slots/:id", isAuthenticated, hasRole([UserRoleEnum.SUPER_ADMIN]), async (req, res) => {
+    try {
+      const slotId = parseInt(req.params.id);
+      const timeSlot = req.body;
+      const updatedSlot = await dataStorage.updateTimeSlot(slotId, timeSlot);
+      if (!updatedSlot) {
+        return res.status(404).json({ message: "Time slot not found" });
+      }
+      res.json(updatedSlot);
+    } catch (error) {
+      console.error("Error updating time slot:", error);
+      res.status(500).json({ message: "Failed to update time slot" });
+    }
+  });
+
+  // Получение настроек временных слотов для класса
+  app.get("/api/class/:classId/time-slots", isAuthenticated, async (req, res) => {
+    try {
+      const classId = parseInt(req.params.classId);
+      const timeSlots = await dataStorage.getClassTimeSlots(classId);
+      res.json(timeSlots);
+    } catch (error) {
+      console.error("Error getting class time slots:", error);
+      res.status(500).json({ message: "Failed to get class time slots" });
+    }
+  });
+
+  // Создание настройки временного слота для класса
+  app.post("/api/class/:classId/time-slots", isAuthenticated, hasRole([UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      const classId = parseInt(req.params.classId);
+      const timeSlot = req.body;
+      
+      // Проверяем, существует ли уже слот для этого класса с таким же номером
+      const existingSlot = await dataStorage.getClassTimeSlotByNumber(classId, timeSlot.slotNumber);
+      if (existingSlot) {
+        // Если слот уже существует, обновляем его
+        const updatedSlot = await dataStorage.updateClassTimeSlot(existingSlot.id, timeSlot);
+        return res.json(updatedSlot);
+      }
+      
+      // Если слота нет, создаем новый
+      const newSlot = await dataStorage.createClassTimeSlot({
+        ...timeSlot,
+        classId
+      });
+      res.status(201).json(newSlot);
+    } catch (error) {
+      console.error("Error creating class time slot:", error);
+      res.status(500).json({ message: "Failed to create class time slot" });
+    }
+  });
+
+  // Обновление настройки временного слота для класса
+  app.put("/api/class-time-slots/:id", isAuthenticated, hasRole([UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      const slotId = parseInt(req.params.id);
+      const timeSlot = req.body;
+      const updatedSlot = await dataStorage.updateClassTimeSlot(slotId, timeSlot);
+      if (!updatedSlot) {
+        return res.status(404).json({ message: "Class time slot not found" });
+      }
+      res.json(updatedSlot);
+    } catch (error) {
+      console.error("Error updating class time slot:", error);
+      res.status(500).json({ message: "Failed to update class time slot" });
+    }
+  });
+
+  // Удаление настройки временного слота для класса
+  app.delete("/api/class-time-slots/:id", isAuthenticated, hasRole([UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      const slotId = parseInt(req.params.id);
+      const deletedSlot = await dataStorage.deleteClassTimeSlot(slotId);
+      if (!deletedSlot) {
+        return res.status(404).json({ message: "Class time slot not found" });
+      }
+      res.json({ message: "Class time slot deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting class time slot:", error);
+      res.status(500).json({ message: "Failed to delete class time slot" });
+    }
+  });
+
+  // Сброс всех настроек временных слотов для класса
+  app.delete("/api/class/:classId/time-slots", isAuthenticated, hasRole([UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
+    try {
+      const classId = parseInt(req.params.classId);
+      await dataStorage.deleteClassTimeSlots(classId);
+      res.json({ message: "All class time slots deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting all class time slots:", error);
+      res.status(500).json({ message: "Failed to delete all class time slots" });
+    }
+  });
+
+  // Получение эффективного временного слота для класса
+  app.get("/api/class/:classId/time-slots/:slotNumber/effective", isAuthenticated, async (req, res) => {
+    try {
+      const classId = parseInt(req.params.classId);
+      const slotNumber = parseInt(req.params.slotNumber);
+      const effectiveSlot = await dataStorage.getEffectiveTimeSlot(classId, slotNumber);
+      if (!effectiveSlot) {
+        return res.status(404).json({ message: "Effective time slot not found" });
+      }
+      res.json(effectiveSlot);
+    } catch (error) {
+      console.error("Error getting effective time slot:", error);
+      res.status(500).json({ message: "Failed to get effective time slot" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

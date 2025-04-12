@@ -3,11 +3,13 @@ import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
+import { TimeSlotsManager } from "@/components/schedule/time-slots-manager";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
 import { Loader2 } from "lucide-react";
 import { Schedule, Class, Subject, User, Grade, Homework } from "@shared/schema";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function ClassSchedulePage() {
   const params = useParams<{ classId: string }>();
@@ -125,28 +127,41 @@ export default function ClassSchedulePage() {
               </h1>
             </div>
             
-            {schedules.length > 0 ? (
-              <ScheduleCarousel
-                schedules={schedules}
-                subjects={subjects}
-                teachers={teachers}
-                classes={classes}
-                grades={grades}
-                homework={homework}
-                currentUser={user}
-                isAdmin={isSchoolAdmin()}
-                subgroups={subgroups}
-                showClassNames={false} // В расписании класса не показываем название класса для каждого урока
-                onAddSchedule={() => {}} // Пустая функция, т.к. не используем добавление расписания на этой странице
-              />
-            ) : (
-              <Alert>
-                <AlertTitle>Расписание отсутствует</AlertTitle>
-                <AlertDescription>
-                  Для данного класса еще не создано расписание
-                </AlertDescription>
-              </Alert>
-            )}
+            <Tabs defaultValue="schedule" className="w-full mb-8">
+              <TabsList className="grid w-[400px] grid-cols-2">
+                <TabsTrigger value="schedule">Расписание</TabsTrigger>
+                <TabsTrigger value="time-slots">Настройка временных слотов</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="schedule" className="mt-4">
+                {schedules.length > 0 ? (
+                  <ScheduleCarousel
+                    schedules={schedules}
+                    subjects={subjects}
+                    teachers={teachers}
+                    classes={classes}
+                    grades={grades}
+                    homework={homework}
+                    currentUser={user}
+                    isAdmin={isSchoolAdmin()}
+                    subgroups={subgroups}
+                    showClassNames={false} // В расписании класса не показываем название класса для каждого урока
+                    onAddSchedule={() => {}} // Пустая функция, т.к. не используем добавление расписания на этой странице
+                  />
+                ) : (
+                  <Alert>
+                    <AlertTitle>Расписание отсутствует</AlertTitle>
+                    <AlertDescription>
+                      Для данного класса еще не создано расписание
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="time-slots" className="mt-4">
+                <TimeSlotsManager classId={classId} />
+              </TabsContent>
+            </Tabs>
           </>
         )}
       </div>
