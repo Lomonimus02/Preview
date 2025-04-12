@@ -247,6 +247,8 @@ interface ScheduleDayCardProps {
   homework?: Homework[];
   currentUser?: User | null;
   isAdmin?: boolean;
+  subgroups?: any[]; // Добавляем список подгрупп
+  showClassNames?: boolean; // Флаг для отображения имен классов (для общего расписания)
   onAddSchedule?: (date: Date, scheduleToEdit?: Schedule) => void;
   onDeleteSchedule?: (scheduleId: number) => void;
 }
@@ -262,6 +264,8 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   homework = [],
   currentUser = null,
   isAdmin = false,
+  subgroups = [],
+  showClassNames = false,
   onAddSchedule,
   onDeleteSchedule,
 }) => {
@@ -409,6 +413,9 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   grades={getScheduleGrades(schedule)}
                   homework={getScheduleHomework(schedule)}
                   isCompleted={getScheduleHomework(schedule) !== undefined} // Урок считается выполненным, если есть домашнее задание
+                  subgroups={subgroups}
+                  className={getClassName(schedule.classId)}
+                  showClass={showClassNames}
                   onClick={(e, actionType) => handleScheduleClick(schedule, actionType)}
                 />
               ))}
