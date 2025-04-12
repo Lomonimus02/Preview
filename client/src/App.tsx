@@ -40,8 +40,8 @@ function Router() {
       <ProtectedRoute path="/users" component={Users} />
       <ProtectedRoute path="/user-roles" component={UserRoles} />
       <ProtectedRoute path="/schedule" component={SchedulePage} />
-      <ProtectedRoute path="/schedule/class/:classId" component={ClassSchedulePage} />
-      <ProtectedRoute path="/schedule/overall" component={OverallSchedulePage} />
+      <ProtectedRoute path="/schedule-class/:classId" component={ClassSchedulePage} />
+      <ProtectedRoute path="/schedule-overall" component={OverallSchedulePage} />
       <ProtectedRoute path="/class-grade-details/:classId/:subjectId/:subgroupId?" component={ClassGradeDetailsPage} />
       <ProtectedRoute path="/grades" component={Grades} />
       <ProtectedRoute path="/grading-systems" component={GradingSystems} />

@@ -31,8 +31,8 @@ export const SchoolAdminScheduleMenu: React.FC = () => {
     if (user.schoolId) return user.schoolId;
     
     // Если у пользователя есть роль школьного администратора с привязкой к школе
-    const schoolAdminRole = user.roles?.find(role => 
-      role.role === "school_admin" && role.schoolId
+    const schoolAdminRole = user.userRoles?.find((roleObj: any) => 
+      roleObj.role === "school_admin" && roleObj.schoolId
     );
     
     if (schoolAdminRole?.schoolId) return schoolAdminRole.schoolId;
