@@ -64,9 +64,14 @@ export const TimeSlotsManager: React.FC<TimeSlotsManagerProps> = ({ classId }) =
     mutationFn: async (data: TimeSlotFormData) => {
       return apiRequest(`/api/class/${classId}/time-slots`, 'POST', data);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Явно обновляем кэш запроса
       queryClient.invalidateQueries({
         queryKey: ['/api/class', classId, 'time-slots']
+      });
+      // Обновляем также стандартные слоты для обеспечения согласованности
+      queryClient.invalidateQueries({
+        queryKey: ['/api/time-slots/defaults']
       });
       setIsDialogOpen(false);
       toast({
@@ -90,8 +95,13 @@ export const TimeSlotsManager: React.FC<TimeSlotsManagerProps> = ({ classId }) =
       return apiRequest(`/api/class-time-slots/${id}`, 'DELETE');
     },
     onSuccess: () => {
+      // Явно обновляем кэш запроса
       queryClient.invalidateQueries({
         queryKey: ['/api/class', classId, 'time-slots']
+      });
+      // Обновляем также все связанные запросы для расписания
+      queryClient.invalidateQueries({
+        queryKey: ['/api/time-slots/defaults']
       });
       toast({
         title: "Успешно",
@@ -114,8 +124,16 @@ export const TimeSlotsManager: React.FC<TimeSlotsManagerProps> = ({ classId }) =
       return apiRequest(`/api/class/${classId}/time-slots/reset`, 'POST');
     },
     onSuccess: () => {
+      // Явно обновляем кэш запроса
       queryClient.invalidateQueries({
         queryKey: ['/api/class', classId, 'time-slots']
+      });
+      // Обновляем также все связанные запросы для расписания
+      queryClient.invalidateQueries({
+        queryKey: ['/api/time-slots/defaults']
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/schedules']
       });
       toast({
         title: "Успешно",
