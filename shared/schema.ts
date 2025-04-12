@@ -258,6 +258,28 @@ export const cumulativeGrades = pgTable("cumulative_grades", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Таблица для хранения предопределенных временных слотов по умолчанию
+export const timeSlots = pgTable("time_slots", {
+  id: serial("id").primaryKey(),
+  slotNumber: integer("slot_number").notNull(), // Номер урока (0-9)
+  startTime: text("start_time").notNull(), // Время начала слота в формате HH:MM
+  endTime: text("end_time").notNull(), // Время окончания слота в формате HH:MM
+  schoolId: integer("school_id"), // Опциональная связь со школой (для школьных наборов слотов)
+  isDefault: boolean("is_default").default(false).notNull(), // Флаг, является ли набор слотов системным по умолчанию
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Таблица для хранения настроек временных слотов для конкретных классов
+export const classTimeSlots = pgTable("class_time_slots", {
+  id: serial("id").primaryKey(),
+  classId: integer("class_id").notNull(), // Класс, для которого настроены слоты
+  slotNumber: integer("slot_number").notNull(), // Номер урока (0-9)
+  startTime: text("start_time").notNull(), // Настроенное время начала слота
+  endTime: text("end_time").notNull(), // Настроенное время окончания слота
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Zod schemas for inserting data
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -351,6 +373,17 @@ export const insertCumulativeGradeSchema = createInsertSchema(cumulativeGrades).
   updatedAt: true
 });
 
+export const insertTimeSlotSchema = createInsertSchema(timeSlots).omit({
+  id: true,
+  createdAt: true
+});
+
+export const insertClassTimeSlotSchema = createInsertSchema(classTimeSlots).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -413,3 +446,9 @@ export type Assignment = typeof assignments.$inferSelect;
 
 export type InsertCumulativeGrade = z.infer<typeof insertCumulativeGradeSchema>;
 export type CumulativeGrade = typeof cumulativeGrades.$inferSelect;
+
+export type InsertTimeSlot = z.infer<typeof insertTimeSlotSchema>;
+export type TimeSlot = typeof timeSlots.$inferSelect;
+
+export type InsertClassTimeSlot = z.infer<typeof insertClassTimeSlotSchema>;
+export type ClassTimeSlot = typeof classTimeSlots.$inferSelect;

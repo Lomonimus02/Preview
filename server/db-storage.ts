@@ -23,11 +23,14 @@ import {
   StudentSubgroup, InsertStudentSubgroup,
   Assignment, InsertAssignment, AssignmentTypeEnum,
   CumulativeGrade, InsertCumulativeGrade, GradingSystemEnum,
+  TimeSlot, InsertTimeSlot,
+  ClassTimeSlot, InsertClassTimeSlot,
   users, schools, classes, subjects, schedules,
   homework, homeworkSubmissions, grades, attendance,
   documents, messages, notifications, parentStudents,
   systemLogs, teacherSubjects, studentClasses, userRoles,
-  subgroups, studentSubgroups, assignments, cumulativeGrades
+  subgroups, studentSubgroups, assignments, cumulativeGrades,
+  timeSlots, classTimeSlots
 } from '@shared/schema';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
@@ -785,6 +788,149 @@ export class DatabaseStorage implements IStorage {
     }
     
     return results;
+  }
+  
+  // ===== TimeSlot operations =====
+  async getTimeSlot(id: number): Promise<TimeSlot | undefined> {
+    const result = await db.select().from(timeSlots).where(eq(timeSlots.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTimeSlotByNumber(slotNumber: number, schoolId?: number): Promise<TimeSlot | undefined> {
+    // Если указан schoolId, ищем слот для этой школы
+    if (schoolId) {
+      const result = await db.select().from(timeSlots)
+        .where(and(
+          eq(timeSlots.slotNumber, slotNumber),
+          eq(timeSlots.schoolId, schoolId)
+        ))
+        .limit(1);
+      if (result.length > 0) return result[0];
+    }
+    
+    // Если слот для школы не найден или schoolId не указан, возвращаем слот по умолчанию
+    const result = await db.select().from(timeSlots)
+      .where(and(
+        eq(timeSlots.slotNumber, slotNumber),
+        eq(timeSlots.isDefault, true)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async getDefaultTimeSlots(): Promise<TimeSlot[]> {
+    return await db.select().from(timeSlots).where(eq(timeSlots.isDefault, true));
+  }
+
+  async getSchoolTimeSlots(schoolId: number): Promise<TimeSlot[]> {
+    return await db.select().from(timeSlots).where(eq(timeSlots.schoolId, schoolId));
+  }
+
+  async createTimeSlot(timeSlot: InsertTimeSlot): Promise<TimeSlot> {
+    const [newTimeSlot] = await db.insert(timeSlots).values(timeSlot).returning();
+    return newTimeSlot;
+  }
+
+  async updateTimeSlot(id: number, timeSlot: Partial<InsertTimeSlot>): Promise<TimeSlot | undefined> {
+    const [updatedTimeSlot] = await db.update(timeSlots)
+      .set(timeSlot)
+      .where(eq(timeSlots.id, id))
+      .returning();
+    return updatedTimeSlot;
+  }
+
+  async deleteTimeSlot(id: number): Promise<TimeSlot | undefined> {
+    const [deletedTimeSlot] = await db.delete(timeSlots)
+      .where(eq(timeSlots.id, id))
+      .returning();
+    return deletedTimeSlot;
+  }
+
+  // ===== ClassTimeSlot operations =====
+  async getClassTimeSlot(id: number): Promise<ClassTimeSlot | undefined> {
+    const result = await db.select().from(classTimeSlots).where(eq(classTimeSlots.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getClassTimeSlotByNumber(classId: number, slotNumber: number): Promise<ClassTimeSlot | undefined> {
+    const result = await db.select().from(classTimeSlots)
+      .where(and(
+        eq(classTimeSlots.classId, classId),
+        eq(classTimeSlots.slotNumber, slotNumber)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async getClassTimeSlots(classId: number): Promise<ClassTimeSlot[]> {
+    return await db.select().from(classTimeSlots).where(eq(classTimeSlots.classId, classId));
+  }
+
+  async createClassTimeSlot(classTimeSlot: InsertClassTimeSlot): Promise<ClassTimeSlot> {
+    const [newClassTimeSlot] = await db.insert(classTimeSlots).values(classTimeSlot).returning();
+    return newClassTimeSlot;
+  }
+
+  async updateClassTimeSlot(id: number, classTimeSlot: Partial<InsertClassTimeSlot>): Promise<ClassTimeSlot | undefined> {
+    const [updatedClassTimeSlot] = await db.update(classTimeSlots)
+      .set(classTimeSlot)
+      .where(eq(classTimeSlots.id, id))
+      .returning();
+    return updatedClassTimeSlot;
+  }
+
+  async deleteClassTimeSlot(id: number): Promise<ClassTimeSlot | undefined> {
+    const [deletedClassTimeSlot] = await db.delete(classTimeSlots)
+      .where(eq(classTimeSlots.id, id))
+      .returning();
+    return deletedClassTimeSlot;
+  }
+
+  async deleteClassTimeSlots(classId: number): Promise<void> {
+    await db.delete(classTimeSlots).where(eq(classTimeSlots.classId, classId));
+  }
+  
+  // Получение эффективного временного слота для класса
+  // Возвращает настроенный слот для класса или слот по умолчанию, если настройки нет
+  async getEffectiveTimeSlot(classId: number, slotNumber: number): Promise<TimeSlot | ClassTimeSlot | undefined> {
+    // Попытка получить персонализированный слот для класса
+    const classSlot = await this.getClassTimeSlotByNumber(classId, slotNumber);
+    if (classSlot) return classSlot;
+    
+    // Если персонализированный слот не найден, получаем класс для определения школы
+    const classEntity = await this.getClass(classId);
+    if (!classEntity) return undefined;
+    
+    // Получаем слот по умолчанию (сначала проверяем школьный слот, потом общий)
+    return await this.getTimeSlotByNumber(slotNumber, classEntity.schoolId);
+  }
+  
+  // Инициализация слотов по умолчанию, если они еще не созданы
+  async initializeDefaultTimeSlots(): Promise<TimeSlot[]> {
+    const defaultSlots = await this.getDefaultTimeSlots();
+    if (defaultSlots.length > 0) return defaultSlots;
+    
+    // Предопределенные слоты по умолчанию
+    const defaultTimeSlotsData: InsertTimeSlot[] = [
+      { slotNumber: 0, startTime: "8:00", endTime: "8:45", isDefault: true },
+      { slotNumber: 1, startTime: "9:00", endTime: "9:45", isDefault: true },
+      { slotNumber: 2, startTime: "9:55", endTime: "10:40", isDefault: true },
+      { slotNumber: 3, startTime: "11:00", endTime: "11:45", isDefault: true },
+      { slotNumber: 4, startTime: "12:00", endTime: "12:45", isDefault: true },
+      { slotNumber: 5, startTime: "12:55", endTime: "13:40", isDefault: true },
+      { slotNumber: 6, startTime: "14:00", endTime: "14:45", isDefault: true },
+      { slotNumber: 7, startTime: "15:15", endTime: "16:00", isDefault: true },
+      { slotNumber: 8, startTime: "16:15", endTime: "17:00", isDefault: true },
+      { slotNumber: 9, startTime: "17:15", endTime: "18:00", isDefault: true }
+    ];
+    
+    const createdSlots: TimeSlot[] = [];
+    for (const slotData of defaultTimeSlotsData) {
+      const newSlot = await this.createTimeSlot(slotData);
+      createdSlots.push(newSlot);
+    }
+    
+    return createdSlots;
   }
 }
 
