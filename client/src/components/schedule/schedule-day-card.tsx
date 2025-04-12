@@ -251,7 +251,7 @@ interface ScheduleDayCardProps {
   showClassNames?: boolean; // Флаг для отображения имен классов (для общего расписания)
   onAddSchedule?: (date: Date, scheduleToEdit?: Schedule) => void;
   onEditSchedule?: (schedule: Schedule) => void; // Новый обработчик для редактирования расписания
-  onDeleteSchedule?: (schedule: Schedule) => void;
+  onDeleteSchedule?: (scheduleId: number) => void;
 }
 
 export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
@@ -574,7 +574,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                       size="sm"
                       onClick={() => {
                         if (onDeleteSchedule) {
-                          onDeleteSchedule(selectedSchedule);
+                          onDeleteSchedule(selectedSchedule.id);
                           setIsDetailsOpen(false);
                         }
                       }}
