@@ -99,8 +99,15 @@ export default function ClassSchedulePage() {
     enabled: !!user && !isNaN(classId)
   });
   
+  // Загрузка подгрупп для класса
+  const { data: subgroups = [], isLoading: subgroupsLoading } = useQuery<any[]>({
+    queryKey: ["/api/subgroups", { classId }],
+    enabled: !!user && !isNaN(classId)
+  });
+  
   const isLoading = classLoading || schedulesLoading || subjectsLoading || 
-                    teachersLoading || classesLoading || homeworkLoading || gradesLoading;
+                    teachersLoading || classesLoading || homeworkLoading || 
+                    gradesLoading || subgroupsLoading;
   
   return (
     <MainLayout>
@@ -128,6 +135,8 @@ export default function ClassSchedulePage() {
                 homework={homework}
                 currentUser={user}
                 isAdmin={isSchoolAdmin()}
+                subgroups={subgroups}
+                showClassNames={false} // В расписании класса не показываем название класса для каждого урока
                 onAddSchedule={() => {}} // Пустая функция, т.к. не используем добавление расписания на этой странице
               />
             ) : (

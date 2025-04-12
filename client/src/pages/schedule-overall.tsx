@@ -81,8 +81,15 @@ export default function OverallSchedulePage() {
     enabled: !!user
   });
   
+  // Загрузка подгрупп
+  const { data: subgroups = [], isLoading: subgroupsLoading } = useQuery<any[]>({
+    queryKey: ["/api/subgroups"],
+    enabled: !!user
+  });
+  
   const isLoading = schedulesLoading || subjectsLoading || 
-                    teachersLoading || classesLoading || homeworkLoading || gradesLoading;
+                    teachersLoading || classesLoading || homeworkLoading || 
+                    gradesLoading || subgroupsLoading;
   
   // Фильтрация расписания по школе администратора
   const schoolClasses = classes.filter(cls => cls.schoolId === getSchoolId());
@@ -170,6 +177,8 @@ export default function OverallSchedulePage() {
                 homework={homework}
                 currentUser={user}
                 isAdmin={isSchoolAdmin()}
+                subgroups={subgroups}
+                showClassNames={true} // Включаем отображение имени класса для каждого урока в общем расписании
                 onAddSchedule={() => {}} // Пустая функция, т.к. не используем добавление расписания на этой странице
               />
             ) : (
