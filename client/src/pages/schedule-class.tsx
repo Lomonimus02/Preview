@@ -3,6 +3,7 @@ import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/main-layout";
 import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
+import { ScheduleGrid } from "@/components/schedule/schedule-grid";
 import { TimeSlotsManager } from "@/components/schedule/time-slots-manager";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/use-auth";
@@ -270,30 +271,66 @@ export default function ClassSchedulePage() {
               </TabsList>
               
               <TabsContent value="schedule" className="mt-4">
-                {schedules.length > 0 ? (
-                  <ScheduleCarousel
-                    schedules={schedules}
-                    subjects={subjects}
-                    teachers={teachers}
-                    classes={classes}
-                    grades={grades}
-                    homework={homework}
-                    currentUser={user}
-                    isAdmin={isSchoolAdmin()}
-                    subgroups={subgroups}
-                    showClassNames={false} // В расписании класса не показываем название класса для каждого урока
-                    onAddSchedule={handleAddSchedule} // Обработчик добавления урока
-                    onEditSchedule={handleEditSchedule} // Обработчик редактирования урока
-                    onDeleteSchedule={handleDeleteSchedule} // Обработчик удаления урока
-                  />
-                ) : (
-                  <Alert>
-                    <AlertTitle>Расписание отсутствует</AlertTitle>
-                    <AlertDescription>
-                      Для данного класса еще не создано расписание
-                    </AlertDescription>
-                  </Alert>
-                )}
+                <Tabs defaultValue="grid" className="w-full mb-4">
+                  <TabsList className="grid w-[350px] grid-cols-2">
+                    <TabsTrigger value="grid">Сетка</TabsTrigger>
+                    <TabsTrigger value="carousel">Карусель</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="grid" className="mt-4">
+                    {schedules.length > 0 ? (
+                      <ScheduleGrid 
+                        classId={classId}
+                        schedules={schedules}
+                        subjects={subjects}
+                        teachers={teachers}
+                        subgroups={subgroups}
+                        isAdmin={isSchoolAdmin()}
+                        onAddSchedule={(slotNumber) => {
+                          setSelectedDate(new Date());
+                          setScheduleToEdit(null);
+                          setIsScheduleFormOpen(true);
+                        }}
+                        onEditSchedule={handleEditSchedule}
+                        onDeleteSchedule={handleDeleteSchedule}
+                      />
+                    ) : (
+                      <Alert>
+                        <AlertTitle>Расписание отсутствует</AlertTitle>
+                        <AlertDescription>
+                          Для данного класса еще не создано расписание
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="carousel" className="mt-4">
+                    {schedules.length > 0 ? (
+                      <ScheduleCarousel
+                        schedules={schedules}
+                        subjects={subjects}
+                        teachers={teachers}
+                        classes={classes}
+                        grades={grades}
+                        homework={homework}
+                        currentUser={user}
+                        isAdmin={isSchoolAdmin()}
+                        subgroups={subgroups}
+                        showClassNames={false}
+                        onAddSchedule={handleAddSchedule}
+                        onEditSchedule={handleEditSchedule}
+                        onDeleteSchedule={handleDeleteSchedule}
+                      />
+                    ) : (
+                      <Alert>
+                        <AlertTitle>Расписание отсутствует</AlertTitle>
+                        <AlertDescription>
+                          Для данного класса еще не создано расписание
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </TabsContent>
               
               <TabsContent value="time-slots" className="mt-4">

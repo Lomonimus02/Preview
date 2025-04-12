@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Schedule, TimeSlot, ClassTimeSlot } from '@shared/schema';
-import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import { Schedule } from '@shared/schema';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Edit, Trash2, Plus, Clock } from 'lucide-react';
+import { TimeSlot, ClassTimeSlot } from '@shared/schema';
 
+// Интерфейс для сетки расписания
 interface ScheduleGridProps {
   schedules: Schedule[];
   classId: number;
@@ -21,240 +22,257 @@ interface ScheduleGridProps {
   isAdmin?: boolean;
 }
 
+// Названия дней недели
+const DAYS_OF_WEEK = [
+  'Понедельник', 
+  'Вторник', 
+  'Среда', 
+  'Четверг', 
+  'Пятница', 
+  'Суббота', 
+  'Воскресенье'
+];
+
 export const ScheduleGrid: React.FC<ScheduleGridProps> = ({
   schedules,
   classId,
   dayOfWeek,
   subjects,
   teachers,
-  subgroups = [],
+  subgroups,
   onAddSchedule,
   onEditSchedule,
   onDeleteSchedule,
   isAdmin = false
 }) => {
-  // Загрузка временных слотов
+  // Получение слотов по умолчанию
   const { data: defaultSlots = [], isLoading: defaultSlotsLoading } = useQuery<TimeSlot[]>({
     queryKey: ['/api/time-slots/defaults'],
   });
 
-  // Загрузка настроенных слотов для класса
+  // Получение настроенных слотов для класса
   const { data: classTimeSlots = [], isLoading: classTimeSlotsLoading } = useQuery<ClassTimeSlot[]>({
     queryKey: ['/api/class', classId, 'time-slots'],
     enabled: !!classId,
   });
 
-  // Определение максимального номера урока в расписании
-  const maxSlotNumber = Math.max(
-    ...schedules.map(s => s.slotNumber || 0),
-    ...defaultSlots.map(s => s.slotNumber),
-    9 // Всегда отображаем до 9-го урока включительно
-  );
+  // Фильтрация расписаний по дню недели, если указан
+  const filteredSchedules = dayOfWeek !== undefined
+    ? schedules.filter(s => s.dayOfWeek === dayOfWeek)
+    : schedules;
 
-  // Определение количества дней для отображения
-  const days = dayOfWeek 
-    ? [dayOfWeek] 
-    : [1, 2, 3, 4, 5, 6, 7]; // 1-7: Понедельник-Воскресенье
+  // Определение отображаемых дней недели
+  const daysToShow = dayOfWeek !== undefined
+    ? [dayOfWeek]
+    : [...new Set(filteredSchedules.map(s => s.dayOfWeek))].sort();
 
-  // Получение эффективного временного слота (настроенного для класса или по умолчанию)
+  // Если нет уроков, но мы хотим показать определенный день
+  if (dayOfWeek !== undefined && !daysToShow.includes(dayOfWeek)) {
+    daysToShow.push(dayOfWeek);
+  }
+
+  // Добавляем дни недели, для которых есть уроки, но которых нет в наборе
+  if (dayOfWeek === undefined) {
+    for (let i = 0; i < 7; i++) {
+      if (!daysToShow.includes(i) && i < 6) { // Добавляем все дни кроме воскресенья
+        daysToShow.push(i);
+      }
+    }
+    daysToShow.sort(); // Сортируем дни недели
+  }
+
+  // Получение эффективного значения слота времени (класс или по умолчанию)
   const getEffectiveTimeSlot = (slotNumber: number) => {
-    // Сначала ищем настроенный слот для класса
     const classSlot = classTimeSlots.find(slot => slot.slotNumber === slotNumber);
-    if (classSlot) return classSlot;
-    
-    // Если не найден, используем слот по умолчанию
+    if (classSlot) {
+      return classSlot;
+    }
     return defaultSlots.find(slot => slot.slotNumber === slotNumber);
   };
 
-  // Проверка, имеет ли день хотя бы один урок с номером >= slotNumber
-  const dayHasLaterLesson = (day: number, slotNumber: number) => {
-    return schedules.some(s => 
-      s.dayOfWeek === day && 
-      (s.slotNumber === undefined || s.slotNumber >= slotNumber)
-    );
-  };
-
-  // Проверка, должен ли урок отображаться в сетке
-  // По условию задачи:
-  // 1. Слот "0 урок" всегда отображается, если в этот день есть хотя бы один урок
-  // 2. Промежуточные пустые слоты отображаются до последнего урока в этот день
-  const shouldShowSlot = (day: number, slotNumber: number) => {
-    const daySchedules = schedules.filter(s => s.dayOfWeek === day);
-    
-    // Если это 0-й урок и в этот день есть любые уроки
-    if (slotNumber === 0 && daySchedules.length > 0) {
-      return true;
-    }
-
-    // Определяем максимальный номер урока в этот день
-    const maxSlotNumberInDay = Math.max(
-      0, // Минимум 0
-      ...daySchedules.map(s => s.slotNumber || 0)
-    );
-
-    // Если слот меньше или равен максимальному номеру урока в этот день
-    return slotNumber <= maxSlotNumberInDay;
+  // Функция для форматирования времени
+  const formatTime = (timeString: string) => {
+    return timeString.substring(0, 5); // Обрезаем до формата HH:MM
   };
 
   // Получение расписания для конкретного дня и слота
-  const getScheduleForSlot = (day: number, slotNumber: number) => {
-    return schedules.filter(s => 
-      s.dayOfWeek === day && 
-      s.slotNumber === slotNumber
+  const getScheduleForSlot = (dayOfWeek: number, slotNumber: number) => {
+    return filteredSchedules.find(s => 
+      s.dayOfWeek === dayOfWeek && 
+      getSlotNumberForTime(s.startTime) === slotNumber
     );
   };
 
-  // Форматирование названия дня недели
-  const getDayName = (day: number) => {
-    const days = [
-      'Понедельник', 'Вторник', 'Среда', 
-      'Четверг', 'Пятница', 'Суббота', 'Воскресенье'
-    ];
-    return days[day - 1]; // day: 1-7
+  // Определение номера слота по времени начала
+  const getSlotNumberForTime = (startTime: string) => {
+    for (let i = 0; i < defaultSlots.length; i++) {
+      const slot = getEffectiveTimeSlot(defaultSlots[i].slotNumber);
+      if (slot && startTime === slot.startTime) {
+        return slot.slotNumber;
+      }
+    }
+    return 0; // Если не найдено, вернуть 0 урок
   };
 
-  // Получение сокращенного названия предмета
+  // Все доступные слоты (от 0 до максимального используемого)
+  const getAvailableSlots = () => {
+    const slots = new Set<number>();
+    
+    // Добавление всех слотов из временных настроек
+    defaultSlots.forEach(slot => slots.add(slot.slotNumber));
+    
+    // Добавление слотов из текущего расписания
+    filteredSchedules.forEach(schedule => {
+      const slotNumber = getSlotNumberForTime(schedule.startTime);
+      slots.add(slotNumber);
+    });
+    
+    return Array.from(slots).sort((a, b) => a - b);
+  };
+
+  const availableSlots = getAvailableSlots();
+
+  // Функция для получения названия предмета
   const getSubjectName = (subjectId: number) => {
     const subject = subjects.find(s => s.id === subjectId);
-    return subject?.name || 'Предмет';
+    return subject ? subject.name : 'Неизвестный предмет';
   };
 
-  // Получение ФИО учителя
+  // Функция для получения имени учителя
   const getTeacherName = (teacherId: number) => {
     const teacher = teachers.find(t => t.id === teacherId);
-    if (!teacher) return 'Учитель';
-    return `${teacher.lastName} ${teacher.firstName?.charAt(0) || ''}. ${teacher.middleName?.charAt(0) || ''}`.trim();
+    return teacher ? `${teacher.lastName} ${teacher.firstName[0]}.` : 'Неизвестный учитель';
   };
 
-  // Получение названия подгруппы
-  const getSubgroupName = (subgroupId?: number) => {
-    if (!subgroupId) return '';
-    const subgroup = subgroups.find(s => s.id === subgroupId);
-    return subgroup?.name || '';
+  // Функция для получения названия подгруппы
+  const getSubgroupName = (subgroupId: number | null) => {
+    if (!subgroupId) return null;
+    const subgroup = subgroups?.find(s => s.id === subgroupId);
+    return subgroup ? subgroup.name : 'Неизвестная подгруппа';
   };
 
+  // Если данные загружаются, показываем индикатор загрузки
   if (defaultSlotsLoading || classTimeSlotsLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-3">Загрузка временных слотов...</span>
-      </div>
-    );
+    return <div className="p-4">Загрузка расписания...</div>;
   }
 
-  // Создаем массив слотов для отображения
-  const slotsToShow = Array.from({ length: maxSlotNumber + 1 }, (_, i) => i)
-    .filter(slotNumber => {
-      // Проверяем, есть ли хотя бы один день, где этот слот должен отображаться
-      return days.some(day => shouldShowSlot(day, slotNumber));
-    });
-
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[800px]">
-        {/* Заголовок с днями недели */}
-        <div className="grid grid-cols-[150px_repeat(7,1fr)] gap-1 mb-2">
-          <div className="bg-primary-50 p-2 rounded flex items-center justify-center font-medium">
-            Время
-          </div>
-          {days.map(day => (
-            <div key={day} className="bg-primary-100 p-2 rounded flex items-center justify-center font-medium">
-              {getDayName(day)}
-            </div>
-          ))}
-        </div>
-        
-        {/* Строки с временными слотами */}
-        {slotsToShow.map(slotNumber => {
-          const timeSlot = getEffectiveTimeSlot(slotNumber);
-          
-          return (
-            <div key={slotNumber} className="grid grid-cols-[150px_repeat(7,1fr)] gap-1 mb-2">
-              {/* Ячейка времени */}
-              <div className="bg-primary-50 p-2 rounded flex flex-col items-center justify-center">
-                <div className="font-medium">{slotNumber} урок</div>
-                <div className="text-sm text-gray-600">
-                  {timeSlot ? `${timeSlot.startTime} - ${timeSlot.endTime}` : '—'}
-                </div>
-              </div>
-              
-              {/* Ячейки для каждого дня недели */}
-              {days.map(day => {
-                const slotSchedules = getScheduleForSlot(day, slotNumber);
-                const shouldDisplay = shouldShowSlot(day, slotNumber);
-                
-                if (!shouldDisplay) {
-                  return <div key={day} className="hidden"></div>;
-                }
+    <div className="space-y-6">
+      {daysToShow.map(day => (
+        <Card key={day} className="overflow-hidden">
+          <CardHeader className="bg-muted/30">
+            <CardTitle>{DAYS_OF_WEEK[day]}</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4">
+            <div className="space-y-2">
+              {availableSlots.map(slotNumber => {
+                const schedule = getScheduleForSlot(day, slotNumber);
+                const timeSlot = getEffectiveTimeSlot(slotNumber);
                 
                 return (
                   <div 
-                    key={day} 
-                    className={cn(
-                      "relative p-2 rounded min-h-[80px] flex flex-col justify-center",
-                      slotSchedules.length > 0 
-                        ? "bg-primary-100 border border-primary" 
-                        : "bg-gray-50 border border-gray-200"
-                    )}
+                    key={`${day}-${slotNumber}`} 
+                    className="grid grid-cols-12 gap-2 p-3 rounded-md border hover:bg-muted/20"
                   >
-                    {slotSchedules.length > 0 ? (
-                      slotSchedules.map(schedule => (
-                        <TooltipProvider key={schedule.id}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div 
-                                className="cursor-pointer p-1 hover:bg-primary-200 rounded"
-                                onClick={() => onEditSchedule && onEditSchedule(schedule)}
-                              >
-                                <div className="font-medium text-sm">
-                                  {getSubjectName(schedule.subjectId)}
-                                </div>
-                                <div className="text-xs">
-                                  {getTeacherName(schedule.teacherId)}
-                                </div>
-                                <div className="flex items-center justify-between mt-1">
-                                  {schedule.room && (
-                                    <span className="text-xs text-gray-600">
-                                      Каб: {schedule.room}
-                                    </span>
-                                  )}
-                                  {schedule.subgroupId && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {getSubgroupName(schedule.subgroupId)}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="text-sm">
-                                <div><strong>Предмет:</strong> {getSubjectName(schedule.subjectId)}</div>
-                                <div><strong>Учитель:</strong> {getTeacherName(schedule.teacherId)}</div>
-                                {schedule.room && <div><strong>Кабинет:</strong> {schedule.room}</div>}
-                                {schedule.subgroupId && <div><strong>Подгруппа:</strong> {getSubgroupName(schedule.subgroupId)}</div>}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      ))
+                    <div className="col-span-2 flex items-center">
+                      <Badge variant="outline" className="flex items-center space-x-1 py-2">
+                        <Clock className="h-3 w-3" />
+                        <span>
+                          {timeSlot ? 
+                            `${formatTime(timeSlot.startTime)}-${formatTime(timeSlot.endTime)}` : 
+                            `Урок ${slotNumber}`
+                          }
+                        </span>
+                      </Badge>
+                    </div>
+                    
+                    {schedule ? (
+                      <div className="col-span-8 flex flex-col">
+                        <div className="font-medium">{getSubjectName(schedule.subjectId)}</div>
+                        <div className="text-sm text-muted-foreground flex flex-wrap gap-x-3">
+                          <span>{getTeacherName(schedule.teacherId)}</span>
+                          {schedule.room && <span>Каб. {schedule.room}</span>}
+                          {schedule.subgroupId && (
+                            <Badge variant="secondary">{getSubgroupName(schedule.subgroupId)}</Badge>
+                          )}
+                        </div>
+                      </div>
                     ) : (
-                      isAdmin && (
-                        <Button 
-                          variant="ghost" 
-                          className="text-gray-400 hover:text-gray-600 w-full h-full"
-                          onClick={() => onAddSchedule && onAddSchedule(slotNumber)}
-                        >
-                          +
-                        </Button>
-                      )
+                      <div className="col-span-8 flex items-center text-muted-foreground text-sm">
+                        Нет урока
+                      </div>
                     )}
+                    
+                    <div className="col-span-2 flex justify-end items-center space-x-1">
+                      {isAdmin && (
+                        <>
+                          {schedule ? (
+                            <>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      onClick={() => onEditSchedule && onEditSchedule(schedule)}
+                                      className="h-8 w-8"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Редактировать урок</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                              
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      onClick={() => onDeleteSchedule && onDeleteSchedule(schedule)}
+                                      className="h-8 w-8 text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Удалить урок</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </>
+                          ) : (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    onClick={() => onAddSchedule && onAddSchedule(slotNumber)}
+                                    className="h-8 w-8"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Добавить урок</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 );
               })}
             </div>
-          );
-        })}
-      </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 };
