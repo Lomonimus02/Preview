@@ -1,167 +1,178 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
-import { useRoleCheck } from "@/hooks/use-role-check";
-import { Class } from "@shared/schema";
 import { ChevronDown, ChevronRight, CalendarIcon } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { Class, UserRoleEnum } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 
 export function AdminScheduleMenu() {
-  const { user } = useAuth();
-  const { isSchoolAdmin } = useRoleCheck();
+  const [isOpen, setIsOpen] = useState(false);
   const [location] = useLocation();
-  const [isExpanded, setIsExpanded] = useState(false);
+  const { user } = useAuth();
   
-  // Определяем, активна ли страница с расписанием
-  const isActive = location.startsWith('/schedule');
-  
-  // Если страница активна, автоматически раскрываем меню
+  // При переходе на другую страницу, закрываем меню
   useEffect(() => {
-    if (isActive) {
-      setIsExpanded(true);
-    }
-  }, [isActive]);
+    setIsOpen(false);
+  }, [location]);
 
-  // Получаем информацию о школе администратора
-  const { data: user_info } = useQuery({
-    queryKey: ["/api/user"],
-    enabled: !!user && isSchoolAdmin()
+  // Загружаем список классов школы
+  const { data: schools = [] } = useQuery({
+    queryKey: ["/api/schools"],
+    enabled: user?.activeRole === UserRoleEnum.SCHOOL_ADMIN || 
+             user?.activeRole === UserRoleEnum.PRINCIPAL || 
+             user?.activeRole === UserRoleEnum.VICE_PRINCIPAL
   });
 
-  // Получаем список классов для школы администратора
-  const { data: classes = [], isLoading: classesLoading } = useQuery<Class[]>({
-    queryKey: ["/api/classes"],
-    queryFn: async () => {
-      if (!user) return [];
+  // Находим ID школы для текущего пользователя
+  const getSchoolId = () => {
+    // Проверяем, является ли пользователь администратором школы
+    if (user?.activeRole === UserRoleEnum.SCHOOL_ADMIN || 
+        user?.activeRole === UserRoleEnum.PRINCIPAL || 
+        user?.activeRole === UserRoleEnum.VICE_PRINCIPAL) {
       
-      // Определяем schoolId
-      let schoolId: number | null = null;
-      
-      // Пытаемся получить schoolId из профиля пользователя или из его ролей
-      console.log("Проверка роли администратора школы...");
+      // Пытаемся найти ID школы из профиля пользователя
       if (user.schoolId) {
-        console.log("schoolId из профиля:", user.schoolId);
-        schoolId = user.schoolId;
-      } else if (user.activeRole?.schoolId) {
-        console.log("schoolId из роли:", user.activeRole.schoolId);
-        schoolId = user.activeRole.schoolId;
+        return user.schoolId;
       }
-      
-      console.log("Используемый schoolId:", schoolId);
-      
-      // Если ID школы не найден, пытаемся получить первую доступную школу для админа
-      if (!schoolId) {
-        console.log("Не найден ID школы для администратора");
-        const schoolsResponse = await apiRequest("/api/schools", "GET");
-        if (schoolsResponse.ok) {
-          const schools = await schoolsResponse.json();
-          if (schools && schools.length > 0) {
-            console.log("Доступные школы:", schools.map((s: any) => `${s.id}: ${s.name}`).join(', '));
-            schoolId = schools[0].id;
-            console.log("Использование первой доступной школы:", schoolId, schools[0].name);
-          }
-        }
+
+      // Если ID школы не найден в профиле, и есть доступные школы,
+      // используем первую доступную школу
+      if (schools.length > 0) {
+        console.log("Используем первую доступную школу:", schools[0].id, schools[0].name);
+        return schools[0].id;
       }
-      
-      if (!schoolId) {
-        console.error("Не удалось определить ID школы для администратора");
-        return [];
-      }
-      
-      // Загружаем классы для конкретной школы
-      const res = await apiRequest(`/api/classes?schoolId=${schoolId}`, "GET");
-      if (!res.ok) throw new Error("Не удалось загрузить классы");
-      const data = await res.json();
-      return data;
-    },
-    enabled: !!user && isSchoolAdmin(),
-    // Добавляем обновление, чтобы новые классы быстрее отображались в меню
-    refetchInterval: 60000, // Проверка каждую минуту
-    refetchOnWindowFocus: true
+    }
+    
+    return null;
+  };
+
+  const schoolId = getSchoolId();
+
+  // Загружаем список классов школы
+  const { data: classes = [] } = useQuery<Class[]>({
+    queryKey: ["/api/classes", { schoolId }],
+    enabled: !!schoolId
   });
 
-  // Проверяем, активна ли страница расписания для конкретного класса
-  const isClassScheduleActive = (classId: number) => {
-    return location === `/schedule/class/${classId}`;
+  // Сортировка классов по номеру и букве
+  const sortedClasses = [...classes].sort((a, b) => {
+    const aName = a.name || "";
+    const bName = b.name || "";
+    
+    // Извлекаем числовую часть имени класса (например, "10" из "10А")
+    const aNumMatch = aName.match(/^(\d+)/);
+    const bNumMatch = bName.match(/^(\d+)/);
+    
+    const aNum = aNumMatch ? parseInt(aNumMatch[1]) : 0;
+    const bNum = bNumMatch ? parseInt(bNumMatch[1]) : 0;
+    
+    // Сначала сортируем по числу
+    if (aNum !== bNum) {
+      return aNum - bNum;
+    }
+    
+    // При одинаковых числах сортируем по букве
+    return aName.localeCompare(bName);
+  });
+
+  // Проверяем, является ли текущий путь активным
+  const isLinkActive = (href: string) => {
+    return location === href || (href !== "/" && location.startsWith(href));
   };
 
-  // Проверяем, активна ли страница общего расписания
-  const isGeneralScheduleActive = () => {
-    return location === '/schedule/general';
-  };
+  // Проверяем, должно ли меню быть открытым на основе текущего пути
+  useEffect(() => {
+    // Если текущий путь начинается с "/schedule", открываем меню
+    if (location.startsWith("/schedule")) {
+      setIsOpen(true);
+    }
+  }, [location]);
 
-  // Сортируем классы по имени
-  const sortedClasses = [...classes].sort((a, b) => a.name.localeCompare(b.name));
+  // Если у пользователя нет нужной роли или нет доступных классов, не показываем меню
+  if (
+    !user ||
+    !(
+      user.activeRole === UserRoleEnum.SCHOOL_ADMIN ||
+      user.activeRole === UserRoleEnum.PRINCIPAL ||
+      user.activeRole === UserRoleEnum.VICE_PRINCIPAL
+    )
+  ) {
+    return null;
+  }
 
   return (
-    <div className="relative mb-2">
-      {/* Основной пункт меню "Расписание" */}
-      <div
+    <div className="mb-2">
+      {/* Кнопка меню */}
+      <button
         className={cn(
-          "group flex items-center px-2 py-2 text-sm font-medium rounded-md cursor-pointer w-full",
-          isActive 
-            ? "bg-primary text-white" 
+          "w-full group flex items-center px-2 py-2 text-sm font-medium rounded-md",
+          isOpen || location.includes("/schedule")
+            ? "bg-primary text-white"
             : "text-gray-700 hover:bg-primary-50 hover:text-gray-900"
         )}
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={() => setIsOpen(!isOpen)}
       >
-        <span className={cn(
-          isActive 
-            ? "text-white" 
-            : "text-gray-500 group-hover:text-gray-700"
-        )}>
-          <CalendarIcon className="h-4 w-4 mr-3" />
+        <span
+          className={cn(
+            "mr-3",
+            isOpen || location.includes("/schedule")
+              ? "text-white"
+              : "text-gray-500 group-hover:text-gray-700"
+          )}
+        >
+          <CalendarIcon className="h-4 w-4" />
         </span>
-        <span className="truncate flex-1">Расписание</span>
-        {isExpanded ? (
+        <span className="flex-1 text-left">Расписание</span>
+        {isOpen ? (
           <ChevronDown className="h-4 w-4" />
         ) : (
           <ChevronRight className="h-4 w-4" />
         )}
-      </div>
+      </button>
 
-      {/* Выпадающее меню с классами и общим расписанием */}
-      {isExpanded && (
-        <div className="ml-6 mt-1 space-y-1">
-          {/* Пункт "Общее расписание" */}
+      {/* Выпадающий список */}
+      {isOpen && (
+        <div className="pl-8 mt-1 space-y-1">
           <Link href="/schedule/general">
-            <div 
+            <div
               className={cn(
-                "flex items-center text-sm py-1.5 px-3 rounded-md w-full cursor-pointer",
-                isGeneralScheduleActive() 
-                  ? "bg-accent/50 text-accent-foreground" 
-                  : "hover:bg-muted text-foreground/80"
+                "group flex items-center px-3 py-1.5 text-sm font-medium rounded-md",
+                isLinkActive("/schedule/general")
+                  ? "bg-primary/10 text-primary"
+                  : "text-gray-700 hover:bg-primary-50 hover:text-gray-900"
               )}
             >
-              <span className="truncate">Общее расписание</span>
+              Общее расписание
             </div>
           </Link>
-          
+
           {/* Список классов */}
-          {classesLoading ? (
-            <div className="text-sm text-muted-foreground py-1 px-3">Загрузка классов...</div>
-          ) : sortedClasses.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-1 px-3">Нет доступных классов</div>
-          ) : (
-            sortedClasses.map((classItem) => (
-              <div key={classItem.id}>
-                <Link href={`/schedule/class/${classItem.id}`}>
-                  <div 
+          <div className="mt-2">
+            <div className="px-3 py-1 text-xs uppercase text-gray-500 font-semibold">
+              Классы
+            </div>
+            <div className="space-y-1 mt-1">
+              {sortedClasses.map((classItem) => (
+                <Link
+                  key={classItem.id}
+                  href={`/schedule-class/${classItem.id}`}
+                >
+                  <div
                     className={cn(
-                      "flex items-center text-sm py-1.5 px-3 rounded-md w-full cursor-pointer",
-                      isClassScheduleActive(classItem.id) 
-                        ? "bg-accent/50 text-accent-foreground" 
-                        : "hover:bg-muted text-foreground/80"
+                      "group flex items-center px-3 py-1.5 text-sm font-medium rounded-md",
+                      isLinkActive(`/schedule-class/${classItem.id}`)
+                        ? "bg-primary/10 text-primary"
+                        : "text-gray-700 hover:bg-primary-50 hover:text-gray-900"
                     )}
                   >
-                    <span className="truncate">{classItem.name}</span>
+                    {classItem.name}
                   </div>
                 </Link>
-              </div>
-            ))
-          )}
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

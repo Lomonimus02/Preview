@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Schedule, Class } from "@shared/schema";
+import { Schedule, Class, Subject, User } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
 import { apiRequest } from "@/lib/queryClient";
@@ -11,13 +12,11 @@ import { ScheduleDayCard } from "@/components/schedule/schedule-day-card";
 import { MainLayout } from "@/components/layout/main-layout";
 import { formatDate, getDayOfWeekName } from "@/lib/date-utils";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function GeneralSchedulePage() {
   const { user } = useAuth();
   const { isSchoolAdmin } = useRoleCheck();
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedClass, setSelectedClass] = useState<string>("all");
   
   // Устанавливаем начало недели на понедельник
   useEffect(() => {
@@ -54,86 +53,41 @@ export default function GeneralSchedulePage() {
     setCurrentDate(today);
   };
 
-  // Получаем информацию о школе администратора
-  const { data: userInfo } = useQuery({
-    queryKey: ["/api/user"],
-    enabled: !!user && isSchoolAdmin()
+  // Загружаем список школ
+  const { data: schools = [], isLoading: schoolsLoading } = useQuery({
+    queryKey: ["/api/schools"],
+    enabled: isSchoolAdmin()
   });
 
-  // Загружаем список классов школы
-  const { data: classes = [], isLoading: classesLoading } = useQuery<Class[]>({
-    queryKey: ["/api/classes"],
-    queryFn: async () => {
-      // Определяем schoolId
-      let schoolId: number | null = null;
-      
-      // Пытаемся получить schoolId из профиля пользователя или из его ролей
-      if (user?.schoolId) {
-        schoolId = user.schoolId;
-      } else if (user?.activeRole?.schoolId) {
-        schoolId = user.activeRole.schoolId;
-      }
-      
-      // Если ID школы не найден, пытаемся получить первую доступную школу для админа
-      if (!schoolId) {
-        const schoolsResponse = await apiRequest("/api/schools", "GET");
-        if (schoolsResponse.ok) {
-          const schools = await schoolsResponse.json();
-          if (schools && schools.length > 0) {
-            schoolId = schools[0].id;
-          }
-        }
-      }
-      
-      if (!schoolId) {
-        console.error("Не удалось определить ID школы для администратора");
-        return [];
-      }
-      
-      // Загружаем классы для конкретной школы
-      const res = await apiRequest(`/api/classes?schoolId=${schoolId}`, "GET");
-      if (!res.ok) throw new Error("Не удалось загрузить классы");
-      return res.json();
-    },
-    enabled: !!user && isSchoolAdmin()
-  });
+  // Находим ID школы для текущего пользователя
+  const getSchoolId = () => {
+    if (user?.schoolId) {
+      return user.schoolId;
+    }
+    
+    // Если ID школы не найден в профиле и есть доступные школы,
+    // используем первую доступную школу
+    if (schools && schools.length > 0) {
+      console.log("Используем первую доступную школу:", schools[0].id, schools[0].name);
+      return schools[0].id;
+    }
+    
+    return null;
+  };
+
+  const schoolId = getSchoolId();
 
   // Загружаем расписание для всех классов школы
   const { data: schedules = [], isLoading: schedulesLoading } = useQuery<Schedule[]>({
     queryKey: ["/api/schedules"],
-    queryFn: async () => {
-      // Определяем schoolId
-      let schoolId: number | null = null;
-      
-      // Пытаемся получить schoolId из профиля пользователя или из его ролей
-      if (user?.schoolId) {
-        schoolId = user.schoolId;
-      } else if (user?.activeRole?.schoolId) {
-        schoolId = user.activeRole.schoolId;
-      }
-      
-      // Если ID школы не найден, пытаемся получить первую доступную школу для админа
-      if (!schoolId) {
-        const schoolsResponse = await apiRequest("/api/schools", "GET");
-        if (schoolsResponse.ok) {
-          const schools = await schoolsResponse.json();
-          if (schools && schools.length > 0) {
-            schoolId = schools[0].id;
-          }
-        }
-      }
-      
-      if (!schoolId) {
-        return [];
-      }
-      
-      // Загружаем расписания для всех классов школы
-      const res = await apiRequest(`/api/schedules?schoolId=${schoolId}`, "GET");
-      if (!res.ok) throw new Error("Не удалось загрузить расписание");
-      return res.json();
-    },
-    enabled: !!user && isSchoolAdmin(),
+    enabled: isSchoolAdmin() && !!schoolId,
     refetchInterval: 60000 // Обновляем каждую минуту
+  });
+
+  // Загружаем классы для отображения информации
+  const { data: classes = [], isLoading: classesLoading } = useQuery<Class[]>({
+    queryKey: ["/api/classes"],
+    enabled: isSchoolAdmin() && !!schoolId
   });
 
   // Создаем массив дат для текущей недели
@@ -143,37 +97,20 @@ export default function GeneralSchedulePage() {
     return date;
   });
 
-  // Фильтруем расписание в соответствии с выбранным классом
-  const filteredSchedules = selectedClass === "all" 
-    ? schedules 
-    : schedules.filter(schedule => schedule.classId === parseInt(selectedClass));
-
   // Группируем расписание по дням недели
   const scheduleByDay = weekDates.map(date => {
     const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay(); // Преобразуем 0 (воскресенье) в 7
     const formattedDate = formatDate(date);
     
     // Фильтруем занятия для этого дня недели
-    const daySchedules = filteredSchedules.filter(schedule => {
+    const daySchedules = schedules.filter(schedule => {
       const scheduleDayOfWeek = schedule.dayOfWeek;
       return scheduleDayOfWeek === dayOfWeek;
     });
     
-    // Сортируем занятия по времени начала и имени класса
+    // Сортируем занятия по времени начала
     daySchedules.sort((a, b) => {
-      if (a.startTime !== b.startTime) {
-        return a.startTime.localeCompare(b.startTime);
-      }
-      
-      // Получаем информацию о классе
-      const classA = classes.find(c => c.id === a.classId);
-      const classB = classes.find(c => c.id === b.classId);
-      
-      if (classA && classB) {
-        return classA.name.localeCompare(classB.name);
-      }
-      
-      return 0;
+      return a.startTime.localeCompare(b.startTime);
     });
     
     return {
@@ -184,10 +121,12 @@ export default function GeneralSchedulePage() {
     };
   });
 
-  const isLoading = classesLoading || schedulesLoading;
+  const isLoading = schoolsLoading || schedulesLoading || classesLoading;
 
-  // Сортируем классы по имени
-  const sortedClasses = [...classes].sort((a, b) => a.name.localeCompare(b.name));
+  // Вспомогательная функция для получения информации о классе
+  const getClassInfo = (classId: number) => {
+    return classes.find(c => c.id === classId);
+  };
 
   return (
     <MainLayout>
@@ -233,24 +172,6 @@ export default function GeneralSchedulePage() {
               </Button>
             </div>
           </div>
-          
-          {/* Фильтр по классам */}
-          <div className="flex justify-start">
-            <Tabs 
-              value={selectedClass} 
-              onValueChange={setSelectedClass}
-              className="w-full sm:w-auto overflow-x-auto"
-            >
-              <TabsList className="grid-flow-col inline-grid auto-cols-max gap-1 p-1">
-                <TabsTrigger value="all">Все классы</TabsTrigger>
-                {sortedClasses.map(classItem => (
-                  <TabsTrigger key={classItem.id} value={classItem.id.toString()}>
-                    {classItem.name}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          </div>
 
           {isLoading ? (
             <div className="flex justify-center items-center py-12">
@@ -273,17 +194,20 @@ export default function GeneralSchedulePage() {
                         <p className="text-sm">Нет занятий</p>
                       </div>
                     ) : (
-                      <div className="space-y-2">
-                        {day.schedules.map(schedule => (
-                          <ScheduleDayCard
-                            key={schedule.id}
-                            schedule={schedule}
-                            isTeacher={false}
-                            variant="vertical"
-                            showClassInfo={selectedClass === "all"}
-                            classes={classes}
-                          />
-                        ))}
+                      <div className="space-y-3">
+                        {day.schedules.map(schedule => {
+                          const classInfo = getClassInfo(schedule.classId);
+                          return (
+                            <ScheduleDayCard
+                              key={schedule.id}
+                              schedule={schedule}
+                              isTeacher={false}
+                              variant="vertical"
+                              showClassInfo={true}
+                              classInfo={classInfo}
+                            />
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
