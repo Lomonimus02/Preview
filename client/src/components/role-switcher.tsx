@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { UserRoleEnum } from "@shared/schema";
@@ -98,12 +98,20 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
   // Находим текущую активную роль
   const activeRole = userRoles.find(role => role.isActive);
   
+  // Используем useState вместо useRef для отслеживания уже выполненных действий, чтобы избежать циклов
+  const [roleActionTaken, setRoleActionTaken] = useState(false);
+  
   // Эффект для принудительного обновления при изменении активной роли пользователя
   // или при входе в систему
   useEffect(() => {
     // Проверяем при входе в систему или при изменении activeRole пользователя
     const checkAndUpdateActiveRole = async () => {
       try {
+        // Предотвращаем повторное выполнение действий в одном цикле рендеринга
+        if (roleActionTaken) {
+          return;
+        }
+        
         // Проверяем, загрузился ли пользователь и его роли
         if (user && !isLoadingRoles && userRoles) {
           // Проверка 1: У пользователя нет ролей - не делаем ничего
@@ -113,6 +121,8 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
   
           // Проверка 2: Нет активной роли в базе данных, но есть роли пользователя - выбираем первую
           if (user.activeRole === null && userRoles.length > 0) {
+            // Устанавливаем флаг, что уже выполняли действие
+            setRoleActionTaken(true);
             // Нужно установить активную роль автоматически
             console.log('Нет активной роли, автоматически устанавливаем первую из списка:', userRoles[0].role);
             switchRoleMutation.mutate(userRoles[0].role);
@@ -120,7 +130,10 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
           }
           
           // Проверка 3: Активная роль установлена, но не соответствует ни одной из доступных ролей
-          if (user.activeRole && !userRoles.some(r => r.role === user.activeRole)) {
+          // ВАЖНО: только если у нас есть права на изменение роли (мы уже залогинены)
+          if (user.activeRole && !userRoles.some(r => r.role === user.activeRole) && switchRoleMutation.isSuccess) {
+            // Устанавливаем флаг, что уже выполняли действие
+            setRoleActionTaken(true);
             console.log('Активная роль не соответствует доступным ролям, переключаемся на первую доступную');
             switchRoleMutation.mutate(userRoles[0].role);
             return;
@@ -128,10 +141,9 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
           
           // Проверка 4: Активная роль в UI не соответствует активной роли пользователя
           if (user.activeRole && (!activeRole || activeRole.role !== user.activeRole)) {
+            // Не делаем мутаций, только обновляем данные
             console.log('Несоответствие активной роли, обновляем данные');
-            // Сначала обновляем данные пользователя для получения актуальной информации
-            await refetchUser();
-            // Затем инвалидируем кэши зависимых запросов
+            // Обновляем кэши
             queryClient.invalidateQueries({ queryKey: ["/api/user"] });
             queryClient.invalidateQueries({ queryKey: ["/api/my-roles"] });
           }
@@ -141,11 +153,14 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
       }
     };
     
+    // Сбрасываем флаг при изменении зависимостей 
+    setRoleActionTaken(false);
+    
     // Вызываем только если пользователь авторизован и роли загружены
     if (user && !isLoadingRoles) {
       checkAndUpdateActiveRole();
     }
-  }, [user, activeRole, userRoles, isLoadingRoles, switchRoleMutation, queryClient, refetchUser]);
+  }, [user, activeRole, userRoles, isLoadingRoles, switchRoleMutation.isSuccess]);
 
   // Показываем загрузку, если роли еще не загружены
   if (isLoadingRoles) {
