@@ -2573,7 +2573,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Создаем запись
+    console.log("Creating attendance record with data:", attendanceData);
     const newAttendance = await dataStorage.createAttendance(attendanceData);
+    console.log("Created attendance record:", newAttendance);
     
     if (newAttendance.status !== "present") {
       // If student is absent or late, notify parents

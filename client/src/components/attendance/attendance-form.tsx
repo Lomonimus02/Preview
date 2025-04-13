@@ -102,8 +102,8 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
         firstName: student.firstName || "",
         lastName: student.lastName || "",
         attendance: attendance,
-        // Если есть запись о посещаемости, используем её значение, иначе считаем, что студент присутствовал
-        present: attendance ? attendance.status === "present" : true,
+        // Если есть запись о посещаемости, используем её значение, иначе считаем, что статус не отмечен (по умолчанию не отмечен)
+        present: attendance ? attendance.status === "present" : false,
       };
     });
 
