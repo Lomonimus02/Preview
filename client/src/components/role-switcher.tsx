@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { UserRoleEnum } from "@shared/schema";
@@ -97,6 +97,19 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
 
   // Находим текущую активную роль
   const activeRole = userRoles.find(role => role.isActive);
+  
+  // Эффект для принудительного обновления при изменении активной роли пользователя
+  useEffect(() => {
+    if (user && user.activeRole) {
+      // Проверяем, соответствует ли активная роль в интерфейсе текущей роли пользователя
+      if (!activeRole || activeRole.role !== user.activeRole) {
+        // Если активная роль в интерфейсе не соответствует активной роли пользователя, обновляем кэш
+        console.log('Несоответствие активной роли, обновляем данные');
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/my-roles"] });
+      }
+    }
+  }, [user, activeRole, queryClient]);
 
   // Показываем загрузку, если роли еще не загружены
   if (isLoadingRoles) {
