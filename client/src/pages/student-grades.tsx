@@ -756,13 +756,27 @@ export default function StudentGrades() {
   };
   
   // Переключение на предыдущий месяц
-  const goToPreviousMonth = () => {
-    setCurrentMonth(prevMonth => subMonths(prevMonth, 1));
+  // Переключение на предыдущий учебный год
+  const goToPreviousYear = () => {
+    setCurrentYear(prevYear => prevYear - 1);
   };
   
-  // Переключение на следующий месяц
-  const goToNextMonth = () => {
-    setCurrentMonth(prevMonth => addMonths(prevMonth, 1));
+  // Переключение на следующий учебный год
+  const goToNextYear = () => {
+    const nextYear = currentYear + 1;
+    const currentDate = new Date();
+    
+    // Не позволяем выбирать будущие учебные годы
+    // Если текущий месяц сентябрь или позже, то можно выбрать текущий год
+    // Иначе можно выбрать только до предыдущего года
+    const currentMonth = currentDate.getMonth();
+    const maxAllowedYear = currentMonth >= 8 
+      ? currentDate.getFullYear() 
+      : currentDate.getFullYear() - 1;
+      
+    if (nextYear <= maxAllowedYear) {
+      setCurrentYear(nextYear);
+    }
   };
   
   // Получение названия предмета или подгруппы
@@ -859,14 +873,17 @@ export default function StudentGrades() {
         {/* Переключатели периодов */}
         <div className="flex items-center space-x-2">
           {/* Переключатель типа периода */}
-          <Select value={displayPeriod} onValueChange={(value) => setDisplayPeriod(value as 'week' | 'month' | 'semester' | 'year')}>
-            <SelectTrigger className="h-9 w-[140px]">
+          <Select value={displayPeriod} onValueChange={(value) => setDisplayPeriod(value as QuarterType)}>
+            <SelectTrigger className="h-9 w-[180px]">
               <SelectValue placeholder="Период" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="week">Неделя</SelectItem>
-              <SelectItem value="month">Месяц</SelectItem>
-              <SelectItem value="semester">Семестр</SelectItem>
+              <SelectItem value="quarter1">1 четверть</SelectItem>
+              <SelectItem value="quarter2">2 четверть</SelectItem>
+              <SelectItem value="quarter3">3 четверть</SelectItem>
+              <SelectItem value="quarter4">4 четверть</SelectItem>
+              <SelectItem value="semester1">1 полугодие</SelectItem>
+              <SelectItem value="semester2">2 полугодие</SelectItem>
               <SelectItem value="year">Учебный год</SelectItem>
             </SelectContent>
           </Select>
@@ -876,7 +893,7 @@ export default function StudentGrades() {
             <Button 
               variant="ghost" 
               size="icon"
-              onClick={goToPreviousMonth}
+              onClick={goToPreviousYear}
               className="h-7 w-7"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -892,7 +909,7 @@ export default function StudentGrades() {
             <Button 
               variant="ghost" 
               size="icon"
-              onClick={goToNextMonth}
+              onClick={goToNextYear}
               className="h-7 w-7"
             >
               <ChevronRight className="h-4 w-4" />
