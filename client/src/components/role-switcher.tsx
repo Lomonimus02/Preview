@@ -57,13 +57,18 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
     mutationFn: async (role: UserRoleEnum) => {
       if (!user || !user.id) throw new Error("Пользователь не авторизован");
       
-      // Используем endpoint /api/switch-role
-      const res = await apiRequest("/api/switch-role", "POST", { role });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Не удалось сменить роль");
+      try {
+        // Используем endpoint /api/switch-role
+        const res = await apiRequest("/api/switch-role", "POST", { role });
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.message || "Не удалось сменить роль");
+        }
+        return await res.json();
+      } catch (error) {
+        console.error("Ошибка API при смене роли:", error);
+        throw error;
       }
-      return await res.json();
     },
     onSuccess: (updatedUser) => {
       // Обновляем данные пользователя в кэше
