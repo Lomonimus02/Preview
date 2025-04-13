@@ -442,17 +442,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      // Получаем роли пользователя
-      const userRoles = await dataStorage.getUserRoles(req.user.id);
+      console.log(`Попытка смены роли для пользователя ${req.user.id} на роль ${role}`);
       
-      // Проверяем, есть ли у пользователя указанная роль
+      // Получаем все доступные роли пользователя (дополнительные роли из user_roles)
+      const userRoles = await dataStorage.getUserRoles(req.user.id);
+      console.log(`Получены роли пользователя: ${JSON.stringify(userRoles.map(r => r.role))}`);
+      
+      // Проверяем, есть ли у пользователя указанная роль среди дополнительных ролей
       const userRole = userRoles.find(ur => ur.role === role);
       
-      if (!userRole && req.user.role !== role) {
+      // Проверяем, является ли указанная роль основной ролью пользователя
+      const isMainUserRole = req.user.role === role;
+      
+      console.log(`Роль ${role} найдена в дополнительных ролях: ${!!userRole}, основная роль пользователя: ${isMainUserRole}`);
+      
+      // Допускаем переключение только если роль найдена среди дополнительных или является основной
+      if (!userRole && !isMainUserRole) {
+        console.log(`Отказано в смене роли: роль ${role} не найдена среди доступных ролей пользователя`);
         return res.status(403).json({ message: "Forbidden. Role not found or doesn't belong to user" });
       }
       
-      // Используем роль пользователя или значение по умолчанию
+      // Используем найденную дополнительную роль или создаем объект из основной роли
       const newRole = userRole || { 
         role: req.user.role, 
         schoolId: req.user.schoolId 
