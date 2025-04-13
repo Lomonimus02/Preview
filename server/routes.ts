@@ -2408,7 +2408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Attendance API
   app.get("/api/attendance", isAuthenticated, async (req, res) => {
-    let attendance = [];
+    let attendanceList = [];
     
     if (req.query.scheduleId) {
       const scheduleId = parseInt(req.query.scheduleId as string);
@@ -2459,21 +2459,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      attendance = await dataStorage.getAttendanceByStudent(studentId);
+      attendanceList = await dataStorage.getAttendanceByStudent(studentId);
     } else if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
       
       // Teachers, school admins, principals, and vice principals can view class attendance
       if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
-        attendance = await dataStorage.getAttendanceByClass(classId);
+        attendanceList = await dataStorage.getAttendanceByClass(classId);
       } else {
         return res.status(403).json({ message: "Forbidden" });
       }
     } else if (req.user.role === UserRoleEnum.STUDENT) {
-      attendance = await dataStorage.getAttendanceByStudent(req.user.id);
+      attendanceList = await dataStorage.getAttendanceByStudent(req.user.id);
     }
     
-    res.json(attendance);
+    res.json(attendanceList);
   });
 
   app.post("/api/attendance", hasRole([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
