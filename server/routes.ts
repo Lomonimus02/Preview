@@ -1438,18 +1438,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Для каждого расписания получаем связанные задания
     for (const schedule of schedules) {
-      if (schedule.status === 'conducted') {
-        try {
-          // Получаем задания для проведенного урока
-          const assignments = await dataStorage.getAssignmentsBySchedule(schedule.id);
-          if (assignments && assignments.length > 0) {
-            // Добавляем задания к объекту расписания
-            schedule.assignments = assignments;
-          }
-        } catch (error) {
-          console.error(`Error fetching assignments for schedule ${schedule.id}:`, error);
-          // Продолжаем работу даже при ошибке получения заданий
+      try {
+        // Получаем задания для урока независимо от статуса
+        const assignments = await dataStorage.getAssignmentsBySchedule(schedule.id);
+        if (assignments && assignments.length > 0) {
+          // Добавляем задания к объекту расписания
+          schedule.assignments = assignments;
         }
+      } catch (error) {
+        console.error(`Error fetching assignments for schedule ${schedule.id}:`, error);
+        // Продолжаем работу даже при ошибке получения заданий
       }
     }
     
@@ -3128,18 +3126,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Для каждого расписания получаем связанные задания
       for (const schedule of schedules) {
-        if (schedule.status === 'conducted') {
-          try {
-            // Получаем задания для проведенного урока
-            const assignments = await dataStorage.getAssignmentsBySchedule(schedule.id);
-            if (assignments && assignments.length > 0) {
-              // Добавляем задания к объекту расписания
-              schedule.assignments = assignments;
-            }
-          } catch (error) {
-            console.error(`Error fetching assignments for schedule ${schedule.id}:`, error);
-            // Продолжаем работу даже при ошибке получения заданий
+        try {
+          // Получаем задания для урока независимо от статуса
+          const assignments = await dataStorage.getAssignmentsBySchedule(schedule.id);
+          if (assignments && assignments.length > 0) {
+            // Добавляем задания к объекту расписания
+            schedule.assignments = assignments;
           }
+        } catch (error) {
+          console.error(`Error fetching assignments for schedule ${schedule.id}:`, error);
+          // Продолжаем работу даже при ошибке получения заданий
         }
       }
       
@@ -3272,18 +3268,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Для каждого расписания получаем связанные задания
       for (const schedule of studentSchedules) {
-        if (schedule.status === 'conducted') {
-          try {
-            // Получаем задания для проведенного урока
-            const assignments = await dataStorage.getAssignmentsBySchedule(schedule.id);
-            if (assignments && assignments.length > 0) {
-              // Добавляем задания к объекту расписания
-              schedule.assignments = assignments;
-            }
-          } catch (error) {
-            console.error(`Error fetching assignments for schedule ${schedule.id}:`, error);
-            // Продолжаем работу даже при ошибке получения заданий
+        try {
+          // Получаем задания для урока независимо от статуса
+          const assignments = await dataStorage.getAssignmentsBySchedule(schedule.id);
+          if (assignments && assignments.length > 0) {
+            // Добавляем задания к объекту расписания
+            schedule.assignments = assignments;
           }
+        } catch (error) {
+          console.error(`Error fetching assignments for schedule ${schedule.id}:`, error);
+          // Продолжаем работу даже при ошибке получения заданий
         }
       }
       
