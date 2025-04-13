@@ -70,6 +70,9 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
       }
     },
     enabled: !!schedule.id,
+    staleTime: 0, // Ensure fresh data on every mount
+    refetchOnWindowFocus: true, // Refetch when the window regains focus
+    cacheTime: 0, // Don't cache at all, always fetch fresh data
   });
 
   // Получаем студентов подгруппы, если урок связан с подгруппой
