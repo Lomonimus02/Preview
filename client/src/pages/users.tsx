@@ -332,9 +332,26 @@ export default function UsersPage() {
         userData.password = undefined; // Используем undefined вместо delete
       }
       
-      // Добавляем логирование отправляемых данных
+      // Добавляем более детальное логирование отправляемых данных
       console.log("Отправляемые данные пользователя:", userData);
-      console.log("ClassIds:", userData.classIds);
+      console.log("ClassIds (тип):", typeof userData.classIds, Array.isArray(userData.classIds));
+      console.log("ClassIds (значение):", userData.classIds);
+      
+      // Проверяем содержимое данных формы перед отправкой
+      const formValues = form.getValues();
+      console.log("Значения формы перед отправкой:", formValues);
+      console.log("Значение classIds в форме:", formValues.classIds);
+      
+      // Проверка - если это массив и он пуст, заменяем на [] 
+      if (userData.classIds === undefined) {
+        userData.classIds = [];
+        console.log("ClassIds было undefined, установлено в []");
+      }
+      
+      // Проверка - для поддержки обратной совместимости с classId
+      if (userData.role === UserRoleEnum.STUDENT && Array.isArray(userData.classIds) && userData.classIds.length > 0) {
+        console.log(`Устанавливаем classId=${userData.classIds[0]} для обратной совместимости`);
+      }
       
       editUserMutation.mutate({
         id: selectedUser.id,
@@ -371,10 +388,26 @@ export default function UsersPage() {
   // Функции для загрузки данных при редактировании
   const fetchStudentClassesForEdit = async (studentId: number) => {
     try {
+      console.log(`Загрузка классов для ученика ID=${studentId}`);
       const res = await fetch(`/api/student-classes?studentId=${studentId}`);
       if (!res.ok) throw new Error("Failed to fetch student classes");
-      const classes = await res.json();
-      form.setValue("classIds", classes.map((c: Class) => c.id));
+      const studentClassConnections = await res.json();
+      console.log(`Получены классы ученика:`, studentClassConnections);
+      
+      // Извлекаем идентификаторы классов из связей студент-класс
+      // В каждой записи есть поле classId с идентификатором класса
+      const classIds = studentClassConnections.map((connection: { classId: number }) => connection.classId);
+      console.log(`Извлеченные classIds:`, classIds);
+      
+      // Фильтруем null или undefined значения
+      const validClassIds = classIds.filter(id => id !== null && id !== undefined);
+      console.log(`Отфильтрованные classIds:`, validClassIds);
+      
+      // Устанавливаем значение в форме
+      form.setValue("classIds", validClassIds);
+      
+      // Проверяем, что значение действительно установлено
+      console.log(`Текущее значение classIds в форме после установки:`, form.getValues("classIds"));
     } catch (error) {
       console.error("Error fetching student classes:", error);
       toast({
