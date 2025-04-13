@@ -833,16 +833,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Проверяем, меняется ли класс пользователя
-    const classIdChanged = req.body.classId && parseInt(req.body.classId) !== user.classId;
+    // Проверяем оба варианта передачи класса - classId (устаревший) и classIds (новый формат)
+    let newClassId: number | undefined;
+    
+    // Если пришел classIds (массив классов) - берем первый элемент
+    if (req.body.classIds && Array.isArray(req.body.classIds) && req.body.classIds.length > 0) {
+      newClassId = req.body.classIds[0];
+      console.log(`Получен массив classIds: ${req.body.classIds}, используем первый элемент: ${newClassId}`);
+    } 
+    // Если пришел classId (обратная совместимость)
+    else if (req.body.classId) {
+      newClassId = parseInt(req.body.classId);
+      console.log(`Получен classId: ${newClassId}`);
+    }
+    
+    const classIdChanged = newClassId !== undefined && newClassId !== user.classId;
     const oldClassId = user.classId;
     
     // Обновляем базовую информацию пользователя
     const updatedUser = await dataStorage.updateUser(id, req.body);
     
     // Если пользователь студент и его класс изменился, обновляем связанные записи
-    if (updatedUser && (user.role === UserRoleEnum.STUDENT || updatedUser.role === UserRoleEnum.STUDENT) && classIdChanged) {
+    if (updatedUser && (user.role === UserRoleEnum.STUDENT || updatedUser.role === UserRoleEnum.STUDENT) && classIdChanged && newClassId) {
       try {
-        console.log(`Обновление связей ученика id=${id} при смене класса с ${oldClassId} на ${req.body.classId}`);
+        console.log(`Обновление связей ученика id=${id} при смене класса с ${oldClassId} на ${newClassId}`);
         
         // Получаем все роли пользователя
         const userRoles = await dataStorage.getUserRoles(id);
@@ -855,11 +869,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.log(`Удаляем запись о роли студента id=${role.id}`);
               await dataStorage.removeUserRole(role.id);
               
-              console.log(`Создаем новую запись о роли студента с classId=${parseInt(req.body.classId)}`);
+              console.log(`Создаем новую запись о роли студента с classId=${newClassId}`);
               await dataStorage.addUserRole({
                 userId: id,
                 role: UserRoleEnum.STUDENT,
-                classId: parseInt(req.body.classId),
+                classId: newClassId,
                 schoolId: role.schoolId
               });
             }
@@ -881,19 +895,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         // Важно: явно добавляем студента в новый класс
-        if (parseInt(req.body.classId)) {
-          console.log(`Явно добавляем студента id=${id} в класс id=${parseInt(req.body.classId)}`);
-          
-          // Проверяем, существует ли уже связь студента с классом
-          const studentClasses = await dataStorage.getStudentClasses(id);
-          const isAlreadyInClass = studentClasses.some(c => c.id === parseInt(req.body.classId));
-          
-          if (!isAlreadyInClass) {
-            // Добавляем запись в таблицу связи студентов с классами
-            await dataStorage.addStudentToClass(id, parseInt(req.body.classId));
-          } else {
-            console.log(`Студент id=${id} уже состоит в классе id=${parseInt(req.body.classId)}`);
-          }
+        console.log(`Явно добавляем студента id=${id} в класс id=${newClassId}`);
+        
+        // Проверяем, существует ли уже связь студента с классом
+        const studentClasses = await dataStorage.getStudentClasses(id);
+        const isAlreadyInClass = studentClasses.some(c => c.id === newClassId);
+        
+        if (!isAlreadyInClass) {
+          // Добавляем запись в таблицу связи студентов с классами
+          await dataStorage.addStudentToClass(id, newClassId);
+        } else {
+          console.log(`Студент id=${id} уже состоит в классе id=${newClassId}`);
         }
       } catch (error) {
         console.error("Error updating user associations:", error);
