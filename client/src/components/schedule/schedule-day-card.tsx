@@ -195,16 +195,21 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           <span>{teacherName}</span>
         </div>
         
-        {/* Отображаем задания, если они есть и урок проведен */}
-        {schedule.status === 'conducted' && schedule.assignments && schedule.assignments.length > 0 && (
+        {/* Отображаем задания, если они есть */}
+        {schedule.assignments && schedule.assignments.length > 0 && (
           <div className="mt-2">
             <div className="text-xs text-gray-500 mb-1">Задания:</div>
             <div className="flex flex-wrap gap-1">
               {schedule.assignments.map((assignment) => (
                 <div 
                   key={assignment.id}
-                  className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium text-gray-800 ${getAssignmentTypeColor(assignment.assignmentType)} hover:bg-opacity-80 cursor-pointer`}
-                  title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. Нажмите для редактирования.`}
+                  className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium text-gray-800 
+                    ${getAssignmentTypeColor(assignment.assignmentType)} 
+                    ${assignment.plannedFor ? 'border border-dashed border-gray-400' : ''} 
+                    hover:bg-opacity-80 cursor-pointer`}
+                  title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. 
+                    ${assignment.plannedFor ? '(Запланировано)' : ''} 
+                    Нажмите для редактирования.`}
                   onClick={(e) => {
                     e.stopPropagation(); // Предотвращаем всплытие события
                     // Вызов обработчика для редактирования задания
@@ -214,6 +219,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
                   }}
                 >
                   {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)} ({assignment.maxScore})
+                  {assignment.plannedFor && <span className="ml-1 text-gray-500">📅</span>}
                 </div>
               ))}
             </div>
