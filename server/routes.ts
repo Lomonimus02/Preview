@@ -7,7 +7,7 @@ import { db } from "./db";
 const dataStorage = dbStorage;
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { UserRoleEnum, studentClasses as studentClassesTable } from "@shared/schema";
+import { UserRoleEnum, studentClasses as studentClassesTable, attendance } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
