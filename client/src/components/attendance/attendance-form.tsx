@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { User, Schedule, Attendance } from "@shared/schema";
+import { User, Schedule, Attendance, Subgroup } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { FiCheck, FiX, FiSave, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -66,12 +66,18 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     queryKey: [`/api/student-subgroups?subgroupId=${schedule.subgroupId}`],
     enabled: !!schedule.subgroupId,
   });
+  
+  // Получаем информацию о подгруппе, если урок связан с подгруппой
+  const { data: subgroupInfo, isLoading: isLoadingSubgroupInfo } = useQuery<Subgroup>({
+    queryKey: [`/api/subgroups/${schedule.subgroupId}`],
+    enabled: !!schedule.subgroupId,
+  });
 
   // При загрузке данных инициализируем состояние студентов
   useEffect(() => {
     // Ждем загрузку всех необходимых данных
     if (isLoadingStudents || isLoadingAttendance || 
-        (schedule.subgroupId && isLoadingStudentSubgroups)) {
+        (schedule.subgroupId && (isLoadingStudentSubgroups || isLoadingSubgroupInfo))) {
       return;
     }
 
@@ -126,7 +132,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
 
   // Сохранение данных о посещаемости
   const handleSaveAttendance = async () => {
-    if (!schedule.id) return;
+    if (!schedule.id || !schedule.classId) return;
     
     setIsSubmitting(true);
     
@@ -136,6 +142,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
         return apiRequest('/api/attendance', 'POST', {
           studentId: student.id,
           scheduleId: schedule.id,
+          classId: schedule.classId,
           status: student.present ? 'present' : 'absent',
         });
       });
@@ -195,7 +202,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
           </p>
           {schedule.subgroupId && (
             <Badge variant="outline" className="mt-1">
-              Подгруппа: ID {schedule.subgroupId}
+              Подгруппа: {subgroupInfo?.name || `ID ${schedule.subgroupId}`}
             </Badge>
           )}
         </div>
@@ -219,7 +226,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
         </div>
       </div>
 
-      {(isLoadingStudents || isLoadingAttendance || isLoadingStudentSubgroups) ? (
+      {(isLoadingStudents || isLoadingAttendance || isLoadingStudentSubgroups || isLoadingSubgroupInfo) ? (
         <div className="py-4 text-center">Загрузка данных...</div>
       ) : students.length === 0 ? (
         <div className="py-4 text-center">Нет студентов для отображения</div>
