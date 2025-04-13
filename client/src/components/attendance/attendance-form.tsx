@@ -103,13 +103,10 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     try {
       // Для каждого студента отправляем запрос на сохранение статуса посещаемости
       const promises = students.map(student => {
-        return apiRequest('/api/attendance', {
-          method: 'POST',
-          data: {
-            studentId: student.id,
-            scheduleId: schedule.id,
-            status: student.present ? 'present' : 'absent',
-          }
+        return apiRequest('/api/attendance', 'POST', {
+          studentId: student.id,
+          scheduleId: schedule.id,
+          status: student.present ? 'present' : 'absent',
         });
       });
       

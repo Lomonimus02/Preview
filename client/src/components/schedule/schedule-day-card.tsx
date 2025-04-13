@@ -40,6 +40,7 @@ import {
 import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum, Assignment, TimeSlot, ClassTimeSlot, Attendance } from "@shared/schema";
 import { HomeworkForm } from "./homework-form";
 import { AssignmentForm } from "../assignments/assignment-form";
+import { AttendanceForm } from "../attendance/attendance-form";
 
 // Функция-хелпер для проверки роли учителя или администратора школы
 const isTeacherOrAdmin = (user?: User | null): boolean => {
@@ -877,6 +878,33 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
               schedule={selectedSchedule}
               existingAssignment={selectedAssignment}
               onClose={() => setIsAssignmentDialogOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог с формой для отметки посещаемости */}
+      <Dialog open={isAttendanceDialogOpen} onOpenChange={setIsAttendanceDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Отметка посещаемости</DialogTitle>
+            <DialogDescription>
+              {selectedSchedule && (
+                <>
+                  Предмет: {getSubject(selectedSchedule.subjectId)?.name}, 
+                  Класс: {getClassName(selectedSchedule.classId)}
+                  {selectedSchedule.subgroupId && (
+                    <>, Подгруппа: {subgroups.find(sg => sg.id === selectedSchedule.subgroupId)?.name || "Подгруппа"}</>
+                  )}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedSchedule && currentUser && isTeacher() && (
+            <AttendanceForm 
+              schedule={selectedSchedule}
+              onClose={() => setIsAttendanceDialogOpen(false)}
             />
           )}
         </DialogContent>
