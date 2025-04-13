@@ -63,12 +63,14 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
 
   // Получаем данные по посещаемости для конкретного урока
   const { data: attendanceData = [], isLoading: isLoadingAttendance, refetch: refetchAttendance } = useQuery<any[]>({
-    queryKey: ['/api/attendance', { scheduleId: schedule.id }],
+    queryKey: ['/api/attendance', { scheduleId: schedule.id, subgroupId: schedule.subgroupId }],
     queryFn: async () => {
       if (!schedule.id) return [];
       try {
-        console.log(`Запрос данных о посещаемости для урока с ID=${schedule.id}`);
-        const response = await fetch(`/api/attendance?scheduleId=${schedule.id}`);
+        console.log(`Запрос данных о посещаемости для урока с ID=${schedule.id}${schedule.subgroupId ? ', подгруппа ' + schedule.subgroupId : ''}`);
+        const url = `/api/attendance?scheduleId=${schedule.id}${schedule.subgroupId ? '&subgroupId=' + schedule.subgroupId : ''}`;
+        console.log(`URL запроса: ${url}`);
+        const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`Ошибка при получении данных о посещаемости: ${response.status}`);
         }
