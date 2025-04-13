@@ -162,6 +162,7 @@ export default function ClassGradeDetailsPage() {
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
   const [selectedAssignmentForEdit, setSelectedAssignmentForEdit] = useState<Assignment | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
@@ -1007,6 +1008,21 @@ export default function ClassGradeDetailsPage() {
     });
   };
   
+  // Функция для обработки выбора действия в контекстном диалоге
+  const handleContextAction = (action: 'status' | 'assignment') => {
+    if (!selectedSchedule) return;
+    
+    // Закрываем контекстный диалог
+    setIsContextDialogOpen(false);
+    
+    // Открываем соответствующий диалог в зависимости от выбранного действия
+    if (action === 'status') {
+      openStatusDialog(selectedSchedule.id);
+    } else if (action === 'assignment') {
+      openAssignmentDialog(selectedSchedule.id);
+    }
+  };
+  
   // Open dialog to create a new assignment
   const openAssignmentDialog = (scheduleId?: number) => {
     // Сбрасываем информацию о редактировании задания
@@ -1508,20 +1524,10 @@ export default function ClassGradeDetailsPage() {
     const schedule = getScheduleById(slot.scheduleId);
     if (!schedule) return;
     
-    // Изменено условие, чтобы можно было добавлять задания и для непроведенных уроков
-    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      // Если у урока уже есть задания, предлагаем добавить еще одно
-      if (slot.assignments && slot.assignments.length > 0) {
-        // Открываем диалог добавления задания
-        openAssignmentDialog(slot.scheduleId);
-      } else {
-        // Открываем диалог добавления первого задания
-        openAssignmentDialog(slot.scheduleId);
-      }
-    } else {
-      // Для всех остальных случаев - открываем диалог статуса урока
-      openStatusDialog(slot.scheduleId);
-    }
+    // Открываем диалог с выбором действия (просмотр/изменение статуса или добавление задания)
+    // Используем контекстное меню или диалог с выбором
+    setSelectedSchedule(schedule);
+    setIsContextDialogOpen(true);
   };
   
   // Loading state
