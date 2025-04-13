@@ -44,7 +44,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, refetchUser } = useAuth();
   
   // Запрашиваем все доступные роли пользователя
   const { data: userRoles = [], isLoading: isLoadingRoles } = useQuery<UserRole[]>({

@@ -3,6 +3,7 @@ import {
   useQuery,
   useMutation,
   UseMutationResult,
+  QueryObserverResult,
 } from "@tanstack/react-query";
 import { insertUserSchema, User, InsertUser, UserRoleEnum } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
@@ -22,6 +23,7 @@ type AuthContextType = {
   loginMutation: UseMutationResult<ExtendedUser, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<ExtendedUser, Error, InsertUser>;
+  refetchUser: () => Promise<QueryObserverResult<User | undefined, Error>>;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -33,9 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     data: user,
     error,
     isLoading,
+    refetch: refetchUser
   } = useQuery<User | undefined, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    refetchInterval: 30000, // Проверяем актуальность данных пользователя каждые 30 секунд
   });
 
   const loginMutation = useMutation({
@@ -109,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
+        refetchUser,
       }}
     >
       {children}
