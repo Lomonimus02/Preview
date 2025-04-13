@@ -2549,6 +2549,27 @@ export default function ClassGradeDetailsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Attendance Dialog */}
+        <Dialog open={isAttendanceDialogOpen} onOpenChange={setIsAttendanceDialogOpen}>
+          <DialogContent className="sm:max-w-[800px] max-h-[800px] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Отметка посещаемости</DialogTitle>
+              <DialogDescription>
+                {selectedSchedule && `Урок: ${
+                  format(new Date(selectedSchedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })
+                } в ${selectedSchedule.startTime || ""}`}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedSchedule && (
+              <AttendanceForm 
+                schedule={selectedSchedule}
+                onClose={() => setIsAttendanceDialogOpen(false)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
