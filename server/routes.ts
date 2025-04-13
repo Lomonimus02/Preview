@@ -2501,13 +2501,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/attendance", hasRole([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
-    console.log("Получен запрос на создание/обновление посещаемости:", req.body);
-    
-    // Проверяем, что урок проведен
-    if (req.body.scheduleId) {
-      const schedule = await dataStorage.getSchedule(req.body.scheduleId);
+    try {
+      console.log("Получен запрос на создание/обновление посещаемости:", req.body);
+      
+      // Проверяем формат запроса - это может быть массив для пакетной обработки или объект для одной записи
+      const isBulkOperation = Array.isArray(req.body);
+      
+      // Берем scheduleId из запроса для проверки состояния урока
+      let scheduleId;
+      if (isBulkOperation) {
+        if (req.body.length === 0) {
+          return res.status(400).json({ message: "Empty attendance list provided" });
+        }
+        scheduleId = req.body[0].scheduleId;
+      } else {
+        scheduleId = req.body.scheduleId;
+      }
+      
+      if (!scheduleId) {
+        return res.status(400).json({ message: "scheduleId is required" });
+      }
+      
+      // Проверяем, что урок существует и проведен
+      const schedule = await dataStorage.getSchedule(scheduleId);
       if (!schedule) {
-        console.log("Расписание не найдено:", req.body.scheduleId);
+        console.log("Расписание не найдено:", scheduleId);
         return res.status(404).json({ message: "Schedule not found" });
       }
       
@@ -2516,134 +2534,197 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Невозможно отметить посещаемость для непроведенного урока");
         return res.status(400).json({ message: "Cannot record attendance for non-conducted lessons" });
       }
-    }
-    
-    // Проверяем, существует ли уже запись о посещаемости для этого студента и урока
-    if (req.body.studentId && req.body.scheduleId) {
-      try {
-        const existingRecords = await db
-          .select()
-          .from(attendance)
-          .where(eq(attendance.studentId, req.body.studentId))
-          .where(eq(attendance.scheduleId, req.body.scheduleId));
-          
-        console.log("Найдено существующих записей:", existingRecords.length);
+      
+      // Получаем все существующие записи о посещаемости для данного урока
+      const existingAttendanceRecords = await db
+        .select()
+        .from(attendance)
+        .where(eq(attendance.scheduleId, scheduleId));
+      
+      console.log(`Найдено ${existingAttendanceRecords.length} существующих записей для урока ${scheduleId}`);
+      
+      // Обработка в зависимости от типа запроса
+      if (isBulkOperation) {
+        const results = [];
         
-        if (existingRecords.length > 0) {
-          console.log("Существующая запись:", existingRecords[0]);
-          
-          // Получаем данные для обновления
-          const updateData: Partial<typeof attendance.$inferInsert> = { 
-            status: req.body.status,
-            comment: req.body.comment
-          };
-          
-          // Если есть дата в запросе, добавляем ее
-          if (req.body.date) {
-            updateData.date = req.body.date;
+        // Для каждой записи в массиве
+        for (const attendanceItem of req.body) {
+          if (!attendanceItem.studentId || !attendanceItem.scheduleId || !attendanceItem.classId) {
+            console.log("Пропускаем некорректную запись:", attendanceItem);
+            continue;
           }
-          // Если дата отсутствует в запросе и в существующей записи, получаем ее из расписания
-          else if (!existingRecords[0].date && req.body.scheduleId) {
-            const schedule = await dataStorage.getSchedule(req.body.scheduleId);
-            if (schedule && schedule.scheduleDate) {
-              updateData.date = schedule.scheduleDate;
-            } else {
-              // Если дата нигде не указана, используем текущую дату
-              updateData.date = new Date().toISOString().split('T')[0];
+          
+          // Ищем существующую запись для этого студента
+          const existingRecord = existingAttendanceRecords.find(
+            record => record.studentId === attendanceItem.studentId
+          );
+          
+          // Определяем дату (из запроса, из расписания или текущую)
+          const attendanceDate = 
+            attendanceItem.date || 
+            schedule.scheduleDate || 
+            new Date().toISOString().split('T')[0];
+          
+          if (existingRecord) {
+            // Обновляем существующую запись
+            const [updatedRecord] = await db.update(attendance)
+              .set({
+                status: attendanceItem.status,
+                comment: attendanceItem.comment,
+                date: attendanceDate
+              })
+              .where(eq(attendance.id, existingRecord.id))
+              .returning();
+              
+            console.log(`Обновлена запись для студента ${attendanceItem.studentId}`);
+            results.push(updatedRecord);
+            
+            // Отправляем уведомление родителям, если студент отсутствует
+            if (updatedRecord.status !== "present" && updatedRecord.status !== existingRecord.status) {
+              await notifyParentsAboutAbsence(updatedRecord.studentId, updatedRecord.status);
+            }
+          } else {
+            // Создаем новую запись
+            const [newRecord] = await db.insert(attendance)
+              .values({
+                studentId: attendanceItem.studentId,
+                scheduleId: attendanceItem.scheduleId,
+                classId: attendanceItem.classId,
+                status: attendanceItem.status,
+                date: attendanceDate,
+                comment: attendanceItem.comment
+              })
+              .returning();
+              
+            console.log(`Создана новая запись для студента ${attendanceItem.studentId}`);
+            results.push(newRecord);
+            
+            // Отправляем уведомление родителям, если студент отсутствует
+            if (newRecord.status !== "present") {
+              await notifyParentsAboutAbsence(newRecord.studentId, newRecord.status);
             }
           }
+        }
+        
+        // Логируем массовое обновление
+        await dataStorage.createSystemLog({
+          userId: req.user.id,
+          action: "attendance_bulk_updated",
+          details: `Updated attendance for ${results.length} students in schedule ${scheduleId}`,
+          ipAddress: req.ip
+        });
+        
+        return res.status(200).json(results);
+      } else {
+        // Обработка одиночной записи
+        if (!req.body.studentId || !req.body.classId) {
+          return res.status(400).json({ 
+            message: "Invalid request data. studentId, scheduleId, and classId are required" 
+          });
+        }
+        
+        // Ищем существующую запись для этого студента
+        const existingRecord = existingAttendanceRecords.find(
+          record => record.studentId === req.body.studentId
+        );
+        
+        // Определяем дату (из запроса, из расписания или текущую)
+        const attendanceDate = 
+          req.body.date || 
+          schedule.scheduleDate || 
+          new Date().toISOString().split('T')[0];
+        
+        let result;
+        
+        if (existingRecord) {
+          // Обновляем существующую запись
+          const [updatedRecord] = await db.update(attendance)
+            .set({
+              status: req.body.status,
+              comment: req.body.comment,
+              date: attendanceDate
+            })
+            .where(eq(attendance.id, existingRecord.id))
+            .returning();
+            
+          console.log(`Обновлена запись для студента ${req.body.studentId}:`, updatedRecord);
+          result = updatedRecord;
           
-          console.log("Данные для обновления:", updateData);
+          // Логируем обновление
+          await dataStorage.createSystemLog({
+            userId: req.user.id,
+            action: "attendance_updated",
+            details: `Updated attendance for student ${updatedRecord.studentId}: ${updatedRecord.status}`,
+            ipAddress: req.ip
+          });
           
-          try {
-            // Если запись уже существует, обновляем её
-            const [updatedAttendance] = await db.update(attendance)
-              .set(updateData)
-              .where(eq(attendance.id, existingRecords[0].id))
-              .returning();
+          // Отправляем уведомление родителям, если студент отсутствует
+          if (updatedRecord.status !== "present" && updatedRecord.status !== existingRecord.status) {
+            await notifyParentsAboutAbsence(updatedRecord.studentId, updatedRecord.status);
+          }
+        } else {
+          // Создаем новую запись
+          const [newRecord] = await db.insert(attendance)
+            .values({
+              studentId: req.body.studentId,
+              scheduleId: req.body.scheduleId,
+              classId: req.body.classId,
+              status: req.body.status,
+              date: attendanceDate,
+              comment: req.body.comment
+            })
+            .returning();
             
-            console.log("Запись обновлена:", updatedAttendance);
-            
-            // Log the action
-            await dataStorage.createSystemLog({
-              userId: req.user.id,
-              action: "attendance_updated",
-              details: `Updated attendance for student ${updatedAttendance.studentId}: ${updatedAttendance.status}`,
-              ipAddress: req.ip
-            });
-            
-            return res.status(200).json(updatedAttendance);
-          } catch (error) {
-            console.error("Ошибка при обновлении записи посещаемости:", error);
-            return res.status(500).json({ message: "Failed to update attendance record", error });
+          console.log(`Создана новая запись для студента ${req.body.studentId}:`, newRecord);
+          result = newRecord;
+          
+          // Логируем создание
+          await dataStorage.createSystemLog({
+            userId: req.user.id,
+            action: "attendance_created",
+            details: `Recorded attendance for student ${newRecord.studentId}: ${newRecord.status}`,
+            ipAddress: req.ip
+          });
+          
+          // Отправляем уведомление родителям, если студент отсутствует
+          if (newRecord.status !== "present") {
+            await notifyParentsAboutAbsence(newRecord.studentId, newRecord.status);
           }
         }
-      } catch (error) {
-        console.error("Ошибка при поиске существующей записи посещаемости:", error);
-        return res.status(500).json({ message: "Failed to check existing attendance records", error });
+        
+        return res.status(200).json(result);
       }
-    }
-    
-    // Создаем новую запись о посещаемости с датой из расписания, если она не указана
-    const attendanceData = {...req.body};
-    
-    // Проверяем, что дата предоставлена, если нет - получаем ее из расписания
-    if (!attendanceData.date && attendanceData.scheduleId) {
-      const schedule = await dataStorage.getSchedule(attendanceData.scheduleId);
-      if (schedule && schedule.scheduleDate) {
-        attendanceData.date = schedule.scheduleDate;
-        console.log("Получена дата из расписания:", attendanceData.date);
-      } else {
-        // Если дата не указана и нет расписания, используем текущую дату
-        attendanceData.date = new Date().toISOString().split('T')[0];
-        console.log("Использована текущая дата:", attendanceData.date);
-      }
-    }
-    
-    // Создаем запись
-    console.log("Создание новой записи посещаемости с данными:", attendanceData);
-    
-    let newAttendance;
-    try {
-      newAttendance = await dataStorage.createAttendance(attendanceData);
-      console.log("Создана новая запись посещаемости:", newAttendance);
     } catch (error) {
-      console.error("Ошибка при создании записи посещаемости:", error);
+      console.error("Ошибка при обработке запроса на обновление посещаемости:", error);
       return res.status(500).json({ 
-        message: "Failed to create attendance record", 
+        message: "Error processing attendance update", 
         error: error instanceof Error ? error.message : String(error) 
       });
     }
-    
-    if (newAttendance.status !== "present") {
-      // If student is absent or late, notify parents
-      const student = await dataStorage.getUser(newAttendance.studentId);
-      if (student) {
-        const relationships = await dataStorage.getStudentParents(student.id);
-        
-        for (const relationship of relationships) {
-          const parent = await dataStorage.getUser(relationship.parentId);
-          if (parent) {
-            await dataStorage.createNotification({
-              userId: parent.id,
-              title: "Отсутствие на уроке",
-              content: `Ваш ребенок отмечен как "${newAttendance.status}" на уроке`
-            });
-          }
+  });
+  
+  // Вспомогательная функция для отправки уведомлений родителям об отсутствии ученика
+  async function notifyParentsAboutAbsence(studentId: number, status: string) {
+    try {
+      const student = await dataStorage.getUser(studentId);
+      if (!student) return;
+      
+      const relationships = await dataStorage.getStudentParents(student.id);
+      
+      for (const relationship of relationships) {
+        const parent = await dataStorage.getUser(relationship.parentId);
+        if (parent) {
+          await dataStorage.createNotification({
+            userId: parent.id,
+            title: "Отсутствие на уроке",
+            content: `Ваш ребенок ${student.lastName} ${student.firstName} отмечен как "${status}" на уроке`
+          });
         }
       }
+    } catch (error) {
+      console.error("Ошибка при отправке уведомлений родителям:", error);
     }
-    
-    // Log the action
-    await dataStorage.createSystemLog({
-      userId: req.user.id,
-      action: "attendance_created",
-      details: `Recorded attendance for student ${newAttendance.studentId}: ${newAttendance.status}`,
-      ipAddress: req.ip
-    });
-    
-    res.status(201).json(newAttendance);
-  });
+  }
 
   // Documents API
   app.get("/api/documents", isAuthenticated, async (req, res) => {
