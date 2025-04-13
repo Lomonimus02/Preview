@@ -1185,6 +1185,33 @@ export default function ClassGradeDetailsPage() {
         data
       });
     } else {
+      // Проверяем, существует ли уже оценка для данного ученика и задания
+      const studentId = data.studentId;
+      const assignmentId = data.assignmentId;
+      const scheduleId = data.scheduleId;
+      
+      // Если у нас есть scheduleId и assignmentId и урок проведен, проверяем на дублирование
+      if (assignmentId && scheduleId) {
+        const schedule = lessonSlots.find(s => s.scheduleId === scheduleId);
+        const isConducted = schedule?.status === "conducted";
+        
+        if (isConducted) {
+          const existingGrade = grades.find(g => 
+            g.studentId === studentId && 
+            g.assignmentId === assignmentId
+          );
+          
+          if (existingGrade) {
+            toast({
+              title: "Оценка уже существует",
+              description: "Для этого ученика уже выставлена оценка за данное задание. Отредактируйте существующую оценку.",
+              variant: "destructive",
+            });
+            return; // Прерываем выполнение функции
+          }
+        }
+      }
+      
       // Adding new grade - обеспечиваем, что scheduleId, assignmentId и subgroupId всегда будут корректно установлены,
       // так как это критически важно для правильного отображения оценок в журналах
       const finalData = {
