@@ -768,6 +768,50 @@ export default function TeacherClasses() {
                 Не проведен
               </Button>
             </div>
+            
+            {/* Опция для запланированного задания для будущих уроков */}
+            {currentSchedule && 
+             currentSchedule.scheduleDate && 
+             new Date() < new Date(`${currentSchedule.scheduleDate}T${currentSchedule.endTime || '23:59:59'}`) && (
+              <div className="mt-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
+                  <div className="flex items-start">
+                    <CalendarIcon className="h-5 w-5 text-amber-600 mt-0.5 mr-2" />
+                    <div>
+                      <h4 className="font-medium text-amber-700">Запланировать задание</h4>
+                      <p className="text-sm text-amber-700 mt-1">
+                        Вы можете запланировать задание к этому уроку заранее. Запланированные задания не влияют на среднюю оценку до проведения урока.
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-3 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                        onClick={() => {
+                          setLessonStatusDialogOpen(false);
+                          // Открываем форму создания задания
+                          if (currentSchedule && selectedCombination) {
+                            setGradeData({
+                              studentId: 0,
+                              scheduleId: currentSchedule.id,
+                              gradeType: 'homework',
+                              plannedFor: true // Помечаем как запланированное задание
+                            });
+                            // Здесь нужно открыть форму задания
+                            // Если у вас есть отдельный компонент для создания заданий, используйте его
+                            toast({
+                              title: "Запланированное задание",
+                              description: "Возможность добавления запланированных заданий доступна в журнале оценок",
+                              variant: "default"
+                            });
+                          }
+                        }}
+                      >
+                        Запланировать задание
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
           <DialogFooter>
