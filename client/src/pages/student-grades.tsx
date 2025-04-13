@@ -961,7 +961,10 @@ export default function StudentGrades() {
                     ? gradeTypeColors[selectedGrade.gradeType] 
                     : 'bg-gray-100'
                 }`}>
-                  {getGradeTypeName(selectedGrade.gradeType)}
+                  {selectedAssignment 
+                    ? getAssignmentTypeName(selectedAssignment.assignmentType) 
+                    : getGradeTypeName(selectedGrade.gradeType)
+                  }
                 </Badge>
               </div>
               
@@ -970,13 +973,53 @@ export default function StudentGrades() {
                 <div className="mt-1 flex flex-col space-y-2">
                   {/* Отображение оценки для пятибалльной системы */}
                   {gradingSystem === GradingSystemEnum.FIVE_POINT && (
-                    <Badge className={`text-lg px-3 py-1 ${
-                      selectedGrade.grade >= 4 ? 'bg-green-100 text-green-800' : 
-                      selectedGrade.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {selectedGrade.grade}
-                    </Badge>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-2 items-center">
+                        <div className="bg-gray-50 p-3 rounded-lg text-center">
+                          <div className="text-xs text-gray-500 mb-1">Оценка</div>
+                          <Badge className={`text-lg px-3 py-1 ${
+                            selectedGrade.grade >= 4 ? 'bg-green-100 text-green-800' : 
+                            selectedGrade.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {selectedGrade.grade}
+                          </Badge>
+                        </div>
+                        {selectedAssignment && (
+                          <>
+                            <div className="bg-gray-50 p-3 rounded-lg text-center">
+                              <div className="text-xs text-gray-500 mb-1">Формат</div>
+                              <Badge variant="outline" className="text-lg px-3 py-1">
+                                {selectedGrade.grade}/{selectedAssignment.maxScore}
+                              </Badge>
+                            </div>
+                            <div className="bg-gray-50 p-3 rounded-lg text-center">
+                              <div className="text-xs text-gray-500 mb-1">Процент</div>
+                              <Badge className={`text-lg px-3 py-1 ${
+                                (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.8 ? 'bg-green-100 text-green-800' : 
+                                (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.6 ? 'bg-yellow-100 text-yellow-800' : 
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {((selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) * 100).toFixed(1)}%
+                              </Badge>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      
+                      {selectedAssignment && (
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div 
+                            className={`h-3 rounded-full ${
+                              (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.8 ? 'bg-green-600' : 
+                              (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.6 ? 'bg-yellow-500' : 
+                              'bg-red-600'
+                            }`}
+                            style={{ width: `${(selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) * 100}%` }}
+                          ></div>
+                        </div>
+                      )}
+                    </div>
                   )}
                   
                   {/* Отображение для накопительной системы */}
