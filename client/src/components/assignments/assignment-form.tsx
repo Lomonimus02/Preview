@@ -11,11 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DialogFooter } from "@/components/ui/dialog";
 import { queryClient } from "@/lib/queryClient";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const assignmentSchema = z.object({
   maxScore: z.string().min(1, "Введите максимальное количество баллов"),
   assignmentType: z.string().min(1, "Выберите тип задания"),
   description: z.string().optional(),
+  plannedFor: z.boolean().default(false),
 });
 
 type AssignmentFormValues = z.infer<typeof assignmentSchema>;
@@ -39,6 +41,7 @@ export const AssignmentForm: React.FC<AssignmentFormProps> = ({
       maxScore: existingAssignment?.maxScore || "",
       assignmentType: existingAssignment?.assignmentType || "",
       description: existingAssignment?.description || "",
+      plannedFor: existingAssignment?.plannedFor || false,
     },
   });
 

@@ -245,6 +245,7 @@ export const assignments = pgTable("assignments", {
   subgroupId: integer("subgroup_id"), // Опциональная связь с подгруппой
   description: text("description"), // Описание задания (опционально)
   displayOrder: integer("display_order").default(0).notNull(), // Порядок отображения (для нескольких заданий в одном уроке)
+  plannedFor: boolean("planned_for").default(false), // Флаг, указывающий, что задание запланировано на будущее
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
