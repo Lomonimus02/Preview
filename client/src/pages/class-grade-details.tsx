@@ -2042,6 +2042,25 @@ export default function ClassGradeDetailsPage() {
           </DialogContent>
         </Dialog>
         
+        {/* Диалог для отметки посещаемости */}
+        <Dialog open={isAttendanceDialogOpen} onOpenChange={setIsAttendanceDialogOpen}>
+          <DialogContent className="sm:max-w-[800px]">
+            <DialogHeader>
+              <DialogTitle>Отметка посещаемости</DialogTitle>
+              <DialogDescription>
+                Отметьте присутствие студентов на уроке
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedSchedule && (
+              <AttendanceForm 
+                schedule={selectedSchedule}
+                onClose={() => setIsAttendanceDialogOpen(false)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+        
         {/* Dialog for adding an assignment */}
         <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
           <DialogContent className="sm:max-w-md">
