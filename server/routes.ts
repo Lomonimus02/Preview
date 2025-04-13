@@ -7,7 +7,7 @@ import { db } from "./db";
 const dataStorage = dbStorage;
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { UserRoleEnum, studentClasses } from "@shared/schema";
+import { UserRoleEnum, studentClasses as studentClassesTable } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -894,18 +894,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
         
+        // Удаляем студента из всех классов перед добавлением в новый
+        console.log(`Удаляем студента id=${id} из всех старых классов`);
+        
+        try {
+          // Получаем все существующие связи студент-класс
+          const studentClassConnections = await db
+            .select()
+            .from(studentClassesTable)
+            .where(eq(studentClassesTable.studentId, id));
+            
+          console.log(`Найдено ${studentClassConnections.length} существующих связей студент-класс`);
+          
+          // Удаляем все старые связи
+          if (studentClassConnections.length > 0) {
+            await db
+              .delete(studentClassesTable)
+              .where(eq(studentClassesTable.studentId, id));
+            console.log(`Удалены все старые связи студента id=${id} с классами`);
+          }
+        } catch (error) {
+          console.error(`Ошибка при удалении старых связей студент-класс:`, error);
+        }
+        
         // Важно: явно добавляем студента в новый класс
         console.log(`Явно добавляем студента id=${id} в класс id=${newClassId}`);
         
-        // Проверяем, существует ли уже связь студента с классом
-        const studentClasses = await dataStorage.getStudentClasses(id);
-        const isAlreadyInClass = studentClasses.some(c => c.id === newClassId);
-        
-        if (!isAlreadyInClass) {
-          // Добавляем запись в таблицу связи студентов с классами
+        // После удаления всех старых связей просто добавляем запись в таблицу связи студентов с классами
+        try {
           await dataStorage.addStudentToClass(id, newClassId);
-        } else {
-          console.log(`Студент id=${id} уже состоит в классе id=${newClassId}`);
+          console.log(`Студент id=${id} добавлен в класс id=${newClassId}`);
+        } catch (error) {
+          console.error(`Ошибка при добавлении студента id=${id} в класс id=${newClassId}:`, error);
         }
       } catch (error) {
         console.error("Error updating user associations:", error);
