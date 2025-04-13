@@ -51,7 +51,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
   });
 
   // Получаем данные по посещаемости для конкретного урока
-  const { data: attendanceData = [], isLoading: isLoadingAttendance } = useQuery<Attendance[]>({
+  const { data: attendanceData = [], isLoading: isLoadingAttendance } = useQuery<any[]>({
     queryKey: [`/api/attendance?scheduleId=${schedule.id}`],
     queryFn: async () => {
       if (!schedule.id) return [];
@@ -124,17 +124,35 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     // Создаем список студентов с их статусом посещаемости
     const studentsWithAttendance = studentsToShow.map(student => {
       // Ищем запись о посещаемости для данного студента
-      const attendance = attendanceData.find(a => 
-        a.studentId === student.id && a.scheduleId === schedule.id
-      );
+      // Проверяем разные форматы данных, которые может вернуть сервер
+      const attendanceItem = attendanceData.find(a => {
+        // Формат 1: attendance напрямую содержит studentId
+        if (a.studentId === student.id) return true;
+        // Формат 2: attendance находится в свойстве attendance
+        if (a.attendance && a.attendance.studentId === student.id) return true;
+        return false;
+      });
+      
+      console.log(`Для студента ${student.id} найдена запись:`, attendanceItem);
+      
+      // Извлекаем данные о посещаемости в зависимости от формата
+      const attendance = attendanceItem && attendanceItem.attendance 
+        ? attendanceItem.attendance 
+        : attendanceItem;
+      
+      // Проверяем статус посещаемости
+      const isPresent = attendance 
+        ? attendance.status === "present" 
+        : false;
+      
+      console.log(`Студент ${student.id} присутствие: ${isPresent}`);
       
       return {
         id: student.id,
         firstName: student.firstName || "",
         lastName: student.lastName || "",
         attendance: attendance,
-        // Если есть запись о посещаемости, используем её значение, иначе считаем, что студент отсутствует
-        present: attendance ? attendance.status === "present" : false,
+        present: isPresent,
       };
     });
 
