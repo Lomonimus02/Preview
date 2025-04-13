@@ -195,7 +195,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
           </p>
           {schedule.subgroupId && (
             <Badge variant="outline" className="mt-1">
-              Подгруппа: {studentSubgroupData?.[0]?.subgroupName || `ID: ${schedule.subgroupId}`}
+              Подгруппа: ID {schedule.subgroupId}
             </Badge>
           )}
         </div>
@@ -219,7 +219,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
         </div>
       </div>
 
-      {(isLoadingStudents || isLoadingAttendance || isLoadingSubgroups) ? (
+      {(isLoadingStudents || isLoadingAttendance || isLoadingStudentSubgroups) ? (
         <div className="py-4 text-center">Загрузка данных...</div>
       ) : students.length === 0 ? (
         <div className="py-4 text-center">Нет студентов для отображения</div>
@@ -261,31 +261,49 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
             <Pagination className="justify-center">
               <PaginationContent>
                 <PaginationItem>
-                  <PaginationPrevious 
-                    onClick={() => goToPage(currentPage - 1)} 
-                    disabled={currentPage === 1 || isSubmitting}
-                    aria-disabled={currentPage === 1 || isSubmitting}
-                  />
+                  {currentPage === 1 || isSubmitting ? (
+                    <PaginationPrevious 
+                      aria-disabled="true"
+                      className="opacity-50 cursor-not-allowed"
+                    />
+                  ) : (
+                    <PaginationPrevious 
+                      onClick={() => goToPage(currentPage - 1)} 
+                    />
+                  )}
                 </PaginationItem>
                 
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                   <PaginationItem key={page}>
-                    <PaginationLink 
-                      isActive={currentPage === page}
-                      onClick={() => goToPage(page)}
-                      disabled={isSubmitting}
-                    >
-                      {page}
-                    </PaginationLink>
+                    {isSubmitting ? (
+                      <PaginationLink 
+                        isActive={currentPage === page}
+                        className="opacity-50 cursor-not-allowed"
+                      >
+                        {page}
+                      </PaginationLink>
+                    ) : (
+                      <PaginationLink 
+                        isActive={currentPage === page}
+                        onClick={() => goToPage(page)}
+                      >
+                        {page}
+                      </PaginationLink>
+                    )}
                   </PaginationItem>
                 ))}
                 
                 <PaginationItem>
-                  <PaginationNext 
-                    onClick={() => goToPage(currentPage + 1)} 
-                    disabled={currentPage === totalPages || isSubmitting}
-                    aria-disabled={currentPage === totalPages || isSubmitting}
-                  />
+                  {currentPage === totalPages || isSubmitting ? (
+                    <PaginationNext 
+                      aria-disabled="true"
+                      className="opacity-50 cursor-not-allowed"
+                    />
+                  ) : (
+                    <PaginationNext 
+                      onClick={() => goToPage(currentPage + 1)} 
+                    />
+                  )}
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
