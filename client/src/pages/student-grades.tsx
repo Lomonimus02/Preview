@@ -166,15 +166,56 @@ export default function StudentGrades() {
   
   // Получение заданий (для детальной информации об оценках)
   const { data: assignments = [] } = useQuery<Assignment[]>({
-    queryKey: ['/api/assignments', studentClass && studentClass.length > 0 ? studentClass[0].id : null],
+    queryKey: ['/api/assignments', studentClass && studentClass.length > 0 ? studentClass[0].id : null, grades],
     queryFn: async ({ queryKey }) => {
       const classId = queryKey[1];
       if (!classId) return [];
+      
+      // Сначала загружаем все задания для класса
       const response = await fetch(`/api/assignments?classId=${classId}`);
       if (!response.ok) throw new Error('Failed to fetch assignments');
-      return response.json();
+      const classAssignments = await response.json();
+      
+      // Для каждой оценки, которая ссылается на задание, но это задание не найдено в классе
+      // делаем дополнительный запрос по конкретному assignmentId
+      const allGrades = queryKey[2] as Grade[] || [];
+      const assignmentIds = new Set<number>();
+      
+      // Получаем список ID заданий, которые присутствуют в оценках
+      allGrades.forEach(grade => {
+        if (grade.assignmentId) {
+          assignmentIds.add(grade.assignmentId);
+        }
+      });
+      
+      // Проверяем, какие задания нужно дополнительно загрузить
+      const missingAssignmentIds = Array.from(assignmentIds).filter(
+        id => !classAssignments.some((a: Assignment) => a.id === id)
+      );
+      
+      // Если есть отсутствующие задания, загружаем их
+      if (missingAssignmentIds.length > 0) {
+        const additionalAssignments = await Promise.all(
+          missingAssignmentIds.map(async id => {
+            try {
+              const response = await fetch(`/api/assignments/${id}`);
+              if (response.ok) {
+                return await response.json();
+              }
+            } catch (error) {
+              console.error(`Error fetching assignment ${id}:`, error);
+            }
+            return null;
+          })
+        );
+        
+        // Объединяем все задания, отфильтровывая null значения
+        return [...classAssignments, ...additionalAssignments.filter(a => a !== null)];
+      }
+      
+      return classAssignments;
     },
-    enabled: !!user && user.role === UserRoleEnum.STUDENT && studentClass && studentClass.length > 0
+    enabled: !!user && user.role === UserRoleEnum.STUDENT && studentClass && studentClass.length > 0 && grades.length > 0
   });
   
   // Интерфейс для данных о средних оценках из журнала учителя
@@ -463,7 +504,7 @@ export default function StudentGrades() {
   };
   
   // Обработчик клика по оценке
-  const handleGradeClick = (grade: Grade, initialAssignment: Assignment | null) => {
+  const handleGradeClick = async (grade: Grade, initialAssignment: Assignment | null) => {
     console.log("Grade clicked:", grade);
     
     // Ищем соответствующее задание, приоритет assignmentId, затем scheduleId
@@ -471,12 +512,49 @@ export default function StudentGrades() {
     
     // Если не передано задание, но есть assignmentId в оценке, найдем задание
     if (!assignment && grade.assignmentId) {
+      // Сначала ищем в локальном кэше
       assignment = assignments.find(a => a.id === grade.assignmentId) || null;
+      
+      // Если не нашли в кэше, делаем прямой запрос к API
+      if (!assignment) {
+        try {
+          console.log(`Trying to load assignment directly by ID: ${grade.assignmentId}`);
+          const response = await fetch(`/api/assignments/${grade.assignmentId}`);
+          if (response.ok) {
+            assignment = await response.json();
+            console.log("Assignment loaded from API:", assignment);
+          } else {
+            console.log("Failed to load assignment from API:", response.status);
+          }
+        } catch (error) {
+          console.error("Error fetching assignment:", error);
+        }
+      }
     }
     
     // Если не найдено по assignmentId, ищем по scheduleId
     if (!assignment && grade.scheduleId) {
+      // Сначала ищем в локальном кэше
       assignment = assignments.find(a => a.scheduleId === grade.scheduleId) || null;
+      
+      // Если не нашли в кэше, делаем прямой запрос к API
+      if (!assignment) {
+        try {
+          console.log(`Trying to load assignments by scheduleId: ${grade.scheduleId}`);
+          const response = await fetch(`/api/assignments/schedule/${grade.scheduleId}`);
+          if (response.ok) {
+            const scheduleAssignments = await response.json();
+            if (scheduleAssignments.length > 0) {
+              assignment = scheduleAssignments[0];
+              console.log("Assignment loaded from API by scheduleId:", assignment);
+            }
+          } else {
+            console.log("Failed to load schedule assignments from API:", response.status);
+          }
+        } catch (error) {
+          console.error("Error fetching schedule assignments:", error);
+        }
+      }
     }
     
     console.log("Assignment data (final):", assignment);
