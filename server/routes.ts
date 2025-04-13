@@ -2611,8 +2611,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const classes = await dataStorage.getStudentClasses(studentId);
-      return res.json(classes);
+      // Получаем связи студент-класс напрямую из БД, чтобы сохранить структуру {studentId, classId}
+      try {
+        const studentClassConnections = await db
+          .select()
+          .from(studentClasses)
+          .where(eq(studentClasses.studentId, studentId));
+          
+        console.log(`Получены связи студент-класс для студента ${studentId}:`, studentClassConnections);
+        return res.json(studentClassConnections);
+      } catch (error) {
+        console.error("Ошибка при получении связей студент-класс:", error);
+        return res.status(500).json({ message: "Ошибка при получении классов студента" });
+      }
     }
     
     // Если запрашиваются ученики класса
