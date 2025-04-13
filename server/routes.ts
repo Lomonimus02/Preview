@@ -2410,7 +2410,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/attendance", isAuthenticated, async (req, res) => {
     let attendance = [];
     
-    if (req.query.studentId) {
+    if (req.query.scheduleId) {
+      const scheduleId = parseInt(req.query.scheduleId as string);
+      
+      // Проверяем, что расписание существует
+      const schedule = await dataStorage.getSchedule(scheduleId);
+      if (!schedule) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+      
+      // Проверяем права доступа
+      if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL, UserRoleEnum.CLASS_TEACHER].includes(req.user.role)) {
+        // Получаем список всех студентов класса
+        const students = await dataStorage.getStudentsByClass(schedule.classId);
+        
+        // Получаем записи о посещаемости для данного урока
+        const attendanceRecords = await db.select().from(attendance).where(eq(attendance.scheduleId, scheduleId));
+        
+        // Формируем результат с информацией о каждом студенте и его статусе посещения
+        const studentAttendance = students.map(student => {
+          const attendanceRecord = attendanceRecords.find(a => a.studentId === student.id);
+          return {
+            studentId: student.id,
+            studentName: `${student.lastName} ${student.firstName}`,
+            attendance: attendanceRecord || null
+          };
+        });
+        
+        return res.json(studentAttendance);
+      } else {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+    } else if (req.query.studentId) {
       const studentId = parseInt(req.query.studentId as string);
       
       // Check permissions
@@ -2446,11 +2477,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/attendance", hasRole([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN]), async (req, res) => {
-    const attendance = await dataStorage.createAttendance(req.body);
+    // Проверяем, что урок проведен
+    if (req.body.scheduleId) {
+      const schedule = await dataStorage.getSchedule(req.body.scheduleId);
+      if (!schedule) {
+        return res.status(404).json({ message: "Schedule not found" });
+      }
+      
+      if (schedule.status !== "conducted") {
+        return res.status(400).json({ message: "Cannot record attendance for non-conducted lessons" });
+      }
+    }
     
-    if (attendance.status !== "present") {
+    // Проверяем, существует ли уже запись о посещаемости для этого студента и урока
+    if (req.body.studentId && req.body.scheduleId) {
+      const existingRecord = await db.select()
+        .from(attendance)
+        .where(eq(attendance.studentId, req.body.studentId))
+        .where(eq(attendance.scheduleId, req.body.scheduleId))
+        .limit(1);
+      
+      if (existingRecord.length > 0) {
+        // Если запись уже существует, обновляем её
+        const [updatedAttendance] = await db.update(attendance)
+          .set({ 
+            status: req.body.status,
+            comment: req.body.comment
+          })
+          .where(eq(attendance.id, existingRecord[0].id))
+          .returning();
+        
+        // Log the action
+        await dataStorage.createSystemLog({
+          userId: req.user.id,
+          action: "attendance_updated",
+          details: `Updated attendance for student ${updatedAttendance.studentId}: ${updatedAttendance.status}`,
+          ipAddress: req.ip
+        });
+        
+        return res.status(200).json(updatedAttendance);
+      }
+    }
+    
+    // Создаем новую запись о посещаемости
+    const newAttendance = await dataStorage.createAttendance(req.body);
+    
+    if (newAttendance.status !== "present") {
       // If student is absent or late, notify parents
-      const student = await dataStorage.getUser(attendance.studentId);
+      const student = await dataStorage.getUser(newAttendance.studentId);
       if (student) {
         const relationships = await dataStorage.getStudentParents(student.id);
         
@@ -2460,7 +2534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await dataStorage.createNotification({
               userId: parent.id,
               title: "Отсутствие на уроке",
-              content: `Ваш ребенок отмечен как "${attendance.status}" на уроке`
+              content: `Ваш ребенок отмечен как "${newAttendance.status}" на уроке`
             });
           }
         }
@@ -2471,11 +2545,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     await dataStorage.createSystemLog({
       userId: req.user.id,
       action: "attendance_created",
-      details: `Recorded attendance for student ${attendance.studentId}: ${attendance.status}`,
+      details: `Recorded attendance for student ${newAttendance.studentId}: ${newAttendance.status}`,
       ipAddress: req.ip
     });
     
-    res.status(201).json(attendance);
+    res.status(201).json(newAttendance);
   });
 
   // Documents API

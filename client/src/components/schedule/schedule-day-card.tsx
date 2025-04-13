@@ -38,6 +38,14 @@ import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, Assignme
 import { HomeworkForm } from "./homework-form";
 import { AssignmentForm } from "../assignments/assignment-form";
 
+// Функция-хелпер для проверки роли учителя или администратора школы
+const isTeacherOrAdmin = (user?: User | null): boolean => {
+  if (!user) return false;
+  return user.role === UserRoleEnum.TEACHER || 
+         user.role === UserRoleEnum.SCHOOL_ADMIN ||
+         user.role === UserRoleEnum.CLASS_TEACHER;
+};
+
 // Функция для получения цвета для типа задания
 const getAssignmentTypeColor = (type?: string): string => {
   switch (type) {
@@ -93,6 +101,7 @@ interface ScheduleItemProps {
   subgroups?: any[]; // Добавляем список подгрупп
   className?: string; // Добавляем имя класса для отображения в общем расписании
   showClass?: boolean; // Флаг для отображения класса (только в общем расписании)
+  currentUser?: User | null; // Добавляем текущего пользователя для проверки прав
   onClick: (e?: React.MouseEvent, actionType?: string, assignment?: Assignment) => void;
 }
 
