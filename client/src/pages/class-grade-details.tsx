@@ -54,7 +54,17 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
-import { CalendarIcon, BookOpenIcon, GraduationCapIcon, Loader2, AlertCircle, Download, PlusCircle } from "lucide-react";
+import { 
+  AlertCircle, 
+  BookOpenIcon, 
+  BookPlus,
+  CalendarClock,
+  CalendarIcon, 
+  Download, 
+  GraduationCapIcon, 
+  Loader2, 
+  PlusCircle 
+} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -2452,6 +2462,48 @@ export default function ClassGradeDetailsPage() {
                 </DialogFooter>
               </form>
             </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Контекстный диалог для выбора действия при клике на ячейку урока */}
+        <Dialog open={isContextDialogOpen} onOpenChange={setIsContextDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Выберите действие</DialogTitle>
+              <DialogDescription>
+                {selectedSchedule && `Урок: ${
+                  format(new Date(selectedSchedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })
+                } в ${selectedSchedule.startTime || ""}`}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <Button 
+                onClick={() => handleContextAction('status')}
+                className="flex items-center justify-start gap-2"
+              >
+                <CalendarClock className="h-5 w-5" />
+                Изменить статус урока
+              </Button>
+              
+              <Button 
+                onClick={() => handleContextAction('assignment')}
+                className="flex items-center justify-start gap-2"
+                variant="outline"
+              >
+                <BookPlus className="h-5 w-5" />
+                Добавить задание
+              </Button>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="secondary" 
+                onClick={() => setIsContextDialogOpen(false)}
+              >
+                Отмена
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
