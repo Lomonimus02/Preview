@@ -3336,6 +3336,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Маршрут для получения учеников по ID класса для страницы оценок
+  // API endpoint для получения студентов по идентификатору подгруппы
+  app.get("/api/students-by-subgroup/:subgroupId", isAuthenticated, async (req, res) => {
+    const subgroupId = parseInt(req.params.subgroupId);
+    if (isNaN(subgroupId)) {
+      return res.status(400).json({ message: "Invalid subgroup ID" });
+    }
+    
+    console.log(`Запрос списка студентов для подгруппы с ID=${subgroupId}`);
+    
+    try {
+      // Получаем информацию о подгруппе
+      const subgroup = await dataStorage.getSubgroup(subgroupId);
+      if (!subgroup) {
+        return res.status(404).json({ message: "Subgroup not found" });
+      }
+      
+      // Получаем студентов подгруппы
+      const students = await dataStorage.getSubgroupStudents(subgroupId);
+      console.log(`Найдено ${students.length} студентов в подгруппе ${subgroupId}`);
+      
+      res.json(students);
+    } catch (error) {
+      console.error(`Ошибка при получении студентов подгруппы ${subgroupId}:`, error);
+      res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+  
   app.get("/api/students-by-class/:classId", isAuthenticated, async (req, res) => {
     const classId = parseInt(req.params.classId);
     if (isNaN(classId)) {

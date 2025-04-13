@@ -58,8 +58,14 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
 
   // Получаем студентов подгруппы, если урок связан с подгруппой
   const { data: subgroupStudents = [], isLoading: isLoadingSubgroupStudents } = useQuery<User[]>({
-    queryKey: [`/api/students-by-class/${schedule.classId}`],
-    enabled: !!schedule.classId,
+    queryKey: ['/api/subgroup-students', schedule.subgroupId],
+    queryFn: async () => {
+      if (!schedule.subgroupId) return [];
+      const response = await fetch(`/api/students-by-subgroup/${schedule.subgroupId}`);
+      const data = await response.json();
+      return data;
+    },
+    enabled: !!schedule.subgroupId,
   });
 
   const { data: studentSubgroupRelations = [], isLoading: isLoadingStudentSubgroups } = useQuery({
