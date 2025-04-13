@@ -124,7 +124,7 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
       <div className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700">
         <ShieldCheck className="h-4 w-4" />
         <span className="truncate">
-          {activeRole ? getRoleName(activeRole.role) : "Нет ролей"}
+          {userRoles.length === 1 ? getRoleName(userRoles[0].role) : "Нет ролей"}
         </span>
       </div>
     );
@@ -142,7 +142,8 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
             <span className="truncate">
-              {activeRole ? getRoleName(activeRole.role) : "Выберите роль"}
+              {activeRole ? getRoleName(activeRole.role) : 
+               userRoles.length > 0 ? "Выберите роль" : "Нет активной роли"}
             </span>
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

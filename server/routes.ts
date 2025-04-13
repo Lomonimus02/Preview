@@ -3005,15 +3005,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
     
-    // Пометим активную роль, если она установлена
-    if (req.user.activeRole) {
+    // Проверим, существует ли активная роль среди доступных ролей пользователя
+    const activeRoleExists = req.user.activeRole && 
+                            result.some(role => role.role === req.user.activeRole);
+
+    // Пометим активную роль или первую доступную, если активной больше нет
+    if (activeRoleExists) {
+      // Если активная роль существует, отметим её
       for (const role of result) {
         role.isActive = role.role === req.user.activeRole;
       }
     } else {
-      // Если активная роль не установлена, пометим основную роль как активную
+      // Если активной роли нет или она была удалена, пометим первую роль как активную
       if (result.length > 0) {
         result[0].isActive = true;
+        
+        // Также обновим активную роль в сессии
+        if (req.session) {
+          const user = req.user as any;
+          user.activeRole = result[0].role;
+          req.session.save();
+        }
       }
     }
     
