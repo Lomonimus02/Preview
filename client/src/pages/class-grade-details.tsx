@@ -173,6 +173,7 @@ export default function ClassGradeDetailsPage() {
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
+  const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null);
   const [selectedAssignmentForEdit, setSelectedAssignmentForEdit] = useState<Assignment | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
@@ -1019,7 +1020,7 @@ export default function ClassGradeDetailsPage() {
   };
   
   // Функция для обработки выбора действия в контекстном диалоге
-  const handleContextAction = (action: 'status' | 'assignment') => {
+  const handleContextAction = (action: 'status' | 'assignment' | 'attendance') => {
     if (!selectedSchedule) return;
     
     // Закрываем контекстный диалог
@@ -1030,6 +1031,17 @@ export default function ClassGradeDetailsPage() {
       openStatusDialog(selectedSchedule.id);
     } else if (action === 'assignment') {
       openAssignmentDialog(selectedSchedule.id);
+    } else if (action === 'attendance') {
+      // Проверяем, что урок проведен
+      if (selectedSchedule.status === 'conducted') {
+        setIsAttendanceDialogOpen(true);
+      } else {
+        toast({
+          title: "Ошибка",
+          description: "Отметка посещаемости доступна только для проведенных уроков",
+          variant: "destructive"
+        });
+      }
     }
   };
   
@@ -2494,6 +2506,17 @@ export default function ClassGradeDetailsPage() {
                 <BookPlus className="h-5 w-5" />
                 Добавить задание
               </Button>
+              
+              {selectedSchedule?.status === 'conducted' && (
+                <Button 
+                  onClick={() => handleContextAction('attendance')}
+                  className="flex items-center justify-start gap-2"
+                  variant="outline"
+                >
+                  <AlertCircle className="h-5 w-5" />
+                  Отметить посещаемость
+                </Button>
+              )}
             </div>
             
             <DialogFooter>
