@@ -2421,8 +2421,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Проверяем права доступа
       if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL, UserRoleEnum.CLASS_TEACHER].includes(req.user.role)) {
-        // Получаем список всех студентов класса
-        const students = await dataStorage.getClassStudents(schedule.classId);
+        let students = [];
+        
+        // Если в расписании указана подгруппа, получаем только студентов этой подгруппы
+        if (schedule.subgroupId) {
+          // Получаем связи студент-подгруппа
+          const studentSubgroupRecords = await db
+            .select()
+            .from(studentClassesTable)
+            .where(eq(studentClassesTable.classId, schedule.classId));
+            
+          // Получаем ID студентов для данной подгруппы
+          const studentIds = studentSubgroupRecords.map(r => r.studentId);
+          
+          // Получаем информацию о студентах
+          if (studentIds.length > 0) {
+            students = await dataStorage.getClassStudents(schedule.classId);
+            // Фильтруем только студентов из текущей подгруппы
+            students = students.filter(student => studentIds.includes(student.id));
+          }
+        } else {
+          // Получаем список всех студентов класса, если подгруппа не указана
+          students = await dataStorage.getClassStudents(schedule.classId);
+        }
         
         // Получаем записи о посещаемости для данного урока
         const attendanceRecords = await db.select().from(attendance).where(eq(attendance.scheduleId, scheduleId));
