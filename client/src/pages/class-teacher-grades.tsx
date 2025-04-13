@@ -18,21 +18,27 @@ import { apiRequest } from "@/lib/queryClient";
 
 export default function ClassTeacherGradesPage() {
   const { user } = useAuth();
-  const { isClassTeacher } = useRoleCheck();
+  const { isClassTeacher, isTeacher } = useRoleCheck();
   const { toast } = useToast();
   const [classId, setClassId] = useState<number | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
 
-  // Проверяем, что пользователь является классным руководителем
+  // Проверяем права доступа пользователя (не обязательно активная роль должна быть class_teacher)
+  const hasClassTeacherAccess = () => {
+    // Достаточно, чтобы пользователь имел роль учителя, а роль class_teacher будет проверена через /api/user-roles
+    return isTeacher() || isClassTeacher();
+  };
+
+  // Проверяем, что пользователь имеет доступ к странице
   useEffect(() => {
-    if (user && !isClassTeacher()) {
+    if (user && !hasClassTeacherAccess()) {
       toast({
         title: "Ошибка доступа",
         description: "Эта страница доступна только для классных руководителей",
         variant: "destructive",
       });
     }
-  }, [user, isClassTeacher, toast]);
+  }, [user, hasClassTeacherAccess, toast]);
 
   // Получаем роли пользователя, чтобы найти привязанный класс
   const { data: userRoles = [] } = useQuery({
@@ -42,7 +48,7 @@ export default function ClassTeacherGradesPage() {
       if (!res.ok) throw new Error("Не удалось загрузить роли пользователя");
       return res.json();
     },
-    enabled: !!user && isClassTeacher(),
+    enabled: !!user && hasClassTeacherAccess(),
   });
 
   // Находим роль классного руководителя и получаем ID класса
@@ -144,7 +150,7 @@ export default function ClassTeacherGradesPage() {
     return subjects.filter(subject => subjectIds.includes(subject.id));
   }, [allGrades, subjects]);
 
-  if (!user || !isClassTeacher()) {
+  if (!user || !hasClassTeacherAccess()) {
     return (
       <MainLayout>
         <div className="container mx-auto px-4 py-6">

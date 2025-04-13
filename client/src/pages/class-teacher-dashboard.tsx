@@ -17,21 +17,26 @@ import { apiRequest } from "@/lib/queryClient";
 
 export default function ClassTeacherDashboard() {
   const { user } = useAuth();
-  const { isClassTeacher } = useRoleCheck();
+  const { isClassTeacher, isTeacher } = useRoleCheck();
   const { toast } = useToast();
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [classId, setClassId] = useState<number | null>(null);
+  
+  // Проверяем права доступа пользователя (не обязательно активная роль должна быть class_teacher)
+  const hasClassTeacherAccess = () => {
+    // Достаточно, чтобы пользователь имел роль учителя, а роль class_teacher будет проверена через /api/user-roles
+    return isTeacher() || isClassTeacher();
+  };
 
-  // Проверяем, что пользователь является классным руководителем
   useEffect(() => {
-    if (user && !isClassTeacher()) {
+    if (user && !hasClassTeacherAccess()) {
       toast({
         title: "Ошибка доступа",
         description: "Эта страница доступна только для классных руководителей",
         variant: "destructive",
       });
     }
-  }, [user, isClassTeacher, toast]);
+  }, [user, hasClassTeacherAccess, toast]);
 
   // Получаем роли пользователя, чтобы найти привязанный класс
   const { data: userRoles = [] } = useQuery({
@@ -41,7 +46,7 @@ export default function ClassTeacherDashboard() {
       if (!res.ok) throw new Error("Не удалось загрузить роли пользователя");
       return res.json();
     },
-    enabled: !!user && isClassTeacher(),
+    enabled: !!user && hasClassTeacherAccess(),
   });
 
   // Находим роль классного руководителя и получаем ID класса
