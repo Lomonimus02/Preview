@@ -2450,10 +2450,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Получаем записи о посещаемости для данного урока используя новый метод
         const attendanceRecords = await dataStorage.getAttendanceBySchedule(scheduleId);
+        console.log(`Получено ${attendanceRecords.length} записей о посещаемости для урока ${scheduleId}`);
         
         // Формируем результат с информацией о каждом студенте и его статусе посещения
         const studentAttendance = students.map(student => {
           const attendanceRecord = attendanceRecords.find(a => a.studentId === student.id);
+          if (attendanceRecord) {
+            console.log(`Найдена посещаемость для студента ${student.id} (${student.lastName} ${student.firstName}): статус=${attendanceRecord.status}`);
+          }
           return {
             studentId: student.id,
             studentName: `${student.lastName} ${student.firstName}`,

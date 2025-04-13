@@ -128,10 +128,15 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     }
   });
 
-  // При загрузке данных инициализируем состояние студентов
-  // Используем useRef для отслеживания, был ли уже компонент инициализирован данными
-  const dataInitialized = React.useRef(false);
+  // Эффект для обработки изменения выбранного урока
+  useEffect(() => {
+    // Сбрасываем данные при изменении расписания для загрузки новых
+    if (schedule.id) {
+      setStudents([]);
+    }
+  }, [schedule.id]);
   
+  // Эффект для инициализации данных о посещаемости
   useEffect(() => {
     // Ждем загрузку всех необходимых данных
     if (isLoadingStudents || isLoadingAttendance || 
@@ -139,15 +144,15 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
       return;
     }
     
-    // Если данные уже инициализированы и не пустые, не перезаписываем их
-    if (dataInitialized.current && students.length > 0) {
+    // Если у нас уже есть данные студентов и мы не в процессе загрузки, не перезагружаем
+    if (students.length > 0 && !isLoadingAttendance) {
       return;
     }
 
     // Определяем список студентов для отображения
     let studentsToShow: User[] = [];
     
-    // Если урок привязан к подгруппе, используем студентов подгруппы
+    // Если урок привязан к подгруппе, используем только студентов данной подгруппы
     if (schedule.subgroupId && subgroupStudents.length > 0) {
       console.log(`Используем ${subgroupStudents.length} студентов из подгруппы ${schedule.subgroupId}`);
       studentsToShow = [...subgroupStudents];
@@ -173,19 +178,30 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     const studentsWithAttendance = studentsToShow.map(student => {
       // Ищем запись о посещаемости для данного студента
       const attendanceRecord = Array.isArray(attendanceData) 
-        ? attendanceData.find(a => {
-            // Проверяем разные форматы данных, которые может вернуть сервер
-            if (a.studentId === student.id) return true;
-            if (a.studentName && a.studentId === student.id) return true;
-            return false;
-          })
+        ? attendanceData.find(a => a.studentId === student.id)
         : null;
       
-      // Получаем ID и статус посещаемости
-      const id = attendanceRecord?.id || attendanceRecord?.attendance?.id;
-      const status = attendanceRecord?.status || 
-                     attendanceRecord?.attendance?.status || 
-                     "absent"; // По умолчанию считаем отсутствующим
+      let status: AttendanceStatus = "absent"; // По умолчанию считаем отсутствующим
+      let id: number | undefined = undefined;
+      let comment: string = "";
+      
+      // Если есть запись о посещаемости, извлекаем её данные
+      if (attendanceRecord) {
+        // Проверяем формат ответа от сервера
+        if (attendanceRecord.attendance) {
+          // Формат: { studentId, studentName, attendance: { id, status, ... } }
+          id = attendanceRecord.attendance.id;
+          status = attendanceRecord.attendance.status || "absent";
+          comment = attendanceRecord.attendance.comment || "";
+          console.log(`Найдена запись посещаемости для студента ${student.id}:`, status);
+        } else if (attendanceRecord.status) {
+          // Формат: { studentId, status, ... }
+          id = attendanceRecord.id;
+          status = attendanceRecord.status;
+          comment = attendanceRecord.comment || "";
+          console.log(`Найдена запись посещаемости для студента ${student.id}:`, status);
+        }
+      }
       
       return {
         id: student.id,
@@ -193,13 +209,11 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
         lastName: student.lastName || "",
         attendanceId: id,
         status: status as AttendanceStatus,
-        comment: attendanceRecord?.comment || ""
+        comment: comment
       };
     });
 
     setStudents(studentsWithAttendance);
-    // Отмечаем, что данные были инициализированы
-    dataInitialized.current = true;
   }, [
     classStudents, 
     subgroupStudents,
@@ -209,7 +223,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     schedule.subgroupId, 
     isLoadingStudents, 
     isLoadingAttendance, 
-    isLoadingSubgroupStudents,
+    isLoadingSubgroupStudents, 
     isLoadingSubgroupInfo,
     students.length
   ]);
