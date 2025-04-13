@@ -1016,6 +1016,18 @@ export default function StudentGrades() {
               <div>
                 <div className="text-sm text-gray-500">Оценка</div>
                 <div className="mt-1 flex flex-col space-y-2">
+                  {/* Базовое отображение оценки для всех систем */}
+                  <div className="bg-gray-50 p-3 rounded-lg text-center">
+                    <div className="text-xs text-gray-500 mb-1">Оценка</div>
+                    <Badge className={`text-lg px-3 py-1 ${
+                      selectedGrade.grade >= 4 ? 'bg-green-100 text-green-800' : 
+                      selectedGrade.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {selectedGrade.grade}
+                    </Badge>
+                  </div>
+                  
                   {/* Отображение оценки для пятибалльной системы */}
                   {gradingSystem === GradingSystemEnum.FIVE_POINT && (
                     <div className="space-y-3">
