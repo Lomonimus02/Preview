@@ -2635,8 +2635,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const studentClassConnections = await db
           .select()
-          .from(studentClasses)
-          .where(eq(studentClasses.studentId, studentId));
+          .from(studentClassesTable)
+          .where(eq(studentClassesTable.studentId, studentId));
           
         console.log(`Получены связи студент-класс для студента ${studentId}:`, studentClassConnections);
         return res.json(studentClassConnections);
@@ -3180,7 +3180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (typeof db !== 'undefined') {
           try {
             // Только если используется реальная БД
-            const dbStudentClasses = await db.select().from(studentClasses).where(eq(studentClasses.classId, classId));
+            const dbStudentClasses = await db.select().from(studentClassesTable).where(eq(studentClassesTable.classId, classId));
             console.log(`Записи в таблице student_classes для класса ${classId}: ${JSON.stringify(dbStudentClasses)}`);
           } catch (error) {
             console.log(`Ошибка при проверке таблицы student_classes: ${error.message}`);
