@@ -195,6 +195,8 @@ export default function UsersPage() {
   
   // Set form values when editing
   const setFormForEdit = (user: User) => {
+    console.log("Начало редактирования пользователя:", user);
+    
     // Загружаем классы для ученика при редактировании
     if (user.role === UserRoleEnum.STUDENT) {
       fetchStudentClassesForEdit(user.id);
@@ -207,7 +209,8 @@ export default function UsersPage() {
       fetchStudentParentsForEdit(user.id);
     }
     
-    form.reset({
+    // Устанавливаем начальные значения для массивов
+    const initialValues = {
       username: user.username,
       password: "", // Don't include password when editing
       confirmPassword: "",
@@ -220,7 +223,10 @@ export default function UsersPage() {
       classIds: [], // Будет заполнено после загрузки данных
       parentIds: [], // Будет заполнено после загрузки данных
       childIds: [], // Будет заполнено после загрузки данных
-    });
+    };
+    
+    console.log("Устанавливаем начальные значения формы:", initialValues);
+    form.reset(initialValues);
   };
   
   // Get role display name
@@ -325,6 +331,10 @@ export default function UsersPage() {
       if (!userData.password) {
         userData.password = undefined; // Используем undefined вместо delete
       }
+      
+      // Добавляем логирование отправляемых данных
+      console.log("Отправляемые данные пользователя:", userData);
+      console.log("ClassIds:", userData.classIds);
       
       editUserMutation.mutate({
         id: selectedUser.id,
