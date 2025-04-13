@@ -132,7 +132,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
 
   // Сохранение данных о посещаемости
   const handleSaveAttendance = async () => {
-    if (!schedule.id || !schedule.classId) return;
+    if (!schedule.id || !schedule.classId || !schedule.scheduleDate) return;
     
     setIsSubmitting(true);
     
@@ -144,6 +144,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
           scheduleId: schedule.id,
           classId: schedule.classId,
           status: student.present ? 'present' : 'absent',
+          date: schedule.scheduleDate // Добавляем дату из расписания
         });
       });
       
