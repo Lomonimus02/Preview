@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { User, Schedule, Attendance, Subgroup } from "@shared/schema";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { FiCheck, FiX, FiSave, FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
   TableBody,
@@ -16,6 +17,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 interface AttendanceFormProps {
@@ -23,12 +31,16 @@ interface AttendanceFormProps {
   onClose: () => void;
 }
 
+// Расширенный интерфейс статуса посещаемости, включающий "late" (опоздание)
+type AttendanceStatus = "present" | "absent" | "late";
+
 interface StudentWithAttendance {
   id: number;
   firstName: string;
   lastName: string;
-  attendance?: Attendance;
-  present: boolean;
+  attendanceId?: number; // ID записи посещаемости, если она уже существует
+  status: AttendanceStatus; // Статус посещаемости
+  comment?: string; // Комментарий (например, причина отсутствия)
 }
 
 export const AttendanceForm: React.FC<AttendanceFormProps> = ({
@@ -40,19 +52,18 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
 
   // Состояние для списка студентов с их статусом посещаемости
   const [students, setStudents] = useState<StudentWithAttendance[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10; // Количество студентов на одной странице
 
-  // Получаем список студентов из класса
+  // Получаем список студентов из класса с оптимизированным ключом запроса
   const { data: classStudents = [], isLoading: isLoadingStudents } = useQuery<User[]>({
-    queryKey: [`/api/students-by-class/${schedule.classId}`],
+    queryKey: ['/api/students-by-class', schedule.classId],
     enabled: !!schedule.classId,
   });
 
   // Получаем данные по посещаемости для конкретного урока
-  const { data: attendanceData = [], isLoading: isLoadingAttendance } = useQuery<any[]>({
-    queryKey: [`/api/attendance?scheduleId=${schedule.id}`],
+  const { data: attendanceData = [], isLoading: isLoadingAttendance, refetch: refetchAttendance } = useQuery<any[]>({
+    queryKey: ['/api/attendance', { scheduleId: schedule.id }],
     queryFn: async () => {
       if (!schedule.id) return [];
       try {
@@ -62,45 +73,59 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
           throw new Error(`Ошибка при получении данных о посещаемости: ${response.status}`);
         }
         const data = await response.json();
-        console.log(`Получено ${data.length} записей о посещаемости для урока ${schedule.id}:`, data);
+        console.log(`Получено ${data.length} записей о посещаемости для урока ${schedule.id}`, data);
         return data;
       } catch (error) {
         console.error("Ошибка при запросе данных о посещаемости:", error);
+        toast({
+          title: "Ошибка загрузки данных",
+          description: "Не удалось загрузить данные о посещаемости. Попробуйте обновить страницу.",
+          variant: "destructive",
+        });
         return [];
       }
     },
     enabled: !!schedule.id,
-    staleTime: 0, // Ensure fresh data on every mount
-    refetchOnWindowFocus: true, // Refetch when the window regains focus
-    gcTime: 0, // В React Query v5 cacheTime переименован в gcTime (garbage collection time)
+    staleTime: 0, // Всегда получаем свежие данные
+    gcTime: 10000, // 10 секунд на сборку мусора
   });
 
   // Получаем студентов подгруппы, если урок связан с подгруппой
   const { data: subgroupStudents = [], isLoading: isLoadingSubgroupStudents } = useQuery<User[]>({
     queryKey: ['/api/students-by-subgroup', schedule.subgroupId],
-    queryFn: async () => {
-      if (!schedule.subgroupId) return [];
-      try {
-        console.log(`Запрос студентов подгруппы с ID=${schedule.subgroupId}`);
-        const response = await fetch(`/api/students-by-subgroup/${schedule.subgroupId}`);
-        if (!response.ok) {
-          throw new Error(`Ошибка при получении студентов подгруппы: ${response.status}`);
-        }
-        const data = await response.json();
-        console.log(`Получено ${data.length} студентов из подгруппы ${schedule.subgroupId}`);
-        return data;
-      } catch (error) {
-        console.error("Ошибка при запросе студентов подгруппы:", error);
-        return [];
-      }
-    },
     enabled: !!schedule.subgroupId,
   });
   
   // Получаем информацию о подгруппе, если урок связан с подгруппой
   const { data: subgroupInfo, isLoading: isLoadingSubgroupInfo } = useQuery<Subgroup>({
-    queryKey: [`/api/subgroups/${schedule.subgroupId}`],
+    queryKey: ['/api/subgroups', schedule.subgroupId],
     enabled: !!schedule.subgroupId,
+  });
+
+  // Мутация для массового обновления посещаемости
+  const updateAttendanceMutation = useMutation({
+    mutationFn: async (attendanceData: any[]) => {
+      return await apiRequest('/api/attendance', 'POST', attendanceData);
+    },
+    onSuccess: () => {
+      // Обновляем данные о посещаемости после успешного сохранения
+      queryClient.invalidateQueries({ queryKey: ['/api/attendance'] });
+      
+      toast({
+        title: "Посещаемость сохранена",
+        description: "Данные о посещаемости успешно сохранены",
+      });
+      
+      onClose();
+    },
+    onError: (error) => {
+      console.error('Ошибка при сохранении посещаемости:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось сохранить данные о посещаемости",
+        variant: "destructive",
+      });
+    }
   });
 
   // При загрузке данных инициализируем состояние студентов
@@ -117,11 +142,11 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     // Если урок привязан к подгруппе, используем студентов подгруппы
     if (schedule.subgroupId && subgroupStudents.length > 0) {
       console.log(`Используем ${subgroupStudents.length} студентов из подгруппы ${schedule.subgroupId}`);
-      studentsToShow = [...subgroupStudents]; // создаем копию массива
+      studentsToShow = [...subgroupStudents];
     } else {
       // Иначе показываем всех студентов класса
       console.log(`Используем ${classStudents.length} студентов из класса ${schedule.classId}`);
-      studentsToShow = [...classStudents]; // создаем копию массива
+      studentsToShow = [...classStudents];
     }
 
     // Сортируем студентов по фамилии и имени
@@ -139,35 +164,30 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     // Создаем список студентов с их статусом посещаемости
     const studentsWithAttendance = studentsToShow.map(student => {
       // Ищем запись о посещаемости для данного студента
-      // Проверяем разные форматы данных, которые может вернуть сервер
-      const attendanceItem = Array.isArray(attendanceData) ? attendanceData.find(a => {
-        // Формат 1: attendance напрямую содержит studentId
-        if (a && a.studentId === student.id) return true;
-        // Формат 2: attendance находится в свойстве attendance
-        if (a && a.attendance && a.attendance.studentId === student.id) return true;
-        return false;
-      }) : null;
+      const attendanceRecord = Array.isArray(attendanceData) 
+        ? attendanceData.find(a => {
+            // Проверяем разные форматы данных, которые может вернуть сервер
+            if (a.studentId === student.id) return true;
+            if (a.studentName && a.studentId === student.id) return true;
+            return false;
+          })
+        : null;
       
-      console.log(`Для студента ${student.id} найдена запись:`, attendanceItem);
+      console.log(`Для студента ${student.id} найдена запись:`, attendanceRecord);
       
-      // Извлекаем данные о посещаемости в зависимости от формата
-      const attendance = attendanceItem && attendanceItem.attendance 
-        ? attendanceItem.attendance 
-        : attendanceItem;
-      
-      // Проверяем статус посещаемости
-      const isPresent = attendance 
-        ? attendance.status === "present" 
-        : false;
-      
-      console.log(`Студент ${student.id} присутствие: ${isPresent}`);
+      // Получаем ID и статус посещаемости
+      const id = attendanceRecord?.id || attendanceRecord?.attendance?.id;
+      const status = attendanceRecord?.status || 
+                     attendanceRecord?.attendance?.status || 
+                     "absent"; // По умолчанию считаем отсутствующим
       
       return {
         id: student.id,
         firstName: student.firstName || "",
         lastName: student.lastName || "",
-        attendance: attendance,
-        present: isPresent,
+        attendanceId: id,
+        status: status as AttendanceStatus,
+        comment: attendanceRecord?.comment || ""
       };
     });
 
@@ -186,60 +206,55 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
   ]);
 
   // Обработчик изменения статуса посещаемости для студента
-  const handleAttendanceChange = (studentId: number, present: boolean) => {
+  const handleAttendanceChange = (studentId: number, status: AttendanceStatus) => {
     setStudents(prev => 
       prev.map(student => 
         student.id === studentId 
-          ? { ...student, present } 
+          ? { ...student, status } 
           : student
       )
     );
   };
 
-  // Сохранение данных о посещаемости
-  const handleSaveAttendance = async () => {
-    if (!schedule.id || !schedule.classId || !schedule.scheduleDate) return;
-    
-    setIsSubmitting(true);
-    
-    try {
-      // Для каждого студента отправляем запрос на сохранение статуса посещаемости
-      // Используем последовательное сохранение вместо параллельного, чтобы избежать конфликтов
-      for (const student of students) {
-        await apiRequest('/api/attendance', 'POST', {
-          studentId: student.id,
-          scheduleId: schedule.id,
-          classId: schedule.classId,
-          status: student.present ? 'present' : 'absent',
-          date: schedule.scheduleDate // Добавляем дату из расписания
-        });
-      }
-      
-      // Сбрасываем полностью кеш, связанный с посещаемостью для текущего расписания
-      queryClient.removeQueries({ queryKey: [`/api/attendance?scheduleId=${schedule.id}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/attendance`] });
-      
-      toast({
-        title: "Посещаемость сохранена",
-        description: "Данные о посещаемости успешно сохранены",
-      });
-      
-      onClose();
-    } catch (error) {
-      console.error('Ошибка при сохранении посещаемости:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось сохранить данные о посещаемости",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+  // Обработчик изменения комментария для студента
+  const handleCommentChange = (studentId: number, comment: string) => {
+    setStudents(prev => 
+      prev.map(student => 
+        student.id === studentId 
+          ? { ...student, comment } 
+          : student
+      )
+    );
   };
 
-  // Обработчик быстрого выбора "Все присутствуют" или "Все отсутствуют"
-  const handleMarkAll = (present: boolean) => {
-    setStudents(prev => prev.map(student => ({ ...student, present })));
+  // Сохранение данных о посещаемости с использованием массовой операции
+  const handleSaveAttendance = () => {
+    if (!schedule.id || !schedule.classId || !schedule.scheduleDate) {
+      toast({
+        title: "Ошибка сохранения",
+        description: "Недостаточно данных о расписании для сохранения посещаемости",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Подготавливаем данные для массового обновления
+    const attendanceData = students.map(student => ({
+      studentId: student.id,
+      scheduleId: schedule.id,
+      classId: schedule.classId,
+      status: student.status,
+      date: schedule.scheduleDate,
+      comment: student.comment
+    }));
+    
+    // Запускаем мутацию для массового обновления посещаемости
+    updateAttendanceMutation.mutate(attendanceData);
+  };
+
+  // Обработчик быстрого выбора статуса для всех студентов
+  const handleMarkAll = (status: AttendanceStatus) => {
+    setStudents(prev => prev.map(student => ({ ...student, status })));
   };
 
   // Получение текущей страницы студентов
@@ -259,6 +274,20 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     }
   };
 
+  // Функция для отображения цвета статуса посещаемости
+  const getStatusBadgeVariant = (status: AttendanceStatus) => {
+    switch (status) {
+      case 'present': return 'success';
+      case 'absent': return 'destructive';
+      case 'late': return 'warning';
+      default: return 'outline';
+    }
+  };
+
+  const isLoading = isLoadingStudents || isLoadingAttendance || 
+    (schedule.subgroupId && (isLoadingSubgroupStudents || isLoadingSubgroupInfo));
+  const isSubmitting = updateAttendanceMutation.isPending;
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between mb-4">
@@ -277,27 +306,31 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => handleMarkAll(true)}
-            disabled={isSubmitting}
+            onClick={() => handleMarkAll("present")}
+            disabled={isSubmitting || isLoading}
           >
             <FiCheck className="mr-1" /> Все присутствуют
           </Button>
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => handleMarkAll(false)}
-            disabled={isSubmitting}
+            onClick={() => handleMarkAll("absent")}
+            disabled={isSubmitting || isLoading}
           >
             <FiX className="mr-1" /> Все отсутствуют
           </Button>
         </div>
       </div>
 
-      {(isLoadingStudents || isLoadingAttendance || 
-          (schedule.subgroupId && (isLoadingSubgroupStudents || isLoadingSubgroupInfo))) ? (
-        <div className="py-4 text-center">Загрузка данных...</div>
+      {isLoading ? (
+        <div className="py-12 text-center">
+          <Spinner className="mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">Загрузка данных...</p>
+        </div>
       ) : students.length === 0 ? (
-        <div className="py-4 text-center">Нет студентов для отображения</div>
+        <div className="py-8 text-center">
+          <p className="text-muted-foreground">Нет студентов для отображения</p>
+        </div>
       ) : (
         <>
           <ScrollArea className="max-h-[400px]">
@@ -306,25 +339,43 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
                 <TableRow>
                   <TableHead className="w-12">№</TableHead>
                   <TableHead>Студент</TableHead>
-                  <TableHead className="w-24 text-center">Присутствие</TableHead>
+                  <TableHead className="w-32 text-center">Статус</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {getCurrentPageStudents().map((student, index) => (
                   <TableRow key={student.id}>
                     <TableCell>{(currentPage - 1) * itemsPerPage + index + 1}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium">
                       {student.lastName} {student.firstName}
                     </TableCell>
-                    <TableCell className="text-center">
-                      <Checkbox
-                        checked={student.present}
-                        onCheckedChange={(checked) => 
-                          handleAttendanceChange(student.id, !!checked)
+                    <TableCell>
+                      <Select
+                        value={student.status}
+                        onValueChange={(value) => 
+                          handleAttendanceChange(student.id, value as AttendanceStatus)
                         }
                         disabled={isSubmitting}
-                        aria-label="Присутствие"
-                      />
+                      >
+                        <SelectTrigger className={`w-full ${
+                          student.status === 'present' ? 'text-green-600' : 
+                          student.status === 'absent' ? 'text-red-600' : 
+                          'text-amber-600'
+                        }`}>
+                          <SelectValue placeholder="Выберите статус" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="present" className="text-green-600">
+                            Присутствует
+                          </SelectItem>
+                          <SelectItem value="absent" className="text-red-600">
+                            Отсутствует
+                          </SelectItem>
+                          <SelectItem value="late" className="text-amber-600">
+                            Опоздал
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -336,49 +387,32 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
             <Pagination className="justify-center">
               <PaginationContent>
                 <PaginationItem>
-                  {currentPage === 1 || isSubmitting ? (
-                    <PaginationPrevious 
-                      aria-disabled="true"
-                      className="opacity-50 cursor-not-allowed"
-                    />
-                  ) : (
-                    <PaginationPrevious 
-                      onClick={() => goToPage(currentPage - 1)} 
-                    />
-                  )}
+                  <PaginationPrevious 
+                    onClick={() => goToPage(currentPage - 1)} 
+                    disabled={currentPage === 1 || isSubmitting}
+                    className={currentPage === 1 || isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
+                  />
                 </PaginationItem>
                 
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
                   <PaginationItem key={page}>
-                    {isSubmitting ? (
-                      <PaginationLink 
-                        isActive={currentPage === page}
-                        className="opacity-50 cursor-not-allowed"
-                      >
-                        {page}
-                      </PaginationLink>
-                    ) : (
-                      <PaginationLink 
-                        isActive={currentPage === page}
-                        onClick={() => goToPage(page)}
-                      >
-                        {page}
-                      </PaginationLink>
-                    )}
+                    <PaginationLink 
+                      isActive={currentPage === page}
+                      onClick={() => goToPage(page)}
+                      disabled={isSubmitting}
+                      className={isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
+                    >
+                      {page}
+                    </PaginationLink>
                   </PaginationItem>
                 ))}
                 
                 <PaginationItem>
-                  {currentPage === totalPages || isSubmitting ? (
-                    <PaginationNext 
-                      aria-disabled="true"
-                      className="opacity-50 cursor-not-allowed"
-                    />
-                  ) : (
-                    <PaginationNext 
-                      onClick={() => goToPage(currentPage + 1)} 
-                    />
-                  )}
+                  <PaginationNext 
+                    onClick={() => goToPage(currentPage + 1)} 
+                    disabled={currentPage === totalPages || isSubmitting}
+                    className={currentPage === totalPages || isSubmitting ? "opacity-50 cursor-not-allowed" : ""}
+                  />
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
@@ -386,21 +420,41 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
         </>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="flex justify-between items-center pt-2">
         <Button
           variant="outline"
-          onClick={onClose}
-          disabled={isSubmitting}
+          size="sm"
+          onClick={() => refetchAttendance()}
+          disabled={isSubmitting || isLoading}
         >
-          Отмена
+          Обновить данные
         </Button>
-        <Button
-          onClick={handleSaveAttendance}
-          disabled={isSubmitting || students.length === 0}
-        >
-          <FiSave className="mr-2" />
-          {isSubmitting ? "Сохранение..." : "Сохранить"}
-        </Button>
+        
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Отмена
+          </Button>
+          <Button
+            onClick={handleSaveAttendance}
+            disabled={isSubmitting || isLoading || students.length === 0}
+          >
+            {isSubmitting ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" />
+                Сохранение...
+              </>
+            ) : (
+              <>
+                <FiSave className="mr-2" />
+                Сохранить
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
