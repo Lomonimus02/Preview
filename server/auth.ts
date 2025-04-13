@@ -75,6 +75,37 @@ export function setupAuth(app: Express) {
         // Если пользователь не найден, возвращаем ошибку
         return done(new Error(`User with id ${id} not found`), null);
       }
+
+      // Получаем все роли пользователя
+      const userRoles = await dataStorage.getUserRoles(id);
+      
+      // Если у пользователя есть активная роль, проверяем её наличие в списке доступных ролей
+      if (user.activeRole) {
+        const activeRoleExists = userRoles.some(role => role.role === user.activeRole);
+        
+        // Если активная роль не существует в списке доступных ролей, выбираем первую доступную
+        if (!activeRoleExists && userRoles.length > 0) {
+          const newActiveRole = userRoles[0].role;
+          console.log(`Активная роль ${user.activeRole} не найдена для пользователя ${user.username}, переключаем на ${newActiveRole}`);
+          
+          // Обновляем активную роль в базе данных
+          await dataStorage.updateUser(id, { activeRole: newActiveRole });
+          
+          // Обновляем объект пользователя
+          user.activeRole = newActiveRole;
+        }
+      } else if (userRoles.length > 0) {
+        // Если активная роль не установлена, устанавливаем первую доступную
+        const newActiveRole = userRoles[0].role;
+        console.log(`Активная роль не установлена для пользователя ${user.username}, устанавливаем ${newActiveRole}`);
+        
+        // Обновляем активную роль в базе данных
+        await dataStorage.updateUser(id, { activeRole: newActiveRole });
+        
+        // Обновляем объект пользователя
+        user.activeRole = newActiveRole;
+      }
+      
       return done(null, user);
     } catch (error) {
       console.error("Error during user deserialization:", error);

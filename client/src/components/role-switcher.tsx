@@ -99,21 +99,53 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
   const activeRole = userRoles.find(role => role.isActive);
   
   // Эффект для принудительного обновления при изменении активной роли пользователя
+  // или при входе в систему
   useEffect(() => {
-    if (user && user.activeRole) {
-      // Проверяем, соответствует ли активная роль в интерфейсе текущей роли пользователя
-      if (!activeRole || activeRole.role !== user.activeRole) {
-        // Если активная роль в интерфейсе не соответствует активной роли пользователя, обновляем кэш
-        console.log('Несоответствие активной роли, обновляем данные');
-        // Сначала обновляем данные пользователя для получения актуальной информации
-        refetchUser().then(() => {
-          // Затем инвалидируем кэши зависимых запросов
-          queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/my-roles"] });
-        });
+    // Проверяем при входе в систему или при изменении activeRole пользователя
+    const checkAndUpdateActiveRole = async () => {
+      try {
+        // Проверяем, загрузился ли пользователь и его роли
+        if (user && !isLoadingRoles && userRoles) {
+          // Проверка 1: У пользователя нет ролей - не делаем ничего
+          if (userRoles.length === 0) {
+            return;
+          }
+  
+          // Проверка 2: Нет активной роли в базе данных, но есть роли пользователя - выбираем первую
+          if (user.activeRole === null && userRoles.length > 0) {
+            // Нужно установить активную роль автоматически
+            console.log('Нет активной роли, автоматически устанавливаем первую из списка:', userRoles[0].role);
+            switchRoleMutation.mutate(userRoles[0].role);
+            return;
+          }
+          
+          // Проверка 3: Активная роль установлена, но не соответствует ни одной из доступных ролей
+          if (user.activeRole && !userRoles.some(r => r.role === user.activeRole)) {
+            console.log('Активная роль не соответствует доступным ролям, переключаемся на первую доступную');
+            switchRoleMutation.mutate(userRoles[0].role);
+            return;
+          }
+          
+          // Проверка 4: Активная роль в UI не соответствует активной роли пользователя
+          if (user.activeRole && (!activeRole || activeRole.role !== user.activeRole)) {
+            console.log('Несоответствие активной роли, обновляем данные');
+            // Сначала обновляем данные пользователя для получения актуальной информации
+            await refetchUser();
+            // Затем инвалидируем кэши зависимых запросов
+            queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/my-roles"] });
+          }
+        }
+      } catch (error) {
+        console.error("Ошибка при проверке и обновлении роли:", error);
       }
+    };
+    
+    // Вызываем только если пользователь авторизован и роли загружены
+    if (user && !isLoadingRoles) {
+      checkAndUpdateActiveRole();
     }
-  }, [user, activeRole, queryClient, refetchUser]);
+  }, [user, activeRole, userRoles, isLoadingRoles, switchRoleMutation, queryClient, refetchUser]);
 
   // Показываем загрузку, если роли еще не загружены
   if (isLoadingRoles) {
