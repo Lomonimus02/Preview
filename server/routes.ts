@@ -2075,9 +2075,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 relatedAssignments[0];
               
               if (assignment) {
-                console.log(`Использую задание: ${assignment.id}, maxScore: ${assignment.maxScore}`);
-                totalEarnedScore += grade.grade;
-                totalMaxScore += Number(assignment.maxScore);
+                console.log(`Использую задание: ${assignment.id}, maxScore: ${assignment.maxScore}, plannedFor: ${assignment.plannedFor}`);
+                
+                // Получаем информацию о расписании, чтобы проверить статус урока
+                const schedule = await dataStorage.getSchedule(grade.scheduleId);
+                
+                // Проверяем, запланировано ли задание и проведен ли урок
+                // Учитываем оценку только если:
+                // 1. задание не запланировано (plannedFor=false) или
+                // 2. задание запланировано, но урок уже проведен (status='conducted')
+                if (!assignment.plannedFor || (assignment.plannedFor && schedule && schedule.status === 'conducted')) {
+                  totalEarnedScore += grade.grade;
+                  totalMaxScore += Number(assignment.maxScore);
+                  console.log(`Оценка учтена в расчете среднего балла`);
+                } else {
+                  console.log(`Оценка не учтена в расчете, т.к. задание запланировано, а урок не проведен`);
+                }
               }
             } else {
               // Если не найдено связанных заданий, но известен scheduleId,
@@ -2088,8 +2101,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (scheduleAssignments && scheduleAssignments.length > 0) {
                 console.log(`Найдено ${scheduleAssignments.length} заданий для урока`);
                 const assignment = scheduleAssignments[0]; // Используем первое задание для этого урока
-                totalEarnedScore += grade.grade;
-                totalMaxScore += Number(assignment.maxScore);
+                
+                // Получаем информацию о расписании, чтобы проверить статус урока
+                const schedule = await dataStorage.getSchedule(grade.scheduleId);
+                
+                // Проверяем, запланировано ли задание и проведен ли урок
+                if (!assignment.plannedFor || (assignment.plannedFor && schedule && schedule.status === 'conducted')) {
+                  totalEarnedScore += grade.grade;
+                  totalMaxScore += Number(assignment.maxScore);
+                  console.log(`Оценка учтена в расчете среднего балла (прямое получение задания)`);
+                } else {
+                  console.log(`Оценка не учтена в расчете, т.к. задание запланировано, а урок не проведен (прямое получение задания)`);
+                }
               } else {
                 // Если для урока нет заданий, но есть оценка, создаем virtual maxScore = 10.0
                 console.log(`Нет заданий для урока, создаем виртуальный maxScore = 10.0`);
