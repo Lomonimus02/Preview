@@ -1255,17 +1255,9 @@ export default function StudentGrades() {
                   </div>
                   
                   <div className="space-y-3">
-                    <div>
-                      <div className="text-sm text-gray-500">Тип задания</div>
-                      <Badge className={assignmentTypeColors[selectedAssignment.assignmentType] || 'bg-gray-100'}>
-                        {getAssignmentTypeName(selectedAssignment.assignmentType)}
-                      </Badge>
-                    </div>
-                    
-                    <div>
-                      <div className="text-sm text-gray-500">Максимальный балл</div>
-                      <div className="font-medium">{selectedAssignment.maxScore}</div>
-                    </div>
+                    <Badge className={assignmentTypeColors[selectedAssignment.assignmentType] || 'bg-gray-100'}>
+                      {getAssignmentTypeName(selectedAssignment.assignmentType)}
+                    </Badge>
                     
                     {selectedAssignment.description && (
                       <div>
