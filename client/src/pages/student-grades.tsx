@@ -453,6 +453,8 @@ export default function StudentGrades() {
   
   // Обработчик клика по оценке
   const handleGradeClick = (grade: Grade, assignment: Assignment | null) => {
+    console.log("Grade clicked:", grade);
+    console.log("Assignment data:", assignment);
     setSelectedGrade(grade);
     setSelectedAssignment(assignment);
     setIsGradeDialogOpen(true);
