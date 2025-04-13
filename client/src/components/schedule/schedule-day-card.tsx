@@ -154,20 +154,18 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Кнопка для создания задания (Отображается только для учетелей и если урок проведен) */}
-          {schedule.status === 'conducted' && (
-            <div 
-              className="cursor-pointer" 
-              onClick={(e) => {
-                e.stopPropagation(); // Предотвращаем всплытие события
-                if (onClick && typeof onClick === 'function') {
-                  onClick(e, "assignment");
-                }
-              }}
-            >
-              <FiList className="text-blue-500 w-5 h-5" title="Создать задание" />
-            </div>
-          )}
+          {/* Кнопка для создания задания (Отображается для учителей, независимо от статуса урока) */}
+          <div 
+            className="cursor-pointer" 
+            onClick={(e) => {
+              e.stopPropagation(); // Предотвращаем всплытие события
+              if (onClick && typeof onClick === 'function') {
+                onClick(e, "assignment");
+              }
+            }}
+          >
+            <FiList className="text-blue-500 w-5 h-5" title={schedule.status === 'conducted' ? "Создать задание" : "Запланировать задание"} />
+          </div>
           
           {/* Кнопка для создания домашнего задания */}
           <div 
@@ -414,7 +412,8 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     
     if (actionType === "homework" && isTeacher()) {
       setIsHomeworkDialogOpen(true);
-    } else if (actionType === "assignment" && isTeacher() && schedule.status === "conducted") {
+    } else if (actionType === "assignment" && isTeacher()) {
+      // Разрешаем создавать задания независимо от статуса
       setSelectedAssignment(undefined); // Создание нового задания
       setIsAssignmentDialogOpen(true);
     } else if (actionType === "edit-assignment" && assignment && isTeacher()) {

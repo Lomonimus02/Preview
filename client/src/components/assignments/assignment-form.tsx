@@ -189,6 +189,31 @@ export const AssignmentForm: React.FC<AssignmentFormProps> = ({
             </FormItem>
           )}
         />
+        
+        {schedule.status === 'not_conducted' && (
+          <FormField
+            control={form.control}
+            name="plannedFor"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel>
+                    Запланированное задание
+                  </FormLabel>
+                  <p className="text-sm text-muted-foreground">
+                    Оценки за это задание будут учитываться в среднем проценте только после проведения урока
+                  </p>
+                </div>
+              </FormItem>
+            )}
+          />
+        )}
 
         <DialogFooter className="flex justify-between items-center">
           {existingAssignment && (
