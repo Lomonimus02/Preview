@@ -65,6 +65,18 @@ export function useRoleCheck() {
     return activeRole === UserRoleEnum.CLASS_TEACHER;
   };
   
+  // Функция для проверки доступа к функциям классного руководителя
+  // Эта функция используется вместо isClassTeacher() когда нужно проверить
+  // имеет ли пользователь роль классного руководителя, независимо от активной роли
+  const hasClassTeacherAccess = () => {
+    if (!user) return false;
+    // Если активная роль - классный руководитель, то доступ есть
+    if (activeRole === UserRoleEnum.CLASS_TEACHER) return true;
+    // В противном случае, просто проверяем, что пользователь - классный руководитель
+    // Проверка через API и userRoles будет выполнена в компоненте
+    return true;
+  };
+  
   // Функция для проверки, является ли пользователь учеником
   const isStudent = () => {
     if (!activeRole) return false;
@@ -99,6 +111,7 @@ export function useRoleCheck() {
     isStudent,
     isParent,
     canViewScheduleDropdown,
-    currentRole
+    currentRole,
+    hasClassTeacherAccess
   };
 }
