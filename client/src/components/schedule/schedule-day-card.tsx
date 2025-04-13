@@ -32,7 +32,8 @@ import {
   FiEdit3, 
   FiTrash2, 
   FiAlertCircle,
-  FiSettings
+  FiSettings,
+  FiUsers
 } from "react-icons/fi";
 import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum, Assignment, TimeSlot, ClassTimeSlot } from "@shared/schema";
 import { HomeworkForm } from "./homework-form";
@@ -116,6 +117,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
   subgroups = [],
   className,
   showClass = false,
+  currentUser,
   onClick,
 }) => {
   // Функция для получения названия подгруппы
@@ -192,6 +194,21 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
               <FiPlus className="text-orange-500 w-5 h-5" title="Добавить домашнее задание" />
             )}
           </div>
+          
+          {/* Кнопка для отметки посещаемости (Только для проведенных уроков и учителей) */}
+          {schedule.status === 'conducted' && currentUser?.role === UserRoleEnum.TEACHER && (
+            <div 
+              className="cursor-pointer" 
+              onClick={(e) => {
+                e.stopPropagation(); // Предотвращаем всплытие события
+                if (onClick && typeof onClick === 'function') {
+                  onClick(e, "attendance");
+                }
+              }}
+            >
+              <FiUsers className="text-purple-500 w-5 h-5" title="Отметить посещаемость" />
+            </div>
+          )}
         </div>
       </div>
       <div className="text-sm text-gray-600">
@@ -312,6 +329,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | undefined>(undefined);
   const [, navigate] = useLocation();
   const { isTeacher, isSchoolAdmin } = useRoleCheck();
@@ -448,6 +466,9 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     } else if (actionType === "edit-assignment" && assignment && isTeacher()) {
       setSelectedAssignment(assignment); // Редактирование существующего задания
       setIsAssignmentDialogOpen(true);
+    } else if (actionType === "attendance" && isTeacher() && schedule.status === 'conducted') {
+      // Открываем диалог для отметки посещаемости (только для проведенных уроков)
+      setIsAttendanceDialogOpen(true);
     } else {
       setIsDetailsOpen(true);
     }
