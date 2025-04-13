@@ -6,7 +6,7 @@ import { useRoleCheck } from "@/hooks/use-role-check";
 import { UserRoleEnum, Grade, Class, Subject, User, Schedule } from "@shared/schema";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, BookOpen, UserCheck, Calendar, Search, Filter, Check, X } from "lucide-react";
+import { AlertCircle, BookOpen, UserCheck, Calendar as CalendarIcon, Search, Filter, Check, X } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -769,10 +769,9 @@ export default function TeacherClasses() {
               </Button>
             </div>
             
-            {/* Опция для запланированного задания для будущих уроков */}
+            {/* Опция для запланированного задания для всех уроков */}
             {currentSchedule && 
-             currentSchedule.scheduleDate && 
-             new Date() < new Date(`${currentSchedule.scheduleDate}T${currentSchedule.endTime || '23:59:59'}`) && (
+             currentSchedule.scheduleDate && (
               <div className="mt-4">
                 <div className="bg-amber-50 border border-amber-200 rounded-md p-4 mb-4">
                   <div className="flex items-start">
@@ -792,8 +791,8 @@ export default function TeacherClasses() {
                             setGradeData({
                               studentId: 0,
                               scheduleId: currentSchedule.id,
-                              gradeType: 'homework',
-                              plannedFor: true // Помечаем как запланированное задание
+                              gradeType: 'homework'
+                              // Поле plannedFor будет добавлено на серверной стороне
                             });
                             // Здесь нужно открыть форму задания
                             // Если у вас есть отдельный компонент для создания заданий, используйте его
