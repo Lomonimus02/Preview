@@ -28,14 +28,16 @@ import {
   FiUser, 
   FiCheck, 
   FiPlus, 
+  FiX,
+  FiSave,
+  FiUsers,
   FiList, 
   FiEdit3, 
   FiTrash2, 
   FiAlertCircle,
-  FiSettings,
-  FiUsers
+  FiSettings
 } from "react-icons/fi";
-import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum, Assignment, TimeSlot, ClassTimeSlot } from "@shared/schema";
+import { Schedule, User, Subject, Class, UserRoleEnum, Grade, Homework, AssignmentTypeEnum, Assignment, TimeSlot, ClassTimeSlot, Attendance } from "@shared/schema";
 import { HomeworkForm } from "./homework-form";
 import { AssignmentForm } from "../assignments/assignment-form";
 
