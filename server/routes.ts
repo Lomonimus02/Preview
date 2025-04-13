@@ -2422,7 +2422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Проверяем права доступа
       if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL, UserRoleEnum.CLASS_TEACHER].includes(req.user.role)) {
         // Получаем список всех студентов класса
-        const students = await dataStorage.getStudentsByClass(schedule.classId);
+        const students = await dataStorage.getClassStudents(schedule.classId);
         
         // Получаем записи о посещаемости для данного урока
         const attendanceRecords = await db.select().from(attendance).where(eq(attendance.scheduleId, scheduleId));
