@@ -58,23 +58,22 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
 
   // Получаем студентов подгруппы, если урок связан с подгруппой
   const { data: subgroupStudents = [], isLoading: isLoadingSubgroupStudents } = useQuery<User[]>({
-    queryKey: ['/api/subgroup-students', schedule.subgroupId],
+    queryKey: ['/api/students-by-subgroup', schedule.subgroupId],
     queryFn: async () => {
       if (!schedule.subgroupId) return [];
-      const response = await fetch(`/api/students-by-subgroup/${schedule.subgroupId}`);
-      const data = await response.json();
-      return data;
-    },
-    enabled: !!schedule.subgroupId,
-  });
-
-  const { data: studentSubgroupRelations = [], isLoading: isLoadingStudentSubgroups } = useQuery({
-    queryKey: [`/api/student-subgroups`],
-    queryFn: async () => {
-      const response = await fetch(`/api/student-subgroups?subgroupId=${schedule.subgroupId}`);
-      const data = await response.json();
-      console.log("Получены связи студент-подгруппа:", data);
-      return data;
+      try {
+        console.log(`Запрос студентов подгруппы с ID=${schedule.subgroupId}`);
+        const response = await fetch(`/api/students-by-subgroup/${schedule.subgroupId}`);
+        if (!response.ok) {
+          throw new Error(`Ошибка при получении студентов подгруппы: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log(`Получено ${data.length} студентов из подгруппы ${schedule.subgroupId}`);
+        return data;
+      } catch (error) {
+        console.error("Ошибка при запросе студентов подгруппы:", error);
+        return [];
+      }
     },
     enabled: !!schedule.subgroupId,
   });
@@ -89,17 +88,21 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
   useEffect(() => {
     // Ждем загрузку всех необходимых данных
     if (isLoadingStudents || isLoadingAttendance || 
-        (schedule.subgroupId && (isLoadingStudentSubgroups || isLoadingSubgroupInfo))) {
+        (schedule.subgroupId && (isLoadingSubgroupStudents || isLoadingSubgroupInfo))) {
       return;
     }
 
-    // Начинаем со всех студентов класса
-    let studentsToShow = [...classStudents];
-
-    // Фильтруем студентов по подгруппе, если она указана
-    if (schedule.subgroupId && studentSubgroupRelations.length > 0) {
-      const subgroupStudentIds = studentSubgroupRelations.map(record => record.studentId);
-      studentsToShow = classStudents.filter(student => subgroupStudentIds.includes(student.id));
+    // Определяем список студентов для отображения
+    let studentsToShow: User[] = [];
+    
+    // Если урок привязан к подгруппе, используем студентов подгруппы
+    if (schedule.subgroupId && subgroupStudents.length > 0) {
+      console.log(`Используем ${subgroupStudents.length} студентов из подгруппы ${schedule.subgroupId}`);
+      studentsToShow = subgroupStudents;
+    } else {
+      // Иначе показываем всех студентов класса
+      console.log(`Используем ${classStudents.length} студентов из класса ${schedule.classId}`);
+      studentsToShow = classStudents;
     }
 
     // Создаем список студентов с их статусом посещаемости
@@ -114,7 +117,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
         firstName: student.firstName || "",
         lastName: student.lastName || "",
         attendance: attendance,
-        // Если есть запись о посещаемости, используем её значение, иначе считаем, что статус не отмечен (по умолчанию не отмечен)
+        // Если есть запись о посещаемости, используем её значение, иначе считаем, что студент отсутствует
         present: attendance ? attendance.status === "present" : false,
       };
     });
@@ -122,13 +125,15 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     setStudents(studentsWithAttendance);
   }, [
     classStudents, 
+    subgroupStudents,
     attendanceData, 
-    studentSubgroupRelations, 
     schedule.id, 
+    schedule.classId,
     schedule.subgroupId, 
     isLoadingStudents, 
     isLoadingAttendance, 
-    isLoadingStudentSubgroups
+    isLoadingSubgroupStudents,
+    isLoadingSubgroupInfo
   ]);
 
   // Обработчик изменения статуса посещаемости для студента
@@ -239,7 +244,8 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
         </div>
       </div>
 
-      {(isLoadingStudents || isLoadingAttendance || isLoadingStudentSubgroups || isLoadingSubgroupInfo) ? (
+      {(isLoadingStudents || isLoadingAttendance || 
+          (schedule.subgroupId && (isLoadingSubgroupStudents || isLoadingSubgroupInfo))) ? (
         <div className="py-4 text-center">Загрузка данных...</div>
       ) : students.length === 0 ? (
         <div className="py-4 text-center">Нет студентов для отображения</div>
