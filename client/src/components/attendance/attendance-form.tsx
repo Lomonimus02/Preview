@@ -129,10 +129,18 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
   });
 
   // При загрузке данных инициализируем состояние студентов
+  // Используем useRef для отслеживания, был ли уже компонент инициализирован данными
+  const dataInitialized = React.useRef(false);
+  
   useEffect(() => {
     // Ждем загрузку всех необходимых данных
     if (isLoadingStudents || isLoadingAttendance || 
         (schedule.subgroupId && (isLoadingSubgroupStudents || isLoadingSubgroupInfo))) {
+      return;
+    }
+    
+    // Если данные уже инициализированы и не пустые, не перезаписываем их
+    if (dataInitialized.current && students.length > 0) {
       return;
     }
 
@@ -173,8 +181,6 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
           })
         : null;
       
-      console.log(`Для студента ${student.id} найдена запись:`, attendanceRecord);
-      
       // Получаем ID и статус посещаемости
       const id = attendanceRecord?.id || attendanceRecord?.attendance?.id;
       const status = attendanceRecord?.status || 
@@ -192,6 +198,8 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     });
 
     setStudents(studentsWithAttendance);
+    // Отмечаем, что данные были инициализированы
+    dataInitialized.current = true;
   }, [
     classStudents, 
     subgroupStudents,
@@ -202,7 +210,8 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     isLoadingStudents, 
     isLoadingAttendance, 
     isLoadingSubgroupStudents,
-    isLoadingSubgroupInfo
+    isLoadingSubgroupInfo,
+    students.length
   ]);
 
   // Обработчик изменения статуса посещаемости для студента
