@@ -1141,20 +1141,12 @@ export default function ClassGradeDetailsPage() {
     setSelectedAssignment(null);
     setSelectedAssignmentId(null);
     
-    // Find schedule by ID to check its status
+    // Убираем ограничение для добавления заданий на непроведенные уроки
+    // Теперь учитель может добавлять задания на любые уроки, включая непроведенные
     let canAddGrade = true;
     
-    if (scheduleId) {
-      const schedule = getScheduleById(scheduleId);
-      if (schedule && schedule.status !== 'conducted') {
-        toast({
-          title: "Невозможно добавить оценку",
-          description: "Урок не отмечен как проведенный. Отметьте урок как проведенный, чтобы добавить оценки.",
-          variant: "destructive",
-        });
-        canAddGrade = false;
-      }
-    }
+    // Оставляем ссылку на расписание, чтобы использовать её в форме для установки статуса "plannedFor"
+    const schedule = scheduleId ? getScheduleById(scheduleId) : null;
     
     if (canAddGrade) {
       // Сбрасываем форму и устанавливаем значения по умолчанию
@@ -1494,10 +1486,9 @@ export default function ClassGradeDetailsPage() {
       return isLessonConducted(scheduleId);
     }
     
-    // Для накопительной системы должно быть еще и задание
-    return isLessonConducted(scheduleId) && 
-           slot.assignments && 
-           slot.assignments.length > 0;
+    // Для накопительной системы важно, чтобы были задания, но не требуется, чтобы урок был проведен
+    // Это позволяет добавлять задания и для непроведенных уроков
+    return slot.assignments && slot.assignments.length > 0;
   };
   
   // Функция для определения должен ли клик по заголовку колонки открыть диалог статуса или диалог добавления задания
@@ -1508,8 +1499,8 @@ export default function ClassGradeDetailsPage() {
     const schedule = getScheduleById(slot.scheduleId);
     if (!schedule) return;
     
-    // Если накопительная система оценивания и урок проведен, то отображаем контекстное меню
-    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && schedule.status === 'conducted') {
+    // Изменено условие, чтобы можно было добавлять задания и для непроведенных уроков
+    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
       // Если у урока уже есть задания, предлагаем добавить еще одно
       if (slot.assignments && slot.assignments.length > 0) {
         // Открываем диалог добавления задания
