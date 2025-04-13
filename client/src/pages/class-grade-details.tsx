@@ -1921,13 +1921,56 @@ export default function ClassGradeDetailsPage() {
                 
                 {/* Check if the current time is before the lesson time */}
                 {selectedSchedule && new Date() < new Date(`${selectedSchedule.scheduleDate}T${selectedSchedule.endTime}`) && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Внимание</AlertTitle>
-                    <AlertDescription>
-                      Урок еще не завершился. Отметить урок как проведенный можно только после его окончания.
-                    </AlertDescription>
-                  </Alert>
+                  <>
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Внимание</AlertTitle>
+                      <AlertDescription>
+                        Урок еще не завершился. Отметить урок как проведенный можно только после его окончания.
+                      </AlertDescription>
+                    </Alert>
+                    
+                    {/* Кнопка для добавления запланированного задания для будущего урока */}
+                    {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && (
+                      <div className="mt-4">
+                        <Alert className="bg-amber-50 border-amber-200">
+                          <CalendarIcon className="h-4 w-4 text-amber-600" />
+                          <AlertTitle className="text-amber-700">Запланировать задание</AlertTitle>
+                          <AlertDescription className="text-amber-700">
+                            Вы можете запланировать задание к этому уроку заранее. Запланированные задания не влияют на среднюю оценку до проведения урока.
+                          </AlertDescription>
+                        </Alert>
+                        
+                        <Button 
+                          variant="outline" 
+                          className="w-full mt-2 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                          onClick={() => {
+                            setIsStatusDialogOpen(false);
+                            // Автоматически устанавливаем флаг plannedFor для заданий будущих уроков
+                            if (selectedSchedule) {
+                              // Пре-заполняем форму для запланированного задания
+                              assignmentForm.reset({
+                                assignmentType: AssignmentTypeEnum.HOMEWORK,
+                                maxScore: "10",
+                                description: "",
+                                scheduleId: selectedSchedule.id,
+                                subjectId: subjectId,
+                                classId: classId,
+                                teacherId: user?.id || 0,
+                                subgroupId: subgroupId || null,
+                                plannedFor: true // Автоматически помечаем как запланированное
+                              });
+                              setSelectedSchedule(selectedSchedule);
+                              setIsAssignmentDialogOpen(true);
+                            }
+                          }}
+                        >
+                          <CalendarIcon className="h-4 w-4 mr-2" />
+                          Запланировать задание
+                        </Button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -2017,7 +2060,14 @@ export default function ClassGradeDetailsPage() {
                       <FormItem>
                         <FormLabel>Описание (опционально)</FormLabel>
                         <FormControl>
-                          <Textarea {...field} placeholder="Введите описание задания" />
+                          <Textarea 
+                            placeholder="Введите описание задания"
+                            onChange={field.onChange}
+                            value={field.value || ""}
+                            ref={field.ref}
+                            name={field.name}
+                            onBlur={field.onBlur}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -2245,7 +2295,6 @@ export default function ClassGradeDetailsPage() {
                                     toast({
                                       title: "Внимание",
                                       description: `Максимальный балл для этого задания: ${maxScore}`,
-                                      variant: "warning",
                                     });
                                   } else {
                                     field.onChange(value);
