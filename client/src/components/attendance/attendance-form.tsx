@@ -95,6 +95,16 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
   // Получаем студентов подгруппы, если урок связан с подгруппой
   const { data: subgroupStudents = [], isLoading: isLoadingSubgroupStudents } = useQuery<User[]>({
     queryKey: ['/api/students-by-subgroup', schedule.subgroupId],
+    queryFn: async () => {
+      if (!schedule.subgroupId) return [];
+      const response = await fetch(`/api/students-by-subgroup?subgroupId=${schedule.subgroupId}`);
+      if (!response.ok) {
+        throw new Error(`Ошибка при получении студентов подгруппы: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log(`Получено ${data.length} студентов из подгруппы ${schedule.subgroupId}:`, data);
+      return data;
+    },
     enabled: !!schedule.subgroupId,
   });
   
@@ -362,9 +372,9 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
         </div>
       ) : (
         <>
-          <ScrollArea className="max-h-[400px]">
+          <ScrollArea className="h-[50vh] max-h-[500px]">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
                   <TableHead className="w-12">№</TableHead>
                   <TableHead>Студент</TableHead>
