@@ -2127,8 +2127,7 @@ export default function ClassGradeDetailsPage() {
                             <SelectContent>
                               {schedules
                                 .filter(s => s.subjectId === subjectId && 
-                                             (subgroupId ? s.subgroupId === subgroupId : true) &&
-                                             s.status === 'conducted')
+                                             (subgroupId ? s.subgroupId === subgroupId : true))
                                 .map(schedule => (
                                   <SelectItem key={schedule.id} value={schedule.id.toString()}>
                                     {format(new Date(schedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })} - {schedule.startTime}
@@ -2238,7 +2237,15 @@ export default function ClassGradeDetailsPage() {
                         // Получаем задания для этого урока
                         const scheduleId = gradeForm.getValues().scheduleId;
                         const slot = lessonSlots.find(s => s.scheduleId === scheduleId);
-                        const availableAssignments = slot?.assignments || [];
+                        // Находим сам урок для проверки его статуса
+                        const schedule = schedules.find(s => s.id === scheduleId);
+                        const isLessonConducted = schedule?.status === 'conducted';
+                        
+                        // Фильтруем задания - показываем только те, которые не запланированные,
+                        // или запланированные, но урок уже проведен
+                        const availableAssignments = (slot?.assignments || []).filter(assignment => 
+                          !assignment.plannedFor || (assignment.plannedFor && isLessonConducted)
+                        );
                         
                         return (
                           <FormItem>
