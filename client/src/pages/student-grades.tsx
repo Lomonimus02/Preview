@@ -415,7 +415,18 @@ export default function StudentGrades() {
       <div className="flex flex-wrap gap-1 justify-center">
         {cellGrades.map((grade) => {
           // Определяем, связано ли с заданием
-          const assignment = assignments.find(a => a.scheduleId === grade.scheduleId);
+          let assignment = null;
+          
+          // Сначала проверяем по assignmentId (если есть)
+          if (grade.assignmentId) {
+            assignment = assignments.find(a => a.id === grade.assignmentId);
+          }
+          
+          // Если assignmentId не задан или не найден, ищем по scheduleId
+          if (!assignment && grade.scheduleId) {
+            assignment = assignments.find(a => a.scheduleId === grade.scheduleId);
+          }
+          
           const hasAssignment = !!assignment;
           
           // Определяем цвет в зависимости от типа задания или оценки
@@ -452,9 +463,24 @@ export default function StudentGrades() {
   };
   
   // Обработчик клика по оценке
-  const handleGradeClick = (grade: Grade, assignment: Assignment | null) => {
+  const handleGradeClick = (grade: Grade, initialAssignment: Assignment | null) => {
     console.log("Grade clicked:", grade);
-    console.log("Assignment data:", assignment);
+    
+    // Ищем соответствующее задание, приоритет assignmentId, затем scheduleId
+    let assignment = initialAssignment;
+    
+    // Если не передано задание, но есть assignmentId в оценке, найдем задание
+    if (!assignment && grade.assignmentId) {
+      assignment = assignments.find(a => a.id === grade.assignmentId) || null;
+    }
+    
+    // Если не найдено по assignmentId, ищем по scheduleId
+    if (!assignment && grade.scheduleId) {
+      assignment = assignments.find(a => a.scheduleId === grade.scheduleId) || null;
+    }
+    
+    console.log("Assignment data (final):", assignment);
+    
     setSelectedGrade(grade);
     setSelectedAssignment(assignment);
     setIsGradeDialogOpen(true);
@@ -556,14 +582,21 @@ export default function StudentGrades() {
       
       // Обрабатываем оценки, связанные с заданиями
       subjectGrades.forEach(grade => {
-        if (grade.scheduleId) {
-          const relatedAssignment = assignments.find(a => a.scheduleId === grade.scheduleId);
-          
-          if (relatedAssignment) {
-            // Если нашли задание, добавляем баллы
-            totalEarnedScore += grade.grade;
-            totalMaxScore += Number(relatedAssignment.maxScore);
-          }
+        // Определяем связанное задание (сначала по assignmentId, затем по scheduleId)
+        let relatedAssignment = null;
+        
+        if (grade.assignmentId) {
+          relatedAssignment = assignments.find(a => a.id === grade.assignmentId);
+        }
+        
+        if (!relatedAssignment && grade.scheduleId) {
+          relatedAssignment = assignments.find(a => a.scheduleId === grade.scheduleId);
+        }
+        
+        if (relatedAssignment) {
+          // Если нашли задание, добавляем баллы
+          totalEarnedScore += grade.grade;
+          totalMaxScore += Number(relatedAssignment.maxScore);
         }
       });
       
@@ -885,12 +918,22 @@ export default function StudentGrades() {
                         })
                         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                         .map(grade => {
-                          const assignment = assignments.find(a => a.scheduleId === grade.scheduleId);
+                          // Ищем соответствующее задание (сначала по assignmentId, затем по scheduleId)
+                          let assignment = null;
+                          
+                          if (grade.assignmentId) {
+                            assignment = assignments.find(a => a.id === grade.assignmentId);
+                          }
+                          
+                          if (!assignment && grade.scheduleId) {
+                            assignment = assignments.find(a => a.scheduleId === grade.scheduleId);
+                          }
+                          
                           return (
                             <TableRow 
                               key={grade.id} 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => handleGradeClick(grade, assignment || null)}
+                              onClick={() => handleGradeClick(grade, assignment)}
                             >
                               <TableCell>
                                 {format(new Date(grade.createdAt), 'dd.MM.yyyy')}
