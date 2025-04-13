@@ -48,9 +48,22 @@ export default function ClassTeacherGradesPage() {
   // Находим роль классного руководителя и получаем ID класса
   useEffect(() => {
     if (userRoles.length > 0) {
-      const classTeacherRole = userRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER && r.classId);
-      if (classTeacherRole && classTeacherRole.classId) {
-        setClassId(classTeacherRole.classId);
+      console.log("Полученные роли:", userRoles);
+      const classTeacherRole = userRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER);
+      console.log("Найдена роль классного руководителя:", classTeacherRole);
+      
+      if (classTeacherRole) {
+        // Проверяем разные варианты поля с ID класса
+        if (classTeacherRole.classId) {
+          console.log("Найден classId:", classTeacherRole.classId);
+          setClassId(classTeacherRole.classId);
+        } else if (classTeacherRole.class_id) {
+          console.log("Найден class_id:", classTeacherRole.class_id);
+          setClassId(classTeacherRole.class_id);
+        } else if (classTeacherRole.classIds && classTeacherRole.classIds.length > 0) {
+          console.log("Найден classIds[0]:", classTeacherRole.classIds[0]);
+          setClassId(classTeacherRole.classIds[0]);
+        }
       }
     }
   }, [userRoles]);
