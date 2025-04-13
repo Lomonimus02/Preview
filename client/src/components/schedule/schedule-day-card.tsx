@@ -198,7 +198,13 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
         {/* Отображаем задания, если они есть */}
         {schedule.assignments && schedule.assignments.length > 0 && (
           <div className="mt-2">
-            <div className="text-xs text-gray-500 mb-1">Задания:</div>
+            <div className="text-xs text-gray-500 mb-1">
+              {/* Группируем задания по типу (запланированные и текущие) */}
+              {schedule.assignments.some(a => a.plannedFor) && schedule.assignments.some(a => !a.plannedFor) ? 
+                'Задания и запланированные работы:' : 
+                schedule.assignments.every(a => a.plannedFor) ? 
+                  'Запланированные работы:' : 'Задания:'}
+            </div>
             <div className="flex flex-wrap gap-1">
               {schedule.assignments.map((assignment) => (
                 <div 
@@ -207,9 +213,10 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
                     ${getAssignmentTypeColor(assignment.assignmentType)} 
                     ${assignment.plannedFor ? 'border border-dashed border-gray-400' : ''} 
                     hover:bg-opacity-80 cursor-pointer`}
-                  title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. 
-                    ${assignment.plannedFor ? '(Запланировано)' : ''} 
-                    Нажмите для редактирования.`}
+                  title={`${assignment.plannedFor ? 'ЗАПЛАНИРОВАНО: ' : ''}${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. 
+                    ${assignment.plannedFor ? 
+                      'Это задание запланировано на будущий урок. Оценки за него не будут учитываться в средней оценке до проведения урока.' : 
+                      'Нажмите для редактирования.'}`}
                   onClick={(e) => {
                     e.stopPropagation(); // Предотвращаем всплытие события
                     // Вызов обработчика для редактирования задания
@@ -218,8 +225,15 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
                     }
                   }}
                 >
-                  {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)} ({assignment.maxScore})
-                  {assignment.plannedFor && <span className="ml-1 text-gray-500">📅</span>}
+                  <span className="font-medium">
+                    {getAssignmentTypeName(assignment.assignmentType).substring(0, 3)}
+                  </span>
+                  <span className="mx-1 font-bold">{assignment.maxScore}б.</span>
+                  {assignment.plannedFor && (
+                    <span className="ml-1 text-gray-600 flex items-center" title="Запланировано">
+                      📅
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
