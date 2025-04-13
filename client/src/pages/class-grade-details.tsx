@@ -1017,15 +1017,7 @@ export default function ClassGradeDetailsPage() {
     if (scheduleId) {
       const schedule = getScheduleById(scheduleId);
       if (schedule) {
-        // Проверяем, проведен ли урок
-        if (schedule.status !== 'conducted') {
-          toast({
-            title: "Невозможно добавить задание",
-            description: "Урок не отмечен как проведенный. Отметьте урок как проведенный, чтобы добавить задание.",
-            variant: "destructive",
-          });
-          return;
-        }
+        // Убрана проверка статуса урока - теперь можно добавлять задания для любых уроков
         setSelectedSchedule(schedule);
       }
     } else {
