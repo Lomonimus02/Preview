@@ -81,9 +81,9 @@ const userFormSchema = insertUserSchema.extend({
   ]),
   confirmPassword: z.string().min(1, "Подтвердите пароль"),
   // Дополнительные поля для привязок
-  classIds: z.array(z.number()).optional(),
-  parentIds: z.array(z.number()).optional(),
-  childIds: z.array(z.number()).optional(),
+  classIds: z.array(z.number()).default([]),
+  parentIds: z.array(z.number()).default([]),
+  childIds: z.array(z.number()).default([]),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Пароли не совпадают",
   path: ["confirmPassword"],
@@ -169,6 +169,9 @@ export default function UsersPage() {
       phone: "",
       role: UserRoleEnum.STUDENT,
       schoolId: null,
+      classIds: [],
+      parentIds: [],
+      childIds: [],
     },
   });
   
