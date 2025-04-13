@@ -85,6 +85,7 @@ const assignmentFormSchema = z.object({
     required_error: "Выберите учителя",
   }),
   subgroupId: z.number().optional().nullable(),
+  plannedFor: z.boolean().default(false),
 });
 
 // Схема для добавления оценки
@@ -2018,6 +2019,29 @@ export default function ClassGradeDetailsPage() {
                           <Textarea {...field} placeholder="Введите описание задания" />
                         </FormControl>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={assignmentForm.control}
+                    name="plannedFor"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Запланированное задание
+                          </FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            Оценки за это задание будут учитываться в среднем проценте только после проведения урока
+                          </p>
+                        </div>
                       </FormItem>
                     )}
                   />
