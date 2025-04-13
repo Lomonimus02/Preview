@@ -22,11 +22,8 @@ export default function ClassTeacherDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [classId, setClassId] = useState<number | null>(null);
   
-  // Проверяем права доступа пользователя (не обязательно активная роль должна быть class_teacher)
-  const hasClassTeacherAccess = () => {
-    // Достаточно, чтобы пользователь имел роль учителя, а роль class_teacher будет проверена через /api/user-roles
-    return isTeacher() || isClassTeacher();
-  };
+  // Используем новую функцию из хука useRoleCheck для проверки доступа
+  const { hasClassTeacherAccess } = useRoleCheck();
 
   useEffect(() => {
     if (user && !hasClassTeacherAccess()) {
@@ -148,7 +145,7 @@ export default function ClassTeacherDashboard() {
     setSelectedStudentId(studentId === selectedStudentId ? null : studentId);
   };
 
-  if (!user || !isClassTeacher()) {
+  if (!user || !hasClassTeacherAccess()) {
     return (
       <MainLayout>
         <div className="container mx-auto px-4 py-6">

@@ -65,6 +65,22 @@ export function useRoleCheck() {
     return activeRole === UserRoleEnum.CLASS_TEACHER;
   };
   
+  // Функция проверяет, имеет ли пользователь доступ к функциям классного руководителя
+  // Проверяет не только активную роль, но и наличие роли CLASS_TEACHER в списке ролей
+  const hasClassTeacherAccess = () => {
+    if (!user) return false;
+    
+    // Если активная роль - классный руководитель, то доступ есть
+    if (activeRole === UserRoleEnum.CLASS_TEACHER) return true;
+    
+    // Если активная роль - обычный учитель, но есть роль классного руководителя, то доступ тоже есть
+    if (activeRole === UserRoleEnum.TEACHER && user.myRoles && Array.isArray(user.myRoles)) {
+      return user.myRoles.some(role => role.role === UserRoleEnum.CLASS_TEACHER);
+    }
+    
+    return false;
+  };
+  
   // Функция для проверки, является ли пользователь учеником
   const isStudent = () => {
     if (!activeRole) return false;
@@ -96,6 +112,7 @@ export function useRoleCheck() {
     isVicePrincipal,
     isTeacher,
     isClassTeacher,
+    hasClassTeacherAccess,
     isStudent,
     isParent,
     canViewScheduleDropdown,
