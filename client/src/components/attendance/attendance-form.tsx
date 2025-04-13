@@ -72,7 +72,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     enabled: !!schedule.id,
     staleTime: 0, // Ensure fresh data on every mount
     refetchOnWindowFocus: true, // Refetch when the window regains focus
-    cacheTime: 0, // Don't cache at all, always fetch fresh data
+    gcTime: 0, // В React Query v5 cacheTime переименован в gcTime (garbage collection time)
   });
 
   // Получаем студентов подгруппы, если урок связан с подгруппой
@@ -117,24 +117,36 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     // Если урок привязан к подгруппе, используем студентов подгруппы
     if (schedule.subgroupId && subgroupStudents.length > 0) {
       console.log(`Используем ${subgroupStudents.length} студентов из подгруппы ${schedule.subgroupId}`);
-      studentsToShow = subgroupStudents;
+      studentsToShow = [...subgroupStudents]; // создаем копию массива
     } else {
       // Иначе показываем всех студентов класса
       console.log(`Используем ${classStudents.length} студентов из класса ${schedule.classId}`);
-      studentsToShow = classStudents;
+      studentsToShow = [...classStudents]; // создаем копию массива
     }
+
+    // Сортируем студентов по фамилии и имени
+    studentsToShow.sort((a, b) => {
+      const lastNameA = a.lastName || '';
+      const lastNameB = b.lastName || '';
+      if (lastNameA !== lastNameB) {
+        return lastNameA.localeCompare(lastNameB);
+      }
+      const firstNameA = a.firstName || '';
+      const firstNameB = b.firstName || '';
+      return firstNameA.localeCompare(firstNameB);
+    });
 
     // Создаем список студентов с их статусом посещаемости
     const studentsWithAttendance = studentsToShow.map(student => {
       // Ищем запись о посещаемости для данного студента
       // Проверяем разные форматы данных, которые может вернуть сервер
-      const attendanceItem = attendanceData.find(a => {
+      const attendanceItem = Array.isArray(attendanceData) ? attendanceData.find(a => {
         // Формат 1: attendance напрямую содержит studentId
-        if (a.studentId === student.id) return true;
+        if (a && a.studentId === student.id) return true;
         // Формат 2: attendance находится в свойстве attendance
-        if (a.attendance && a.attendance.studentId === student.id) return true;
+        if (a && a.attendance && a.attendance.studentId === student.id) return true;
         return false;
-      });
+      }) : null;
       
       console.log(`Для студента ${student.id} найдена запись:`, attendanceItem);
       
@@ -192,19 +204,19 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     
     try {
       // Для каждого студента отправляем запрос на сохранение статуса посещаемости
-      const promises = students.map(student => {
-        return apiRequest('/api/attendance', 'POST', {
+      // Используем последовательное сохранение вместо параллельного, чтобы избежать конфликтов
+      for (const student of students) {
+        await apiRequest('/api/attendance', 'POST', {
           studentId: student.id,
           scheduleId: schedule.id,
           classId: schedule.classId,
           status: student.present ? 'present' : 'absent',
           date: schedule.scheduleDate // Добавляем дату из расписания
         });
-      });
+      }
       
-      await Promise.all(promises);
-      
-      // Обновляем данные
+      // Сбрасываем полностью кеш, связанный с посещаемостью для текущего расписания
+      queryClient.removeQueries({ queryKey: [`/api/attendance?scheduleId=${schedule.id}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/attendance`] });
       
       toast({
