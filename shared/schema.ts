@@ -141,6 +141,7 @@ export const attendance = pgTable("attendance", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull(),
   classId: integer("class_id").notNull(),
+  scheduleId: integer("schedule_id").notNull(), // Ссылка на конкретное занятие
   date: date("date").notNull(),
   status: text("status").notNull(), // "present", "absent", "late"
   comment: text("comment"),

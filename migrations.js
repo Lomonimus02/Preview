@@ -171,6 +171,42 @@ async function addGradeAssignmentIdColumn() {
   }
 }
 
+async function addAttendanceScheduleIdColumn() {
+  try {
+    console.log('Проверяем наличие колонки schedule_id в таблице attendance...');
+    const checkColumnExistsQuery = `
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'attendance' AND column_name = 'schedule_id'
+    `;
+    
+    const result = await db.execute(sql.raw(checkColumnExistsQuery));
+    
+    if (result.length === 0) {
+      console.log('Колонка schedule_id не найдена, добавляем...');
+      const addColumnQuery = `
+        ALTER TABLE attendance 
+        ADD COLUMN schedule_id INTEGER NOT NULL DEFAULT 0
+      `;
+      await db.execute(sql.raw(addColumnQuery));
+      
+      // Удаляем ограничение NOT NULL DEFAULT 0 после создания
+      const removeDefaultQuery = `
+        ALTER TABLE attendance 
+        ALTER COLUMN schedule_id DROP DEFAULT
+      `;
+      await db.execute(sql.raw(removeDefaultQuery));
+      
+      console.log('Колонка schedule_id успешно добавлена');
+    } else {
+      console.log('Колонка schedule_id уже существует');
+    }
+  } catch (error) {
+    console.error('Ошибка при добавлении колонки schedule_id:', error);
+    throw error;
+  }
+}
+
 async function runMigrations() {
   try {
     console.log('Запуск миграций...');
@@ -180,6 +216,7 @@ async function runMigrations() {
     await addGradeSubgroupIdColumn();
     await addClassGradingSystemColumn();
     await addGradeAssignmentIdColumn();
+    await addAttendanceScheduleIdColumn();
     console.log('Миграции успешно выполнены');
   } catch (error) {
     console.error('Ошибка при выполнении миграций:', error);
