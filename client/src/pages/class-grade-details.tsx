@@ -6,6 +6,7 @@ import { useRoleCheck } from "@/hooks/use-role-check";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { AttendanceForm } from "@/components/attendance/attendance-form";
 import { 
   UserRoleEnum, 
   Grade,
