@@ -105,11 +105,15 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
       if (!activeRole || activeRole.role !== user.activeRole) {
         // Если активная роль в интерфейсе не соответствует активной роли пользователя, обновляем кэш
         console.log('Несоответствие активной роли, обновляем данные');
-        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/my-roles"] });
+        // Сначала обновляем данные пользователя для получения актуальной информации
+        refetchUser().then(() => {
+          // Затем инвалидируем кэши зависимых запросов
+          queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/my-roles"] });
+        });
       }
     }
-  }, [user, activeRole, queryClient]);
+  }, [user, activeRole, queryClient, refetchUser]);
 
   // Показываем загрузку, если роли еще не загружены
   if (isLoadingRoles) {
