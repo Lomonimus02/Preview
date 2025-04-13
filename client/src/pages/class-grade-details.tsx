@@ -1174,6 +1174,22 @@ export default function ClassGradeDetailsPage() {
       const assignmentId = data.assignmentId;
       const scheduleId = data.scheduleId;
       
+      // Проверяем, не пытаемся ли мы выставить оценку за запланированное задание 
+      // в непроведенном уроке
+      if (assignmentId) {
+        const assignment = assignments.find(a => a.id === assignmentId);
+        const schedule = schedules.find(s => s.id === scheduleId);
+        
+        if (assignment?.plannedFor && schedule?.status !== 'conducted') {
+          toast({
+            title: "Ошибка",
+            description: "Невозможно выставить оценку за запланированное задание, пока урок не проведен",
+            variant: "destructive"
+          });
+          return; // Прерываем выполнение функции
+        }
+      }
+      
       // Если у нас есть scheduleId и assignmentId и урок проведен, проверяем на дублирование
       if (assignmentId && scheduleId) {
         const schedule = lessonSlots.find(s => s.scheduleId === scheduleId);
