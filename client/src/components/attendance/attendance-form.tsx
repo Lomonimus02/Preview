@@ -81,7 +81,7 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
 
       setStudents(studentsWithAttendance);
     }
-  }, [classStudents, attendanceData, schedule]);
+  }, [classStudents, attendanceData, schedule.id, schedule.subgroupId]);
 
   // Обработчик изменения статуса посещаемости для студента
   const handleAttendanceChange = (studentId: number, present: boolean) => {
