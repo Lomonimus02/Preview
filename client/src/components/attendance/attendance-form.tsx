@@ -187,19 +187,23 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
       
       // Если есть запись о посещаемости, извлекаем её данные
       if (attendanceRecord) {
+        console.log("Найдена запись для студента:", student.id, attendanceRecord);
+        
         // Проверяем формат ответа от сервера
-        if (attendanceRecord.attendance) {
+        if (attendanceRecord.attendance && attendanceRecord.attendance !== null) {
           // Формат: { studentId, studentName, attendance: { id, status, ... } }
           id = attendanceRecord.attendance.id;
           status = attendanceRecord.attendance.status || "absent";
           comment = attendanceRecord.attendance.comment || "";
-          console.log(`Найдена запись посещаемости для студента ${student.id}:`, status);
+          console.log(`Найдена запись посещаемости для студента ${student.id} в поле attendance:`, status);
         } else if (attendanceRecord.status) {
           // Формат: { studentId, status, ... }
           id = attendanceRecord.id;
           status = attendanceRecord.status;
           comment = attendanceRecord.comment || "";
-          console.log(`Найдена запись посещаемости для студента ${student.id}:`, status);
+          console.log(`Найдена запись посещаемости для студента ${student.id} напрямую:`, status);
+        } else {
+          console.log(`Для студента ${student.id} найдена запись, но не удалось извлечь статус, используем absent по умолчанию`);
         }
       }
       
