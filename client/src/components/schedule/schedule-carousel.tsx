@@ -99,7 +99,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   const getSchedulesForDate = (date: Date) => {
     const formattedDate = format(date, "yyyy-MM-dd");
     
-    return schedules.filter(schedule => {
+    const filteredSchedules = schedules.filter(schedule => {
       // Фильтрация по дате, если установлена конкретная дата
       if (schedule.scheduleDate) {
         // Используем сравнение дат без времени (только год, месяц, день)
@@ -113,6 +113,18 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
       const dayOfWeek = date.getDay() === 0 ? 7 : date.getDay();
       return schedule.dayOfWeek === dayOfWeek;
     });
+    
+    // Отладочный вывод
+    console.log(`Расписание на ${formattedDate}:`, filteredSchedules);
+    if (filteredSchedules.length > 0) {
+      filteredSchedules.forEach(schedule => {
+        if (schedule.assignments && schedule.assignments.length > 0) {
+          console.log(`Найдены задания для расписания ${schedule.id}:`, schedule.assignments);
+        }
+      });
+    }
+    
+    return filteredSchedules;
   };
 
   const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
