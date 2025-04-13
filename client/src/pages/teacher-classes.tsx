@@ -769,7 +769,7 @@ export default function TeacherClasses() {
               </Button>
             </div>
             
-            {/* Опция для запланированного задания для всех уроков */}
+            {/* Опция для запланированного задания для всех уроков, удалено условие на проверку статуса */}
             {currentSchedule && 
              currentSchedule.scheduleDate && (
               <div className="mt-4">
