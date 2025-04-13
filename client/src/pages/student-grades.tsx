@@ -137,8 +137,12 @@ export default function StudentGrades() {
   const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
-  // Период отображения: "неделя", "месяц", "семестр", "год"
-  const [displayPeriod, setDisplayPeriod] = useState<'week' | 'month' | 'semester' | 'year'>('month');
+  // Определение типов четвертей и полугодий
+  type QuarterType = 'quarter1' | 'quarter2' | 'quarter3' | 'quarter4' | 'semester1' | 'semester2' | 'year';
+  
+  // Период отображения: четверти, полугодия и год
+  const [displayPeriod, setDisplayPeriod] = useState<QuarterType>('quarter1');
+  const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
   
   // Получение данных студента
   const { data: studentClass } = useQuery<Class[]>({
@@ -274,63 +278,75 @@ export default function StudentGrades() {
   
   // Получаем начало и конец периода просмотра в зависимости от выбранного периода
   const { startDate, endDate, periodLabel } = useMemo(() => {
-    if (displayPeriod === 'week') {
-      const start = startOfWeek(currentMonth, { weekStartsOn: 1 }); // Неделя начинается с понедельника
-      const end = endOfWeek(currentMonth, { weekStartsOn: 1 });
-      return { 
-        startDate: start, 
-        endDate: end,
-        periodLabel: `${format(start, 'dd.MM.yyyy')} - ${format(end, 'dd.MM.yyyy')}` 
-      };
-    } else if (displayPeriod === 'month') {
-      const start = startOfMonth(currentMonth);
-      const end = endOfMonth(currentMonth);
-      return { 
-        startDate: start, 
-        endDate: end,
-        periodLabel: format(currentMonth, 'LLLL yyyy', { locale: ru }) 
-      };
-    } else if (displayPeriod === 'semester') {
-      // Примерное определение семестра (первый: сентябрь-декабрь, второй: январь-май)
-      const currentYear = currentMonth.getFullYear();
-      const currentMonthNum = currentMonth.getMonth();
-      
-      let start, end;
-      if (currentMonthNum >= 8 && currentMonthNum <= 11) { // Сентябрь-Декабрь
-        start = new Date(currentYear, 8, 1); // 1 сентября
-        end = new Date(currentYear, 11, 31); // 31 декабря
-        return { 
-          startDate: start, 
-          endDate: end,
-          periodLabel: `I семестр (сент.-дек. ${currentYear})` 
-        };
-      } else if (currentMonthNum >= 0 && currentMonthNum <= 4) { // Январь-Май
-        start = new Date(currentYear, 0, 1); // 1 января
-        end = new Date(currentYear, 4, 31); // 31 мая
-        return { 
-          startDate: start, 
-          endDate: end,
-          periodLabel: `II семестр (янв.-май ${currentYear})` 
-        };
-      } else { // Летние месяцы
-        start = new Date(currentYear, 5, 1); // 1 июня
-        end = new Date(currentYear, 7, 31); // 31 августа
-        return { 
-          startDate: start, 
-          endDate: end,
-          periodLabel: `Летний период (июнь-авг. ${currentYear})` 
-        };
-      }
-    } else { // год
-      const start = new Date(currentMonth.getFullYear(), 0, 1); // 1 января текущего года
-      const end = new Date(currentMonth.getFullYear(), 11, 31); // 31 декабря текущего года
-      return { 
-        startDate: start, 
-        endDate: end,
-        periodLabel: `${currentMonth.getFullYear()} год` 
-      };
+    let start: Date;
+    let end: Date;
+    let label = '';
+    
+    // Функция для получения учебного года
+    const getAcademicYear = (year: number) => {
+      const currentMonth = new Date().getMonth();
+      // Если текущий месяц сентябрь и позже, то учебный год начинается в текущем году
+      // Иначе учебный год начался в предыдущем году
+      return currentMonth >= 8 ? year : year - 1;
+    };
+    
+    const academicYear = getAcademicYear(currentYear);
+    
+    switch (displayPeriod) {
+      case 'quarter1': // 1 четверть: сентябрь - октябрь
+        start = new Date(academicYear, 8, 1); // 1 сентября
+        end = new Date(academicYear, 9, 31); // 31 октября
+        label = `1 четверть (сентябрь - октябрь ${academicYear})`;
+        break;
+        
+      case 'quarter2': // 2 четверть: ноябрь - декабрь
+        start = new Date(academicYear, 10, 1); // 1 ноября
+        end = new Date(academicYear, 11, 31); // 31 декабря
+        label = `2 четверть (ноябрь - декабрь ${academicYear})`;
+        break;
+        
+      case 'quarter3': // 3 четверть: январь - март
+        start = new Date(academicYear + 1, 0, 1); // 1 января
+        end = new Date(academicYear + 1, 2, 31); // 31 марта
+        label = `3 четверть (январь - март ${academicYear + 1})`;
+        break;
+        
+      case 'quarter4': // 4 четверть: апрель - июнь
+        start = new Date(academicYear + 1, 3, 1); // 1 апреля
+        end = new Date(academicYear + 1, 5, 30); // 30 июня
+        label = `4 четверть (апрель - июнь ${academicYear + 1})`;
+        break;
+        
+      case 'semester1': // 1 полугодие: сентябрь - декабрь
+        start = new Date(academicYear, 8, 1); // 1 сентября
+        end = new Date(academicYear, 11, 31); // 31 декабря
+        label = `1 полугодие (сентябрь - декабрь ${academicYear})`;
+        break;
+        
+      case 'semester2': // 2 полугодие: январь - июнь
+        start = new Date(academicYear + 1, 0, 1); // 1 января
+        end = new Date(academicYear + 1, 5, 30); // 30 июня
+        label = `2 полугодие (январь - июнь ${academicYear + 1})`;
+        break;
+        
+      case 'year': // Учебный год: сентябрь - июнь
+        start = new Date(academicYear, 8, 1); // 1 сентября
+        end = new Date(academicYear + 1, 5, 30); // 30 июня
+        label = `Учебный год ${academicYear}-${academicYear + 1}`;
+        break;
+        
+      default:
+        start = new Date(academicYear, 8, 1);
+        end = new Date(academicYear, 9, 31);
+        label = `1 четверть (сентябрь - октябрь ${academicYear})`;
     }
-  }, [currentMonth, displayPeriod]);
+    
+    return { 
+      startDate: start, 
+      endDate: end, 
+      periodLabel: label 
+    };
+  }, [currentYear, displayPeriod]);
   
   // Определяем дни текущего периода
   const daysInPeriod = useMemo(() => {
