@@ -2519,12 +2519,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(1);
       
       if (existingRecord.length > 0) {
+        // Получаем данные для обновления
+        const updateData: Partial<typeof attendance.$inferInsert> = { 
+          status: req.body.status,
+          comment: req.body.comment
+        };
+        
+        // Если есть дата в запросе, добавляем ее
+        if (req.body.date) {
+          updateData.date = req.body.date;
+        }
+        // Если дата отсутствует в запросе и в существующей записи, получаем ее из расписания
+        else if (!existingRecord[0].date && req.body.scheduleId) {
+          const schedule = await dataStorage.getSchedule(req.body.scheduleId);
+          if (schedule && schedule.scheduleDate) {
+            updateData.date = schedule.scheduleDate;
+          } else {
+            // Если дата нигде не указана, используем текущую дату
+            updateData.date = new Date().toISOString().split('T')[0];
+          }
+        }
+        
         // Если запись уже существует, обновляем её
         const [updatedAttendance] = await db.update(attendance)
-          .set({ 
-            status: req.body.status,
-            comment: req.body.comment
-          })
+          .set(updateData)
           .where(eq(attendance.id, existingRecord[0].id))
           .returning();
         
@@ -2540,8 +2558,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     
-    // Создаем новую запись о посещаемости
-    const newAttendance = await dataStorage.createAttendance(req.body);
+    // Создаем новую запись о посещаемости с датой из расписания, если она не указана
+    const attendanceData = {...req.body};
+    
+    // Проверяем, что дата предоставлена, если нет - получаем ее из расписания
+    if (!attendanceData.date && attendanceData.scheduleId) {
+      const schedule = await dataStorage.getSchedule(attendanceData.scheduleId);
+      if (schedule && schedule.scheduleDate) {
+        attendanceData.date = schedule.scheduleDate;
+      } else {
+        // Если дата не указана и нет расписания, используем текущую дату
+        attendanceData.date = new Date().toISOString().split('T')[0];
+      }
+    }
+    
+    // Создаем запись
+    const newAttendance = await dataStorage.createAttendance(attendanceData);
     
     if (newAttendance.status !== "present") {
       // If student is absent or late, notify parents
