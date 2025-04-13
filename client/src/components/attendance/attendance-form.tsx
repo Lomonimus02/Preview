@@ -63,7 +63,8 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
 
   // Получаем данные по посещаемости для конкретного урока
   const { data: attendanceData = [], isLoading: isLoadingAttendance, refetch: refetchAttendance } = useQuery<any[]>({
-    queryKey: ['/api/attendance', { scheduleId: schedule.id, subgroupId: schedule.subgroupId }],
+    // Обновляем ключ запроса, чтобы он повторно запрашивался при изменении subgroupId
+    queryKey: ['/api/attendance', schedule.id, schedule.subgroupId],
     queryFn: async () => {
       if (!schedule.id) return [];
       try {
@@ -97,6 +98,8 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
     queryKey: ['/api/students-by-subgroup', schedule.subgroupId],
     queryFn: async () => {
       if (!schedule.subgroupId) return [];
+      
+      // Используем параметр запроса в соответствии с новым API на сервере
       const response = await fetch(`/api/students-by-subgroup?subgroupId=${schedule.subgroupId}`);
       if (!response.ok) {
         throw new Error(`Ошибка при получении студентов подгруппы: ${response.status}`);

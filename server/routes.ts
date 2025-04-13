@@ -3422,8 +3422,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Маршрут для получения учеников по ID класса для страницы оценок
   // API endpoint для получения студентов по идентификатору подгруппы
-  app.get("/api/students-by-subgroup/:subgroupId", isAuthenticated, async (req, res) => {
-    const subgroupId = parseInt(req.params.subgroupId);
+  app.get("/api/students-by-subgroup", isAuthenticated, async (req, res) => {
+    const subgroupId = parseInt(req.query.subgroupId as string);
     if (isNaN(subgroupId)) {
       return res.status(400).json({ message: "Invalid subgroup ID" });
     }
