@@ -63,7 +63,13 @@ export const AttendanceForm: React.FC<AttendanceFormProps> = ({
   });
 
   const { data: studentSubgroupRelations = [], isLoading: isLoadingStudentSubgroups } = useQuery({
-    queryKey: [`/api/student-subgroups?subgroupId=${schedule.subgroupId}`],
+    queryKey: [`/api/student-subgroups`],
+    queryFn: async () => {
+      const response = await fetch(`/api/student-subgroups?subgroupId=${schedule.subgroupId}`);
+      const data = await response.json();
+      console.log("Получены связи студент-подгруппа:", data);
+      return data;
+    },
     enabled: !!schedule.subgroupId,
   });
   
