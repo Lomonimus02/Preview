@@ -2445,8 +2445,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           students = await dataStorage.getClassStudents(schedule.classId);
         }
         
-        // Получаем записи о посещаемости для данного урока
-        const attendanceRecords = await db.select().from(attendance).where(eq(attendance.scheduleId, scheduleId));
+        // Получаем записи о посещаемости для данного урока используя новый метод
+        const attendanceRecords = await dataStorage.getAttendanceBySchedule(scheduleId);
         
         // Формируем результат с информацией о каждом студенте и его статусе посещения
         const studentAttendance = students.map(student => {
