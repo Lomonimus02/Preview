@@ -1473,9 +1473,10 @@ export default function ClassGradeDetailsPage() {
   
   // Проверяет, можно ли добавить оценку для урока в накопительной системе
   const canAddGradeToLesson = (scheduleId: number, slot: LessonSlot) => {
-    // Для пятибалльной системы достаточно только, чтобы урок был проведен
+    // Для пятибалльной системы больше не требуется, чтобы урок был проведен
     if (!classData || classData.gradingSystem !== GradingSystemEnum.CUMULATIVE) {
-      return isLessonConducted(scheduleId);
+      // Убрана проверка statusa урока - можно добавлять оценки на любой урок
+      return true;
     }
     
     // Для накопительной системы важно, чтобы были задания, но не требуется, чтобы урок был проведен
