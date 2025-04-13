@@ -1094,20 +1094,41 @@ export default function StudentGrades() {
               <div>
                 <div className="text-sm text-gray-500">Оценка</div>
                 <div className="mt-1 flex flex-col space-y-2">
-                  {/* Базовое отображение оценки для всех систем */}
-                  <div className="bg-gray-50 p-3 rounded-lg text-center">
-                    <div className="text-xs text-gray-500 mb-1">Оценка</div>
-                    <Badge className={`text-lg px-3 py-1 ${
-                      selectedGrade.grade >= 4 ? 'bg-green-100 text-green-800' : 
-                      selectedGrade.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {selectedGrade.grade}
-                    </Badge>
-                  </div>
+                  {/* Отображение оценки для всех систем с информацией о задании */}
+                  {selectedAssignment ? (
+                    <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center">
+                        <Badge className={`text-lg px-3 py-1 mr-2 ${
+                          (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.8 ? 'bg-green-100 text-green-800' : 
+                          (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.6 ? 'bg-yellow-100 text-yellow-800' : 
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {selectedGrade.grade}/{selectedAssignment.maxScore}
+                        </Badge>
+                      </div>
+                      <Badge className={`text-lg px-3 py-1 ${
+                        (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.8 ? 'bg-green-100 text-green-800' : 
+                        (selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) >= 0.6 ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {((selectedGrade.grade / parseFloat(selectedAssignment.maxScore.toString())) * 100).toFixed(1)}%
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 p-3 rounded-lg text-center">
+                      <div className="text-xs text-gray-500 mb-1">Оценка</div>
+                      <Badge className={`text-lg px-3 py-1 ${
+                        selectedGrade.grade >= 4 ? 'bg-green-100 text-green-800' : 
+                        selectedGrade.grade >= 3 ? 'bg-yellow-100 text-yellow-800' : 
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {selectedGrade.grade}
+                      </Badge>
+                    </div>
+                  )}
                   
                   {/* Отображение оценки для пятибалльной системы */}
-                  {gradingSystem === GradingSystemEnum.FIVE_POINT && (
+                  {gradingSystem === GradingSystemEnum.FIVE_POINT && selectedAssignment && (
                     <div className="space-y-3">
                       <div className="grid grid-cols-3 gap-2 items-center">
                         <div className="bg-gray-50 p-3 rounded-lg text-center">
