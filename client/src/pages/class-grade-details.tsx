@@ -643,7 +643,16 @@ export default function ClassGradeDetailsPage() {
   // Mutation для обновления оценки
   const updateGradeMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: Partial<Grade> }) => {
-      const res = await apiRequest(`/api/grades/${id}`, 'PATCH', data);
+      // Для корректного обновления убеждаемся, что все необходимые поля присутствуют
+      const updateData = {
+        ...data,
+        classId: data.classId || classId,
+        subjectId: data.subjectId || subjectId,
+        teacherId: data.teacherId || user?.id,
+        subgroupId: data.subgroupId || subgroupId,
+      };
+      
+      const res = await apiRequest(`/api/grades/${id}`, 'PATCH', updateData);
       
       if (!res.ok) {
         const error = await res.json();
@@ -882,7 +891,7 @@ export default function ClassGradeDetailsPage() {
       classId: classId,
       subjectId: subjectId,
       teacherId: user?.id,
-      date: grade.date || null,
+      // В модели Grade нет поля date, но оно может приходить от API
       scheduleId: grade.scheduleId || null,
       subgroupId: grade.subgroupId || subgroupId,
       assignmentId: grade.assignmentId || null,
@@ -1028,8 +1037,11 @@ export default function ClassGradeDetailsPage() {
     event.preventDefault();
     
     const formData = new FormData(event.currentTarget);
+    const assignmentType = formData.get('assignmentType') as string;
+    
+    // Преобразуем строковый тип задания в AssignmentTypeEnum
     const data = {
-      assignmentType: formData.get('assignmentType') as string,
+      assignmentType: assignmentType as AssignmentTypeEnum, // Теперь тип явно приведен к enum
       maxScore: formData.get('maxScore') as string,
       description: formData.get('description') as string || null,
       scheduleId: parseInt(formData.get('scheduleId') as string),
@@ -1551,8 +1563,31 @@ export default function ClassGradeDetailsPage() {
                                             if (e.key === 'Enter') {
                                               const value = (e.target as HTMLInputElement).value;
                                               if (value && !isNaN(parseInt(value))) {
-                                                // Создаем новую оценку прямо здесь
+                                                // Проверяем, что введенная оценка не превышает максимальный балл
                                                 const gradeValue = parseInt(value);
+                                                
+                                                // Проверка существования slot.assignments
+                                                if (!slot.assignments || slot.assignments.length === 0) {
+                                                  toast({
+                                                    title: "Ошибка при добавлении оценки",
+                                                    description: "Невозможно добавить оценку: задание не найдено",
+                                                    variant: "destructive",
+                                                  });
+                                                  return;
+                                                }
+                                                
+                                                const maxScore = parseInt(slot.assignments[0].maxScore);
+                                                
+                                                if (gradeValue > maxScore) {
+                                                  toast({
+                                                    title: "Ошибка при добавлении оценки",
+                                                    description: `Оценка не может быть больше максимального балла (${maxScore})`,
+                                                    variant: "destructive",
+                                                  });
+                                                  return;
+                                                }
+                                                
+                                                // Создаем новую оценку
                                                 const newGrade = {
                                                   studentId: student.id,
                                                   grade: gradeValue,
