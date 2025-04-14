@@ -148,7 +148,7 @@ export default function MessagesPage() {
   
   // Получение списка сообщений для выбранного чата
   const { data: chatMessages = [], isLoading: messagesLoading } = useQuery<ChatMessage[]>({
-    queryKey: ["/api/chats", selectedChatId, "messages"],
+    queryKey: [`/api/chats/${selectedChatId}/messages`],
     enabled: !!selectedChatId,
     refetchInterval: 5000, // Обновляем каждые 5 секунд
   });
@@ -220,7 +220,8 @@ export default function MessagesPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chats", selectedChatId, "messages"] });
+      // Обновляем правильный ключ запроса для сообщений
+      queryClient.invalidateQueries({ queryKey: [`/api/chats/${selectedChatId}/messages`] });
       queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
       messageForm.reset();
       setSelectedAttachment(null);
@@ -266,6 +267,7 @@ export default function MessagesPage() {
       return res.json();
     },
     onSuccess: () => {
+      // Обновляем информацию о всех чатах
       queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
     },
   });
@@ -393,26 +395,37 @@ export default function MessagesPage() {
   };
   
   // Форматирование времени сообщения
-  const formatMessageTime = (dateStr: string) => {
-    const now = new Date();
-    const messageDate = new Date(dateStr);
-    
-    // Если сообщение отправлено сегодня, показываем только время
-    if (messageDate.toDateString() === now.toDateString()) {
-      return messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    }
-    
-    // Если сообщение отправлено в этом году, показываем дату без года
-    if (messageDate.getFullYear() === now.getFullYear()) {
-      return messageDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + 
+  const formatMessageTime = (dateStr: string | Date) => {
+    try {
+      const now = new Date();
+      const messageDate = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+      
+      // Проверка на валидность даты
+      if (isNaN(messageDate.getTime())) {
+        console.warn('Некорректная дата:', dateStr);
+        return 'Сейчас';
+      }
+      
+      // Если сообщение отправлено сегодня, показываем только время
+      if (messageDate.toDateString() === now.toDateString()) {
+        return messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      }
+      
+      // Если сообщение отправлено в этом году, показываем дату без года
+      if (messageDate.getFullYear() === now.getFullYear()) {
+        return messageDate.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + 
+               ' ' + 
+               messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      }
+      
+      // Иначе показываем полную дату
+      return messageDate.toLocaleDateString('ru-RU') + 
              ' ' + 
              messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    } catch (error) {
+      console.error('Ошибка при форматировании даты:', error);
+      return 'Сейчас';
     }
-    
-    // Иначе показываем полную дату
-    return messageDate.toLocaleDateString('ru-RU') + 
-           ' ' + 
-           messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   };
   
   // Получение имени пользователя по ID
