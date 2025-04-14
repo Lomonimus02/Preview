@@ -10,6 +10,8 @@ import {
   Attendance, InsertAttendance,
   Document, InsertDocument,
   Message, InsertMessage,
+  Chat, InsertChat, ChatTypeEnum,
+  ChatParticipant, InsertChatParticipant,
   Notification, InsertNotification,
   ParentStudent, InsertParentStudent,
   SystemLog, InsertSystemLog,
@@ -156,6 +158,23 @@ export interface IStorage {
   addStudentToSubgroup(studentSubgroup: InsertStudentSubgroup): Promise<StudentSubgroup>;
   removeStudentFromSubgroup(studentId: number, subgroupId: number): Promise<void>;
   getSchedulesBySubgroup(subgroupId: number): Promise<Schedule[]>;
+  
+  // Chat operations
+  createChat(chat: InsertChat): Promise<Chat>;
+  getChat(id: number): Promise<Chat | undefined>;
+  getUserChats(userId: number): Promise<Chat[]>;
+  getUsersChatBySchool(schoolId: number): Promise<Chat[]>;
+  
+  // Chat participant operations
+  addChatParticipant(participant: InsertChatParticipant): Promise<ChatParticipant>;
+  getChatParticipants(chatId: number): Promise<ChatParticipant[]>;
+  getUserChatParticipations(userId: number): Promise<ChatParticipant[]>;
+  removeChatParticipant(chatId: number, userId: number): Promise<void>;
+  
+  // Message operations - расширенные для работы с чатами
+  getChatMessages(chatId: number): Promise<Message[]>;
+  createChatMessage(message: InsertMessage): Promise<Message>;
+  markLastReadMessage(chatId: number, userId: number, messageId: number): Promise<void>;
 }
 
 // In-memory storage implementation
