@@ -468,7 +468,9 @@ export type Document = typeof documents.$inferSelect;
 
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertChat = z.infer<typeof insertChatSchema>;
-export type Chat = typeof chats.$inferSelect;
+export type Chat = typeof chats.$inferSelect & {
+  unreadCount?: number; // Количество непрочитанных сообщений (вычисляемое поле)
+};
 
 export type InsertChatParticipant = z.infer<typeof insertChatParticipantSchema>;
 export type ChatParticipant = typeof chatParticipants.$inferSelect;

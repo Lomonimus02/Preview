@@ -1,6 +1,6 @@
 import { IStorage } from './storage';
 import { db } from './db';
-import { eq, and, or, inArray, sql, lte, ne } from 'drizzle-orm';
+import { eq, and, or, inArray, sql, lte, ne, gt } from 'drizzle-orm';
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import * as schema from '@shared/schema';
@@ -505,13 +505,52 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
     
-    // Извлекаем ID чатов
+    // Извлекаем ID чатов и последние прочитанные сообщения
     const chatIds = participations.map(p => p.chatId);
+    const participationMap = new Map(
+      participations.map(p => [p.chatId, p.lastReadMessageId])
+    );
     
     // Получаем чаты по их ID
-    return await db.select().from(chats)
+    const userChats = await db.select().from(chats)
       .where(inArray(chats.id, chatIds))
       .orderBy(sql`chats.last_message_at DESC NULLS LAST`);
+      
+    // Для каждого чата рассчитываем количество непрочитанных сообщений
+    const result = await Promise.all(userChats.map(async (chat) => {
+      // Получаем lastReadMessageId для данного пользователя в этом чате
+      const lastReadMessageId = participationMap.get(chat.id);
+      
+      // Если нет lastReadMessageId, считаем все сообщения непрочитанными
+      if (lastReadMessageId === null || lastReadMessageId === undefined) {
+        // Подсчитываем количество сообщений от других пользователей
+        const allMessages = await db.select().from(messages)
+          .where(and(
+            eq(messages.chatId, chat.id),
+            ne(messages.senderId, userId)
+          ));
+        
+        return {
+          ...chat,
+          unreadCount: allMessages.length
+        };
+      } else {
+        // Если есть lastReadMessageId, подсчитываем сообщения с id > lastReadMessageId
+        const unreadMessages = await db.select().from(messages)
+          .where(and(
+            eq(messages.chatId, chat.id),
+            ne(messages.senderId, userId),
+            gt(messages.id, lastReadMessageId)
+          ));
+        
+        return {
+          ...chat,
+          unreadCount: unreadMessages.length
+        };
+      }
+    }));
+    
+    return result;
   }
   
   async getUsersChatBySchool(schoolId: number): Promise<Chat[]> {
