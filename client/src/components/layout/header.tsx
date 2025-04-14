@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { BellIcon, ChevronDownIcon, Menu, MenuIcon } from "lucide-react";
+import { BellIcon, ChevronDownIcon, MessageSquare, MenuIcon } from "lucide-react";
 import { Link } from "wouter";
 import { 
   DropdownMenu, 
@@ -21,14 +21,28 @@ interface HeaderProps {
   toggleSidebar: () => void;
 }
 
+interface NotificationCounts {
+  notificationsUnreadCount: number;
+  messagesUnreadCount: number;
+  totalUnreadCount: number;
+}
+
 export function Header({ toggleSidebar }: HeaderProps) {
   const { user, logoutMutation } = useAuth();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
+  // Получение списка всех уведомлений для показа в меню
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ["/api/notifications"],
     enabled: !!user
   });
+
+  // Получение количества непрочитанных уведомлений и сообщений
+  const { data: notificationCounts = { notificationsUnreadCount: 0, messagesUnreadCount: 0, totalUnreadCount: 0 } } = 
+    useQuery<NotificationCounts>({
+      queryKey: ["/api/notifications/count"],
+      enabled: !!user
+    });
 
   const unreadNotifications = notifications.filter(notification => !notification.isRead);
   
@@ -39,6 +53,7 @@ export function Header({ toggleSidebar }: HeaderProps) {
   const markNotificationAsRead = async (id: number) => {
     await apiRequest("POST", `/api/notifications/${id}/read`);
     queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/notifications/count"] });
   };
 
   return (
@@ -60,11 +75,24 @@ export function Header({ toggleSidebar }: HeaderProps) {
         </div>
         
         <div className="flex items-center space-x-4">
+          {/* Иконка для сообщений с индикатором количества */}
+          <Link href="/messages" className="relative">
+            <MessageSquare className="h-5 w-5 text-gray-600" />
+            {notificationCounts.messagesUnreadCount > 0 && (
+              <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 rounded-full text-xs">
+                {notificationCounts.messagesUnreadCount > 9 ? "9+" : notificationCounts.messagesUnreadCount}
+              </Badge>
+            )}
+          </Link>
+          
+          {/* Выпадающее меню уведомлений с индикатором количества */}
           <DropdownMenu open={notificationsOpen} onOpenChange={setNotificationsOpen}>
             <DropdownMenuTrigger className="relative focus:outline-none">
               <BellIcon className="h-5 w-5 text-gray-600" />
-              {unreadNotifications.length > 0 && (
-                <Badge variant="destructive" className="absolute -top-1 -right-1 h-2 w-2 p-0 rounded-full"/>
+              {notificationCounts.notificationsUnreadCount > 0 && (
+                <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 rounded-full text-xs">
+                  {notificationCounts.notificationsUnreadCount > 9 ? "9+" : notificationCounts.notificationsUnreadCount}
+                </Badge>
               )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">

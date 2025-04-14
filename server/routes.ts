@@ -3403,9 +3403,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Notifications count API
   app.get("/api/notifications/count", isAuthenticated, async (req, res) => {
-    const notifications = await dataStorage.getNotificationsByUser(req.user.id);
-    const unreadCount = notifications.filter(n => !n.isRead).length;
-    res.json({ unreadCount });
+    try {
+      // Получаем непрочитанные уведомления
+      const notifications = await dataStorage.getNotificationsByUser(req.user.id);
+      const notificationsUnreadCount = notifications.filter(n => !n.isRead).length;
+      
+      // Получаем непрочитанные сообщения
+      const chats = await dataStorage.getUserChats(req.user.id);
+      const messagesUnreadCount = chats.reduce((total, chat) => total + (chat.unreadCount || 0), 0);
+      
+      // Общее количество непрочитанных элементов
+      const totalUnreadCount = notificationsUnreadCount + messagesUnreadCount;
+      
+      res.json({ 
+        notificationsUnreadCount,
+        messagesUnreadCount,
+        totalUnreadCount
+      });
+    } catch (error) {
+      console.error("Error getting notification counts:", error);
+      res.status(500).json({ message: "Failed to get notification counts" });
+    }
   });
   
   // Endpoint для получения расписания для ученика (для классного руководителя)
