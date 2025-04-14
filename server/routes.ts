@@ -10,10 +10,16 @@ import { setupAuth } from "./auth";
 import { z } from "zod";
 import { UserRoleEnum, studentClasses as studentClassesTable, attendance, studentSubgroups } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import path from "path";
+import express from "express";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
   setupAuth(app);
+  
+  // Настройка статического обслуживания для загруженных файлов
+  const uploadsPath = path.join(process.cwd(), 'uploads');
+  app.use('/uploads', express.static(uploadsPath));
 
   // Middleware to check if user is authenticated
   const isAuthenticated = (req, res, next) => {
@@ -4346,7 +4352,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Загрузка файла для чата
+  app.post("/api/upload/chat", isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      // Проверяем, загружен ли файл
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      
+      // Определяем тип файла (изображение, видео, документ)
+      const fileType = getFileType(req.file.mimetype);
+      
+      // Формируем URL для доступа к файлу
+      const fileUrl = getFileUrl(req.file.filename);
+      
+      // Отправляем информацию о загруженном файле
+      res.status(201).json({
+        success: true,
+        fileUrl,
+        fileType,
+        originalName: req.file.originalname,
+        size: req.file.size
+      });
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      res.status(500).json({ message: "Failed to upload file" });
+    }
+  });
+
   // Отправка сообщения в чат
+  // Загрузка файлов для чата
+  app.post("/api/chats/:chatId/upload", isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      const chatId = parseInt(req.params.chatId);
+      
+      // Проверяем, загружен ли файл
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      
+      // Проверяем, является ли пользователь участником чата
+      const participants = await dataStorage.getChatParticipants(chatId);
+      const isParticipant = participants.some(p => p.userId === req.user.id);
+      
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant of this chat" });
+      }
+      
+      // Определяем тип файла
+      const attachmentType = getFileType(req.file.mimetype);
+      
+      // Формируем URL файла
+      const attachmentUrl = getFileUrl(req.file.filename);
+      
+      // Возвращаем информацию о загруженном файле
+      res.status(201).json({
+        success: true,
+        file: {
+          filename: req.file.filename,
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size,
+          url: attachmentUrl,
+          type: attachmentType
+        }
+      });
+      
+    } catch (error) {
+      console.error("Error uploading file for chat:", error);
+      res.status(500).json({ message: "Failed to upload file", error: error.message });
+    }
+  });
+
   app.post("/api/chats/:chatId/messages", isAuthenticated, async (req, res) => {
     try {
       const chatId = parseInt(req.params.chatId);

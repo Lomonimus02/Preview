@@ -1,7 +1,8 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import * as multer from 'multer';
+import multer from 'multer';
 import { Request } from 'express';
+import type { FileFilterCallback } from 'multer';
 
 // Создаем директорию для загрузок, если она не существует
 const uploadDir = path.join(process.cwd(), 'uploads');
@@ -24,7 +25,7 @@ const storage = multer.diskStorage({
 });
 
 // Функция для определения типа файла
-const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
   // Разрешенные типы файлов
   const allowedFileTypes = [
     // Изображения
