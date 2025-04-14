@@ -81,9 +81,20 @@ export function setupAuth(app: Express) {
       
       // Если у пользователя есть активная роль, проверяем её наличие в списке доступных ролей
       if (user.activeRole) {
-        const activeRoleExists = userRoles.some(role => role.role === user.activeRole);
+        // Проверяем, есть ли активная роль среди основной и дополнительных ролей пользователя
+        const activeRoleInRoles = userRoles.some(role => role.role === user.activeRole);
+        const isMainRole = user.role === user.activeRole;
+        const activeRoleExists = activeRoleInRoles || isMainRole;
         
-        // Если активная роль не существует в списке доступных ролей, выбираем первую доступную
+        console.log(`Проверка активной роли для пользователя ${user.username}:`, {
+          активнаяРоль: user.activeRole,
+          основнаяРоль: user.role,
+          активнаяРольЭтоОсновная: isMainRole,
+          найденаСредиДополнительных: activeRoleInRoles,
+          активнаяРольДоступна: activeRoleExists
+        });
+        
+        // Если активная роль не существует ни как основная, ни как дополнительная - выбираем первую доступную
         if (!activeRoleExists && userRoles.length > 0) {
           const newActiveRole = userRoles[0].role;
           console.log(`Активная роль ${user.activeRole} не найдена для пользователя ${user.username}, переключаем на ${newActiveRole}`);
