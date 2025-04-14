@@ -1,6 +1,6 @@
 import { IStorage } from './storage';
 import { db } from './db';
-import { eq, and, or, inArray, sql } from 'drizzle-orm';
+import { eq, and, or, inArray, sql, lte, ne } from 'drizzle-orm';
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import * as schema from '@shared/schema';
@@ -575,11 +575,21 @@ export class DatabaseStorage implements IStorage {
   }
   
   async markLastReadMessage(chatId: number, userId: number, messageId: number): Promise<void> {
+    // Обновляем lastReadMessageId для участника чата
     await db.update(chatParticipants)
       .set({ lastReadMessageId: messageId })
       .where(and(
         eq(chatParticipants.chatId, chatId),
         eq(chatParticipants.userId, userId)
+      ));
+      
+    // Также отмечаем все сообщения до этого как прочитанные
+    await db.update(messages)
+      .set({ isRead: true })
+      .where(and(
+        eq(messages.chatId, chatId),
+        lte(messages.id, messageId), // Все сообщения с ID <= messageId
+        ne(messages.senderId, userId) // Только сообщения от других пользователей
       ));
   }
 

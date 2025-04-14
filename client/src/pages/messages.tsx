@@ -358,10 +358,13 @@ export default function MessagesPage() {
   // Обработка прочтения сообщений при выборе чата
   useEffect(() => {
     if (selectedChatId && chatMessages.length > 0) {
-      const lastMessage = chatMessages[chatMessages.length - 1];
+      // Найдем последнее сообщение от другого пользователя
+      const lastMessage = [...chatMessages]
+        .reverse()
+        .find(msg => msg.senderId !== user?.id);
       
-      // Если последнее сообщение от другого пользователя и не прочитано
-      if (lastMessage.senderId !== user?.id && !lastMessage.isRead) {
+      // Если есть непрочитанное сообщение от другого пользователя
+      if (lastMessage && !lastMessage.isRead) {
         updateReadStatusMutation.mutate({
           chatId: selectedChatId,
           messageId: lastMessage.id,
