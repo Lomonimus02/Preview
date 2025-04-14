@@ -42,6 +42,8 @@ import { HomeworkForm } from "./homework-form";
 import { AssignmentForm } from "../assignments/assignment-form";
 import { AttendanceForm } from "../attendance/attendance-form";
 
+// Функция не нужна, она уже есть ниже в коде
+
 // Функция-хелпер для проверки роли учителя или администратора школы
 const isTeacherOrAdmin = (user?: User | null): boolean => {
   if (!user) return false;
@@ -277,8 +279,14 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
               {grades.map((grade) => (
                 <div 
                   key={grade.id}
-                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground"
-                  title={grade.comment || ""}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-pointer hover:bg-primary-dark transition-colors"
+                  title={grade.comment || "Нажмите для просмотра деталей"}
+                  onClick={(e) => {
+                    e.stopPropagation(); // Предотвращаем всплытие события
+                    if (onClick && typeof onClick === 'function') {
+                      onClick(e, "grade", grade as unknown as Assignment);
+                    }
+                  }}
                 >
                   {grade.grade}
                 </div>
@@ -333,7 +341,9 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   const [isHomeworkDialogOpen, setIsHomeworkDialogOpen] = useState(false);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
+  const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | undefined>(undefined);
+  const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
   const [studentAttendance, setStudentAttendance] = useState<any | null>(null);
   const [, navigate] = useLocation();
   const { isTeacher, isSchoolAdmin, isStudent } = useRoleCheck();
@@ -484,6 +494,64 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     }
   };
 
+  // Функция для загрузки информации о задании по ID
+  const fetchAssignmentById = async (assignmentId: number): Promise<Assignment | null> => {
+    try {
+      console.log(`Загрузка задания с ID: ${assignmentId}`);
+      const response = await fetch(`/api/assignments/${assignmentId}`);
+      if (response.ok) {
+        return await response.json();
+      } else {
+        console.error(`Ошибка при загрузке задания: ${response.status}`);
+        return null;
+      }
+    } catch (error) {
+      console.error("Ошибка при загрузке задания:", error);
+      return null;
+    }
+  };
+
+  // Функция для загрузки заданий по scheduleId
+  const fetchAssignmentsByScheduleId = async (scheduleId: number): Promise<Assignment[]> => {
+    try {
+      console.log(`Загрузка заданий для урока с ID: ${scheduleId}`);
+      const response = await fetch(`/api/assignments/schedule/${scheduleId}`);
+      if (response.ok) {
+        return await response.json();
+      } else {
+        console.error(`Ошибка при загрузке заданий для урока: ${response.status}`);
+        return [];
+      }
+    } catch (error) {
+      console.error("Ошибка при загрузке заданий для урока:", error);
+      return [];
+    }
+  };
+
+  // Обработчик клика по оценке
+  const handleGradeClick = async (grade: Grade) => {
+    console.log("Клик по оценке:", grade);
+    setSelectedGrade(grade);
+    
+    let assignment = null;
+    
+    // Сначала ищем по assignmentId (если есть)
+    if (grade.assignmentId) {
+      assignment = await fetchAssignmentById(grade.assignmentId);
+    }
+    
+    // Если не найдено по assignmentId, ищем по scheduleId
+    if (!assignment && grade.scheduleId) {
+      const assignments = await fetchAssignmentsByScheduleId(grade.scheduleId);
+      if (assignments.length > 0) {
+        assignment = assignments[0];
+      }
+    }
+    
+    setSelectedAssignment(assignment || undefined);
+    setIsGradeDialogOpen(true);
+  };
+
   const handleScheduleClick = (schedule: Schedule, actionType?: string, assignment?: Assignment) => {
     setSelectedSchedule(schedule);
     
@@ -499,6 +567,10 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
     } else if (actionType === "attendance" && isTeacher() && schedule.status === 'conducted') {
       // Открываем диалог для отметки посещаемости (только для проведенных уроков)
       setIsAttendanceDialogOpen(true);
+    } else if (actionType === "grade" && isStudent()) {
+      // Обработка клика по оценке
+      const grade = assignment as unknown as Grade; // Используем параметр assignment для передачи оценки
+      handleGradeClick(grade);
     } else {
       // Для студентов загружаем данные о посещаемости при открытии диалога
       if (isStudent() && currentUser && schedule.status === 'conducted') {
@@ -989,6 +1061,74 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
               schedule={selectedSchedule}
               onClose={() => setIsAttendanceDialogOpen(false)}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Диалог для просмотра детальной информации об оценке */}
+      <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Информация об оценке</DialogTitle>
+            <DialogDescription>
+              {selectedSchedule && selectedGrade && (
+                <>
+                  Предмет: {getSubject(selectedSchedule.subjectId)?.name}, 
+                  Дата: {selectedSchedule.scheduleDate 
+                    ? format(new Date(selectedSchedule.scheduleDate), "dd.MM.yyyy")
+                    : format(date, "dd.MM.yyyy")}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedGrade && (
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <div className="p-4 rounded-full bg-primary text-primary-foreground text-2xl font-bold w-16 h-16 flex items-center justify-center">
+                  {selectedGrade.grade}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-3 p-4 bg-gray-50 rounded-lg">
+                {selectedAssignment && (
+                  <>
+                    <div>
+                      <h4 className="text-gray-500 text-sm mb-1">Тип задания</h4>
+                      <p className="font-medium">{getAssignmentTypeName(selectedAssignment.assignmentType)}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-gray-500 text-sm mb-1">Название</h4>
+                      <p className="font-medium">{selectedAssignment.title || "-"}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-gray-500 text-sm mb-1">Описание</h4>
+                      <p className="text-sm">{selectedAssignment.description || "-"}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-gray-500 text-sm mb-1">Максимальный балл</h4>
+                      <p className="font-medium">{selectedAssignment.maxScore}</p>
+                    </div>
+                  </>
+                )}
+                
+                {selectedGrade.comment && (
+                  <div>
+                    <h4 className="text-gray-500 text-sm mb-1">Комментарий учителя</h4>
+                    <p className="text-sm italic">{selectedGrade.comment}</p>
+                  </div>
+                )}
+                
+                <div>
+                  <h4 className="text-gray-500 text-sm mb-1">Дата выставления</h4>
+                  <p className="text-sm">
+                    {selectedGrade.createdAt 
+                      ? format(new Date(selectedGrade.createdAt), "dd.MM.yyyy HH:mm") 
+                      : "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
