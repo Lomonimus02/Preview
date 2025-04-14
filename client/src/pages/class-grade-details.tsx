@@ -1085,6 +1085,34 @@ export default function ClassGradeDetailsPage() {
     return true;
   };
   
+  // Function to check if a student already has a grade for a specific assignment
+  const hasStudentGradeForAssignment = (studentId: number, assignmentId: number): boolean => {
+    if (!filteredGrades) return false;
+    
+    return filteredGrades.some(g => 
+      g.studentId === studentId && 
+      g.assignmentId === assignmentId
+    );
+  };
+  
+  // Function to check if a student has at least one available assignment without a grade
+  const hasAvailableAssignmentsForGrading = (studentId: number, slot: LessonSlot): boolean => {
+    // Если это не накопительная система, то всегда можно добавить оценку
+    if (classData?.gradingSystem !== GradingSystemEnum.CUMULATIVE) {
+      return true;
+    }
+    
+    // Если нет заданий, нельзя добавить оценку
+    if (!slot.assignments || slot.assignments.length === 0) {
+      return false;
+    }
+    
+    // Проверяем, есть ли хотя бы одно задание без оценки
+    return slot.assignments.some(assignment => 
+      !hasStudentGradeForAssignment(studentId, assignment.id)
+    );
+  };
+  
   // Handle header click to show context menu or open assignment dialog
   const handleHeaderClick = (slot: LessonSlot) => {
     // Если это накопительная система, открываем диалог добавления задания
@@ -1491,7 +1519,9 @@ export default function ClassGradeDetailsPage() {
                                           </div>
                                         ))}
                                         {/* Кнопка "+" для добавления еще одной оценки в тот же дату и урок */}
-                                        {canEditGrades && canAddGradeToLesson(slot.scheduleId, slot) && (
+                                        {canEditGrades && 
+                                         canAddGradeToLesson(slot.scheduleId, slot) && 
+                                         hasAvailableAssignmentsForGrading(student.id, slot) && (
                                           <Button 
                                             variant="ghost" 
                                             size="sm" 
@@ -1503,7 +1533,9 @@ export default function ClassGradeDetailsPage() {
                                           </Button>
                                         )}
                                       </div>
-                                    ) : canEditGrades && canAddGradeToLesson(slot.scheduleId, slot) ? (
+                                    ) : canEditGrades && 
+                                       canAddGradeToLesson(slot.scheduleId, slot) && 
+                                       hasAvailableAssignmentsForGrading(student.id, slot) ? (
                                       // Если заданий нет или одно задание, добавляем возможность прямого ввода
                                       classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
                                       slot.assignments && 
