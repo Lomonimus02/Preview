@@ -1281,11 +1281,35 @@ export default function ClassGradeDetailsPage() {
     // Преобразуем строку в число
     const grade = parseInt(value, 10);
     
-    // Проверка на корректность ввода
-    if (isNaN(grade) || grade < 1 || grade > 10) {
+    // Получаем детали задания для проверки максимального балла
+    const assignment = assignments.find(a => a.id === assignmentId);
+    if (!assignment) {
+      toast({
+        title: "Ошибка",
+        description: "Задание не найдено",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Получаем максимальный балл для задания
+    const maxScore = parseInt(assignment.maxScore);
+    
+    // Проверка на корректность ввода и на максимальный балл
+    if (isNaN(grade) || grade < 1) {
       toast({
         title: "Некорректная оценка",
-        description: "Оценка должна быть числом от 1 до 10",
+        description: "Оценка должна быть положительным числом",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Проверка на превышение максимального балла за конкретное задание
+    if (grade > maxScore) {
+      toast({
+        title: "Превышен максимальный балл",
+        description: `Оценка не может быть больше ${maxScore} баллов для этого задания`,
         variant: "destructive"
       });
       return;
@@ -1304,17 +1328,6 @@ export default function ClassGradeDetailsPage() {
         data: { grade: grade }
       });
     } else {
-      // Получаем детали задания
-      const assignment = assignments.find(a => a.id === assignmentId);
-      if (!assignment) {
-        toast({
-          title: "Ошибка",
-          description: "Задание не найдено",
-          variant: "destructive"
-        });
-        return;
-      }
-      
       // Если оценки нет, создаем новую
       const newGrade: any = {
         studentId: studentId,
@@ -1483,7 +1496,7 @@ export default function ClassGradeDetailsPage() {
         studentsInSubgroup.forEach(id => subgroupStudentIds.add(id));
       });
       
-      console.log(`Студенты в подгруппах предмета ${subjectId}:`, [...subgroupStudentIds]);
+      console.log(`Студенты в подгруппах предмета ${subjectId}:`, Array.from(subgroupStudentIds));
       
       // 4. Фильтруем оценки для основного предмета, исключая подгруппы
       const result = grades.filter(grade => {
@@ -1505,7 +1518,7 @@ export default function ClassGradeDetailsPage() {
         // КРИТЕРИЙ 3: Если студент состоит в подгруппе по этому предмету,
         // то не показываем его оценки без расписания в основном журнале
         // (они должны быть только в журнале подгруппы)
-        if (Array.from(subgroupStudentIds).includes(grade.studentId) && !grade.scheduleId) {
+        if (subgroupStudentIds.has(grade.studentId) && !grade.scheduleId) {
           return false;
         }
         
