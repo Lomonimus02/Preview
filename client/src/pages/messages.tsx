@@ -672,31 +672,37 @@ export default function MessagesPage() {
                                         className="block"
                                       >
                                         <img 
-                                          src={message.attachmentUrl} 
+                                          src={message.attachmentUrl.startsWith('http') ? message.attachmentUrl : message.attachmentUrl} 
                                           alt="Изображение" 
-                                          className="max-w-full rounded hover:opacity-90 transition-opacity"
+                                          className="max-w-full h-auto max-h-[300px] rounded-md hover:opacity-90 transition-opacity border border-gray-200 shadow-sm"
+                                          onError={(e) => {
+                                            console.error('Ошибка загрузки изображения:', message.attachmentUrl);
+                                            e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTMgMTRIMTFWNEgxM1YxNFoiIGZpbGw9ImN1cnJlbnRDb2xvciI+PC9wYXRoPjxwYXRoIGQ9Ik0xMyAyMEgxMVYxOEgxM1YyMFoiIGZpbGw9ImN1cnJlbnRDb2xvciI+PC9wYXRoPjwvc3ZnPg==';
+                                            e.currentTarget.alt = 'Не удалось загрузить изображение';
+                                            e.currentTarget.classList.add('p-4', 'bg-red-50');
+                                          }}
                                         />
                                       </a>
                                     ) : message.attachmentType === 'video' ? (
-                                      <div className="rounded overflow-hidden">
+                                      <div className="rounded-md overflow-hidden border border-gray-200 shadow-sm">
                                         <div className="relative">
                                           <video 
                                             src={message.attachmentUrl}
                                             controls
-                                            className="max-w-full w-full rounded"
+                                            className="max-w-full w-full rounded-t-md bg-black"
                                             controlsList="nodownload"
                                             preload="metadata"
                                             poster={message.attachmentUrl + '?poster=true'}
                                           />
-                                          <div className="absolute inset-0 bg-black/10 pointer-events-none flex items-center justify-center">
-                                            <Play className="h-8 w-8 text-white opacity-80" />
+                                          <div className="absolute inset-0 bg-black/30 pointer-events-none flex items-center justify-center">
+                                            <Play className="h-12 w-12 text-white opacity-80" />
                                           </div>
                                         </div>
-                                        <div className="flex mt-1 gap-1">
+                                        <div className="flex p-2 gap-2 bg-gray-50">
                                           <a 
                                             href={message.attachmentUrl} 
                                             download
-                                            className="flex items-center p-1 bg-white/20 justify-center text-xs rounded flex-1 hover:bg-white/30 transition-colors"
+                                            className="flex items-center p-1.5 bg-gray-100 justify-center text-xs rounded flex-1 hover:bg-gray-200 transition-colors"
                                           >
                                             <Download className="h-3 w-3 mr-1" />
                                             <span>Скачать</span>
@@ -705,7 +711,7 @@ export default function MessagesPage() {
                                             href={message.attachmentUrl} 
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="flex items-center p-1 bg-white/20 justify-center text-xs rounded flex-1 hover:bg-white/30 transition-colors"
+                                            className="flex items-center p-1.5 bg-gray-100 justify-center text-xs rounded flex-1 hover:bg-gray-200 transition-colors"
                                           >
                                             <ExternalLink className="h-3 w-3 mr-1" />
                                             <span>Открыть</span>
@@ -716,13 +722,13 @@ export default function MessagesPage() {
                                       <a 
                                         href={message.attachmentUrl} 
                                         download
-                                        className="flex items-center p-2 bg-white/20 rounded hover:bg-white/30 transition-colors"
+                                        className="flex items-center p-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors border border-gray-200 shadow-sm"
                                       >
-                                        <FileIcon className="h-4 w-4 mr-2" />
+                                        <FileIcon className="h-5 w-5 mr-2 text-gray-600" />
                                         <span className="text-sm truncate flex-grow">
                                           {message.attachmentUrl.split('/').pop() || 'Документ'}
                                         </span>
-                                        <span className="text-xs opacity-70 ml-2">Скачать</span>
+                                        <span className="text-xs bg-gray-200 px-2 py-1 rounded-full ml-2">Скачать</span>
                                       </a>
                                     )}
                                   </div>
