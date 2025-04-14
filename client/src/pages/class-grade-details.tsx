@@ -868,17 +868,23 @@ export default function ClassGradeDetailsPage() {
     setSelectedDate(date || null);
     setEditingGradeId(null);
     
-    // Сбросим выбранное задание
-    setSelectedAssignmentId(null);
-    
     // Для накопительной системы, если есть scheduleId, нужно найти возможные задания
+    let assignmentId = null;
+    
     if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && scheduleId) {
       const scheduleAssignments = assignments.filter(a => a.scheduleId === scheduleId);
       
       // Если есть только одно задание для этого урока, автоматически выбираем его
       if (scheduleAssignments.length === 1) {
-        setSelectedAssignmentId(scheduleAssignments[0].id);
+        assignmentId = scheduleAssignments[0].id;
+        setSelectedAssignmentId(assignmentId);
+      } else {
+        // Сбросим выбранное задание, если задач несколько
+        setSelectedAssignmentId(null);
       }
+    } else {
+      // Сбросим выбранное задание
+      setSelectedAssignmentId(null);
     }
     
     // Устанавливаем значения формы
@@ -887,12 +893,12 @@ export default function ClassGradeDetailsPage() {
       classId,
       subjectId,
       teacherId: user?.id,
-      gradeType: "classwork",
+      gradeType: assignmentId ? (assignments.find(a => a.id === assignmentId)?.assignmentType || "classwork") : "classwork",
       comment: '',
       date,
       scheduleId: scheduleId || null,
       subgroupId,
-      assignmentId: selectedAssignmentId || null,
+      assignmentId: assignmentId,
     });
     
     setIsGradeDialogOpen(true);
