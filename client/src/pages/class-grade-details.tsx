@@ -28,6 +28,8 @@ interface LessonSlot {
   scheduleId: number;
   formattedDate: string;
   startTime?: string;
+  endTime?: string;
+  status?: string;
   assignments?: Assignment[];
 }
 import { format } from "date-fns";
