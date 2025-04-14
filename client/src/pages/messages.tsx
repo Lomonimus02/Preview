@@ -216,8 +216,8 @@ export default function MessagesPage() {
           }
           
           const uploadResult = await uploadResponse.json();
-          attachmentUrl = uploadResult.fileUrl;
-          attachmentType = uploadResult.fileType;
+          attachmentUrl = uploadResult.file.url;
+          attachmentType = uploadResult.file.type;
           
           console.log('Файл успешно загружен:', uploadResult);
         } catch (error) {
