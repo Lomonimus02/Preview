@@ -28,8 +28,6 @@ interface LessonSlot {
   scheduleId: number;
   formattedDate: string;
   startTime?: string;
-  endTime?: string;
-  status?: string;
   assignments?: Assignment[];
 }
 import { format } from "date-fns";
@@ -142,9 +140,7 @@ const createGradeFormSchema = (gradingSystem: GradingSystemEnum | undefined, ass
     return baseSchema.extend({
       grade: z.number({
         required_error: "Укажите балл",
-      }).min(0, "Минимальный балл - 0"),
-      // Убираем валидацию максимального балла и сделаем автоматическую коррекцию вместо отклонения формы
-      // .max(assignmentMaxScore, `Максимальный балл - ${assignmentMaxScore}`),
+      }).min(0, "Минимальный балл - 0").max(assignmentMaxScore, `Максимальный балл - ${assignmentMaxScore}`),
     });
   }
 
@@ -391,28 +387,6 @@ export default function ClassGradeDetailsPage() {
         return assignmentType;
     }
   }, []);
-  
-  // Функция для получения названия типа оценки
-  const getGradeTypeName = useCallback((gradeType: string) => {
-    switch(gradeType) {
-      case 'test':
-      case 'Контрольная':
-        return 'Контрольная работа';
-      case 'exam':
-      case 'Экзамен':
-        return 'Экзамен';
-      case 'homework':
-      case 'Домашняя':
-        return 'Домашнее задание';
-      case 'project':
-        return 'Проект';
-      case 'classwork':
-      case 'Практическая':
-        return 'Работа на уроке';
-      default:
-        return gradeType;
-    }
-  }, []);
 
   // Get unique lesson slots (date + scheduleId pairs) from schedules for this class and subject
   // Используем useState вместо useMemo, чтобы можно было обновлять данные
@@ -463,453 +437,734 @@ export default function ClassGradeDetailsPage() {
     }, {} as Record<number, string[]>);
   }, [teacherSchedules]);
   
-  // Отфильтрованные оценки, учитывая подгруппу, если она указана
-  const filteredGrades = useMemo(() => {
-    if (!grades) return [];
-    
-    let filtered = grades;
-    
-    // Если указана подгруппа, фильтруем оценки
-    if (subgroupId) {
-      // Для подгруппы оставляем только оценки, связанные с уроками этой подгруппы
-      // или оценки, у которых явно указана эта подгруппа
-      filtered = grades.filter(grade => {
-        // Если у оценки напрямую указана эта подгруппа
-        if (grade.subgroupId === subgroupId) return true;
-        
-        // Если у оценки указан урок, проверяем, относится ли он к этой подгруппе
-        if (grade.scheduleId) {
-          const schedule = schedules.find(s => s.id === grade.scheduleId);
-          return schedule && schedule.subgroupId === subgroupId;
-        }
-        
-        return false;
-      });
-    }
-    
-    return filtered;
-  }, [grades, subgroupId, schedules]);
-
-  // Функция для получения оценок конкретного студента на определенную дату
-  const getStudentGradeForSlot = useCallback((studentId: number, slot: LessonSlot, grades: Grade[]) => {
-    if (!grades) return [];
-    
-    // Фильтруем все оценки для данного ученика и расписания
-    const studentGrades = grades.filter(g => 
-      g.studentId === studentId && 
-      g.scheduleId === slot.scheduleId
-    );
-    
-    // Проверяем, чтобы оценка в накопительной системе была связана с заданием
-    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      // Проверяем, что все оценки имеют связанное задание
-      studentGrades.forEach(grade => {
-        if (!grade.assignmentId) {
-          console.warn("Найдена оценка без привязки к заданию в накопительной системе:", grade);
-        }
-      });
-    }
-    
-    return studentGrades;
-  }, [classData?.gradingSystem]);
-
-  // Функция для расчета среднего балла студента
-  const calculateAverageGrade = useCallback((studentId: number) => {
-    if (!filteredGrades) return "-";
-    
-    const studentGrades = filteredGrades.filter(g => g.studentId === studentId);
-    if (studentGrades.length === 0) return "-";
-    
-    // Для накопительной системы оценок вычисляем процент от максимума
-    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      let totalSum = 0;
-      let totalMaxScore = 0;
-      
-      // Проходим по всем оценкам студента и собираем сумму и максимально возможную сумму
-      for (const grade of studentGrades) {
-        if (grade.assignmentId) {
-          // Находим соответствующее задание для этой оценки
-          const assignment = assignments.find(a => a.id === grade.assignmentId);
-          if (assignment) {
-            totalSum += grade.grade;
-            totalMaxScore += parseInt(assignment.maxScore);
-          }
-        } else {
-          // Если нет связи с заданием, считаем обычным образом
-          totalSum += grade.grade;
-          totalMaxScore += 5; // Предполагаем максимум для обычной оценки
-        }
-      }
-      
-      if (totalMaxScore === 0) return "-"; // Защита от деления на ноль
-      
-      // Возвращаем процент от максимального балла
-      const percentage = (totalSum / totalMaxScore) * 100;
-      return percentage.toFixed(1) + "%";
-    } else {
-      // Для обычной системы - простое среднее арифметическое
-      const sum = studentGrades.reduce((acc, g) => acc + g.grade, 0);
-      return (sum / studentGrades.length).toFixed(1);
-    }
-  }, [filteredGrades, assignments, classData?.gradingSystem]);
-  
-  // Функция для построения схемы формы для добавления оценки
-  // с учетом типа оценочной системы и выбранного задания
-  const getGradeFormSchema = useCallback(() => {
-    // Если это накопительная система и выбрано задание, берем максимальный балл из задания
-    let maxScore: number | undefined;
-    
-    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && selectedAssignmentId) {
-      const assignment = assignments.find(a => a.id === selectedAssignmentId);
-      if (assignment) {
-        maxScore = parseInt(assignment.maxScore);
-      }
-    }
-    
+  // Определяем схему на основе системы оценивания класса
+  const gradeFormSchema = useMemo(() => {
+    // Находим максимальный балл для выбранного задания (если выбрано)
+    const maxScore = selectedAssignment ? parseInt(selectedAssignment.maxScore) : undefined;
     return createGradeFormSchema(classData?.gradingSystem, maxScore);
-  }, [classData?.gradingSystem, selectedAssignmentId, assignments]);
-  
+  }, [classData?.gradingSystem, selectedAssignment]);
+
+  // Grade form
   const gradeForm = useForm<z.infer<ReturnType<typeof createGradeFormSchema>>>({
-    resolver: zodResolver(getGradeFormSchema()),
+    resolver: zodResolver(gradeFormSchema),
     defaultValues: {
-      classId: classId,
+      studentId: undefined,
+      grade: undefined,
+      comment: "",
+      gradeType: "Текущая",
       subjectId: subjectId,
+      classId: classId,
       teacherId: user?.id,
-      studentId: selectedStudentId || undefined,
-      subgroupId: subgroupId,
-      scheduleId: null,
-      assignmentId: null,
-      gradeType: "classwork",
+      scheduleId: null, // Добавляем scheduleId с изначальным значением null
+      subgroupId: subgroupId || null, // Важно! Устанавливаем subgroupId если открыт журнал подгруппы
+      assignmentId: null, // Добавляем поле для связи с заданием (для накопительной системы)
     },
   });
   
-  // Эффект для обновления defaultValues формы при изменении выбранного студента или задания
+  // Обновляем форму при изменении выбранного задания
   useEffect(() => {
-    if (selectedStudentId) {
-      gradeForm.setValue('studentId', selectedStudentId);
+    if (selectedAssignment) {
+      gradeForm.setValue('assignmentId', selectedAssignment.id);
+      // Перевалидируем форму с новыми ограничениями на максимальный балл
+      gradeForm.trigger('grade');
+    } else {
+      gradeForm.setValue('assignmentId', null);
     }
-    
-    if (selectedDate) {
-      gradeForm.setValue('date', selectedDate);
-    }
-    
-    if (selectedAssignmentId) {
-      gradeForm.setValue('assignmentId', selectedAssignmentId);
-      
-      // Если выбрано задание, устанавливаем тип оценки в соответствии с типом задания
-      const assignment = assignments.find(a => a.id === selectedAssignmentId);
-      if (assignment) {
-        gradeForm.setValue('gradeType', assignment.assignmentType);
-      }
-    }
-  }, [selectedStudentId, selectedDate, selectedAssignmentId, gradeForm, assignments]);
+  }, [selectedAssignment, gradeForm]);
   
-  // Mutation для добавления оценки
+  // Mutation to add grade
   const addGradeMutation = useMutation({
     mutationFn: async (data: z.infer<ReturnType<typeof createGradeFormSchema>>) => {
-      const res = await apiRequest('/api/grades', 'POST', data);
-      
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Ошибка при добавлении оценки');
-      }
-      
+      // Убедимся, что scheduleId всегда передается, если был выбран конкретный урок
+      const gradeData = {
+        ...data,
+        scheduleId: data.scheduleId || null,
+      };
+      const res = await apiRequest("/api/grades", "POST", gradeData);
       return res.json();
     },
-    onSuccess: (data) => {
-      toast({
-        title: "Оценка успешно добавлена",
-        description: `Оценка ${data.grade} добавлена студенту`,
+    onMutate: async (newGradeData) => {
+      // Отменяем исходящие запросы за оценками
+      await queryClient.cancelQueries({ queryKey: ["/api/grades"] });
+      
+      // Сохраняем предыдущее состояние
+      const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]) || [];
+      const previousGradesWithFilter = queryClient.getQueryData<Grade[]>(["/api/grades", { classId, subjectId }]) || [];
+      
+      // Создаём временную оценку для оптимистичного обновления
+      // Учитываем выбранную дату, если она есть
+      let createdAtDate = new Date();
+      
+      // Если у нас есть selectedDate, используем его вместо текущей даты
+      if (selectedDate) {
+        // Правильная обработка строки даты - убеждаемся, что у нас всегда строка
+        const dateString = selectedDate || '';
+        if (dateString.trim() !== '') {
+          createdAtDate = new Date(dateString);
+        }
+      }
+      
+      // Преобразуем Date в строку ISO для совместимости с типом в Grade
+      const createdAt = createdAtDate.toISOString();
+      
+      // Создаём временную оценку для оптимистичного обновления интерфейса
+      const tempGrade: Grade = {
+        id: Date.now(), // Временный ID для локального отображения
+        studentId: newGradeData.studentId!, 
+        subjectId: newGradeData.subjectId!,
+        classId: newGradeData.classId!,
+        teacherId: newGradeData.teacherId!,
+        grade: newGradeData.grade!,
+        comment: newGradeData.comment || null,
+        gradeType: newGradeData.gradeType || "Текущая",
+        // Добавляем scheduleId для привязки к конкретному уроку
+        scheduleId: newGradeData.scheduleId || null,
+        // Очень важно! Добавляем subgroupId, если оценка ставится в подгруппе
+        subgroupId: newGradeData.subgroupId || null,
+        // Используем строковое представление даты для отображения в UI
+        // В БД сама дата будет приведена к нужному типу
+        createdAt: createdAt as unknown as Date,
+      };
+      
+      // Оптимистично обновляем кеш react-query для обоих запросов
+      queryClient.setQueryData<Grade[]>(["/api/grades"], [...previousGrades, tempGrade]);
+      queryClient.setQueryData<Grade[]>(["/api/grades", { classId, subjectId }], [...previousGradesWithFilter, tempGrade]);
+      
+      // Возвращаем контекст с предыдущим состоянием
+      return { previousGrades, previousGradesWithFilter };
+    },
+    onSuccess: (newGrade) => {
+      // После успешного запроса обновляем кеш актуальными данными
+      // Обновляем все запросы связанные с оценками
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades"]
       });
       
-      // Обновляем кэш оценок
-      queryClient.invalidateQueries({
-        queryKey: ["/api/grades", { classId, subjectId, subgroupId }],
+      // Инвалидируем запрос с конкретными параметрами класса и предмета (для основного журнала)
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId }]
       });
       
+      // Если оценка добавлена в подгруппе, инвалидируем запрос этой подгруппы
+      if (subgroupId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/grades", { classId, subjectId, subgroupId }]
+        });
+      }
+      
+      console.log("Запрос данных обновлен после добавления оценки:", { 
+        classId, 
+        subjectId, 
+        subgroupId,
+        grade: newGrade 
+      });
+      
+      console.log("Оценка добавлена:", newGrade, "для подгруппы:", subgroupId);
+      
+      // Закрываем диалог только после успешного добавления
       setIsGradeDialogOpen(false);
       
       // Очищаем форму
       gradeForm.reset({
         studentId: undefined,
         grade: undefined,
-        gradeType: "classwork",
         comment: "",
-        classId: classId,
+        gradeType: "Текущая",
         subjectId: subjectId,
+        classId: classId,
         teacherId: user?.id,
-        subgroupId: subgroupId,
+        scheduleId: null, // Добавляем scheduleId с изначальным значением null
+        subgroupId: subgroupId || null, // Сохраняем текущую подгруппу, если мы в контексте подгруппы
       });
       
-      // Сбрасываем состояния выбора
-      setSelectedStudentId(null);
-      setSelectedDate(null);
-      setSelectedAssignmentId(null);
-    },
-    onError: (error) => {
       toast({
-        title: "Ошибка при добавлении оценки",
-        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        title: "Оценка добавлена",
+        description: "Оценка успешно добавлена в журнал",
+      });
+    },
+    onError: (error, newGrade, context) => {
+      // При ошибке возвращаем предыдущее состояние
+      if (context?.previousGrades) {
+        queryClient.setQueryData(["/api/grades"], context.previousGrades);
+      }
+      if (context?.previousGradesWithFilter) {
+        queryClient.setQueryData(["/api/grades", { classId, subjectId }], context.previousGradesWithFilter);
+      }
+      
+      toast({
+        title: "Ошибка",
+        description: "Не удалось добавить оценку. Попробуйте позже.",
         variant: "destructive",
       });
     },
+    // Всегда возвращаемся к актуальному состоянию после выполнения мутации
+    onSettled: () => {
+      // Добавляем дополнительную инвалидацию для запроса с параметрами подгруппы
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      // Явно инвалидируем запрос с параметрами для текущего класса, предмета и подгруппы
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId, subgroupId }] 
+      });
+      console.log("Запрос данных для подгруппы после сохранения оценки:", { classId, subjectId, subgroupId });
+    },
   });
   
-  // Mutation для обновления оценки
+  // Mutation to update grade
   const updateGradeMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number, data: Partial<Grade> }) => {
-      // Для корректного обновления убеждаемся, что все необходимые поля присутствуют
-      const updateData = {
-        ...data,
-        classId: data.classId || classId,
-        subjectId: data.subjectId || subjectId,
-        teacherId: data.teacherId || user?.id,
-        subgroupId: data.subgroupId || subgroupId,
+    mutationFn: async ({ id, data }: { id: number, data: Partial<z.infer<typeof gradeFormSchema>> }) => {
+      // Если мы обновляем только тип оценки, используем PATCH для частичного обновления
+      if (Object.keys(data).length === 1 && 'gradeType' in data) {
+        const res = await apiRequest(`/api/grades/${id}`, "PATCH", data);
+        return res.json();
+      } else {
+        // Для полного обновления используем PUT 
+        const res = await apiRequest(`/api/grades/${id}`, "PUT", data);
+        return res.json();
+      }
+    },
+    onMutate: async ({ id, data }) => {
+      // Отменяем исходящие запросы
+      await queryClient.cancelQueries({ queryKey: ["/api/grades"] });
+      
+      // Сохраняем предыдущее состояние
+      const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]) || [];
+      const previousGradesWithFilter = queryClient.getQueryData<Grade[]>(["/api/grades", { classId, subjectId }]) || [];
+      
+      // Функция обновления данных оценки
+      const updateGradeData = (oldData: Grade[] = []) => {
+        return oldData.map(grade => {
+          if (grade.id === id) {
+            // Обновляем существующую оценку
+            return {
+              ...grade,
+              ...data,
+              grade: data.grade || grade.grade, // Обновляем оценку, если она есть в data
+              comment: data.comment !== undefined ? data.comment : grade.comment,
+              gradeType: data.gradeType || grade.gradeType,
+            };
+          }
+          return grade;
+        });
       };
       
-      const res = await apiRequest(`/api/grades/${id}`, 'PATCH', updateData);
+      // Оптимистично обновляем кеш в обоих запросах
+      queryClient.setQueryData<Grade[]>(["/api/grades"], updateGradeData);
+      queryClient.setQueryData<Grade[]>(["/api/grades", { classId, subjectId }], updateGradeData);
       
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Ошибка при обновлении оценки');
+      return { previousGrades, previousGradesWithFilter };
+    },
+    onSuccess: (updatedGrade) => {
+      // Обновляем все запросы связанные с оценками
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades"]
+      });
+      
+      // Инвалидируем запрос с конкретными параметрами класса и предмета (для основного журнала)
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId }]
+      });
+      
+      // Если оценка обновлена в подгруппе, инвалидируем запрос этой подгруппы
+      if (subgroupId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/grades", { classId, subjectId, subgroupId }]
+        });
       }
       
-      return res.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Оценка успешно обновлена",
-        description: `Оценка изменена на ${data.grade}`,
+      console.log("Запрос данных обновлен после обновления оценки:", { 
+        classId, 
+        subjectId, 
+        subgroupId,
+        grade: updatedGrade 
       });
       
-      // Обновляем кэш оценок
-      queryClient.invalidateQueries({
-        queryKey: ["/api/grades", { classId, subjectId, subgroupId }],
-      });
-      
+      // Закрываем диалог и очищаем форму после успешного обновления
       setIsGradeDialogOpen(false);
       setEditingGradeId(null);
       
       gradeForm.reset({
         studentId: undefined,
         grade: undefined,
-        gradeType: "classwork",
         comment: "",
-        classId: classId,
+        gradeType: "Текущая",
         subjectId: subjectId,
+        classId: classId,
         teacherId: user?.id,
-        subgroupId: subgroupId,
+        scheduleId: null, // Добавляем scheduleId с изначальным значением null
+        subgroupId: subgroupId || null, // Сохраняем текущую подгруппу, если мы в контексте подгруппы
       });
       
-      // Сбрасываем состояния выбора
-      setSelectedStudentId(null);
-      setSelectedDate(null);
-      setSelectedAssignmentId(null);
-    },
-    onError: (error) => {
       toast({
-        title: "Ошибка при обновлении оценки",
-        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
-        variant: "destructive",
+        title: "Оценка обновлена",
+        description: "Оценка успешно обновлена в журнале",
       });
     },
-  });
-  
-  // Mutation для удаления оценки
-  const deleteGradeMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest(`/api/grades/${id}`, 'DELETE');
-      
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Ошибка при удалении оценки');
+    onError: (error, variables, context) => {
+      // При ошибке возвращаем предыдущее состояние
+      if (context?.previousGrades) {
+        queryClient.setQueryData(["/api/grades"], context.previousGrades);
+      }
+      if (context?.previousGradesWithFilter) {
+        queryClient.setQueryData(["/api/grades", { classId, subjectId }], context.previousGradesWithFilter);
       }
       
-      return res.json();
-    },
-    onSuccess: () => {
       toast({
-        title: "Оценка успешно удалена",
-      });
-      
-      // Обновляем кэш оценок
-      queryClient.invalidateQueries({
-        queryKey: ["/api/grades", { classId, subjectId, subgroupId }],
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Ошибка при удалении оценки",
-        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        title: "Ошибка",
+        description: "Не удалось обновить оценку. Попробуйте позже.",
         variant: "destructive",
       });
     },
+    onSettled: () => {
+      // Добавляем дополнительную инвалидацию для запроса с параметрами подгруппы
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      
+      // Явно инвалидируем запрос с параметрами для текущего класса, предмета и подгруппы
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId, subgroupId }] 
+      });
+      
+      console.log("Запрос данных после обновления оценки:", { classId, subjectId, subgroupId });
+    },
   });
   
-  // Mutation для добавления задания
+  // Форма для добавления задания
+  const assignmentForm = useForm<z.infer<typeof assignmentFormSchema>>({
+    resolver: zodResolver(assignmentFormSchema),
+    defaultValues: {
+      assignmentType: undefined,
+      maxScore: "",
+      description: "",
+      scheduleId: undefined,
+      subjectId: subjectId,
+      classId: classId,
+      teacherId: user?.id,
+      subgroupId: subgroupId || undefined,
+    },
+  });
+
+  // Mutation to add assignment
   const addAssignmentMutation = useMutation({
     mutationFn: async (data: z.infer<typeof assignmentFormSchema>) => {
-      const res = await apiRequest('/api/assignments', 'POST', data);
-      
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Ошибка при добавлении задания');
-      }
-      
+      const res = await apiRequest("/api/assignments", "POST", data);
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (newAssignment) => {
       toast({
-        title: "Задание успешно добавлено",
-        description: `Задание типа "${getAssignmentTypeName(data.assignmentType)}" добавлено к уроку`,
+        title: "Задание создано",
+        description: "Задание успешно добавлено к уроку",
       });
       
-      // Обновляем кэш заданий
-      queryClient.invalidateQueries({
-        queryKey: ["/api/assignments", { classId, subjectId, subgroupId }],
+      // Ручное обновление lessonSlots
+      // Добавляем созданное задание в соответствующий слот расписания
+      const updatedLessonSlots = [...lessonSlots];
+      const slotIndex = updatedLessonSlots.findIndex(
+        slot => slot.scheduleId === newAssignment.scheduleId
+      );
+      
+      if (slotIndex !== -1) {
+        // Если нашли слот расписания, добавляем к нему задание
+        if (!updatedLessonSlots[slotIndex].assignments) {
+          updatedLessonSlots[slotIndex].assignments = [];
+        }
+        updatedLessonSlots[slotIndex].assignments?.push(newAssignment);
+        
+        // Обновляем состояние lessonSlots
+        setLessonSlots(updatedLessonSlots);
+        
+        console.log('Задание добавлено в слот:', {
+          slotIndex,
+          slot: updatedLessonSlots[slotIndex],
+          newAssignment
+        });
+      }
+      
+      // Обновляем кеш запросов
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/assignments", { classId, subjectId, subgroupId }] 
       });
       
+      // Закрываем диалог и сбрасываем форму
       setIsAssignmentDialogOpen(false);
+      assignmentForm.reset({
+        assignmentType: undefined,
+        maxScore: "",
+        description: "",
+        scheduleId: undefined,
+        subjectId: subjectId,
+        classId: classId,
+        teacherId: user?.id,
+        subgroupId: subgroupId || undefined,
+      });
     },
     onError: (error) => {
       toast({
-        title: "Ошибка при добавлении задания",
-        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        title: "Ошибка",
+        description: `Не удалось создать задание: ${error.message}`,
         variant: "destructive",
       });
-    },
+    }
   });
   
-  // Mutation для обновления задания
+  // Mutation to update assignment
   const updateAssignmentMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number, data: Partial<Assignment> }) => {
-      const res = await apiRequest(`/api/assignments/${id}`, 'PATCH', data);
-      
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Ошибка при обновлении задания');
-      }
-      
+    mutationFn: async (data: z.infer<typeof assignmentFormSchema> & { id: number }) => {
+      const { id, ...updateData } = data;
+      const res = await apiRequest(`/api/assignments/${id}`, "PATCH", updateData);
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (updatedAssignment) => {
       toast({
-        title: "Задание успешно обновлено",
-        description: `Задание типа "${getAssignmentTypeName(data.assignmentType)}" обновлено`,
+        title: "Задание обновлено",
+        description: "Задание успешно изменено",
       });
       
-      // Обновляем кэш заданий
-      queryClient.invalidateQueries({
-        queryKey: ["/api/assignments", { classId, subjectId, subgroupId }],
+      // Обновляем кеш запросов
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/assignments", { classId, subjectId, subgroupId }] 
       });
       
+      // Закрываем диалог и сбрасываем форму
       setIsAssignmentDialogOpen(false);
       setEditingAssignmentId(null);
+      setSelectedAssignmentForEdit(null);
+      
+      assignmentForm.reset({
+        assignmentType: undefined,
+        maxScore: "",
+        description: "",
+        scheduleId: undefined,
+        subjectId: subjectId,
+        classId: classId,
+        teacherId: user?.id,
+        subgroupId: subgroupId || undefined,
+      });
     },
     onError: (error) => {
       toast({
-        title: "Ошибка при обновлении задания",
-        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        title: "Ошибка",
+        description: `Не удалось обновить задание: ${error.message}`,
         variant: "destructive",
       });
-    },
+    }
   });
   
-  // Mutation для удаления задания
+  // Mutation to delete assignment
   const deleteAssignmentMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest(`/api/assignments/${id}`, 'DELETE');
-      
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Ошибка при удалении задания');
-      }
-      
+      const res = await apiRequest(`/api/assignments/${id}`, "DELETE");
       return res.json();
     },
     onSuccess: () => {
       toast({
-        title: "Задание успешно удалено",
+        title: "Задание удалено",
+        description: "Задание успешно удалено",
       });
       
-      // Обновляем кэш заданий
-      queryClient.invalidateQueries({
-        queryKey: ["/api/assignments", { classId, subjectId, subgroupId }],
+      // Обновляем кеш запросов
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/assignments", { classId, subjectId, subgroupId }] 
       });
     },
     onError: (error) => {
+      console.error("Ошибка при удалении задания:", error);
       toast({
-        title: "Ошибка при удалении задания",
-        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        title: "Ошибка",
+        description: `Не удалось удалить задание: ${error.message}`,
         variant: "destructive",
       });
-    },
+    }
   });
-  
-  // Mutation для обновления статуса урока
+
+  // Mutation to update schedule status
   const updateScheduleStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: number, status: string }) => {
-      const res = await apiRequest(`/api/schedules/${id}/status`, 'PATCH', { status });
-      
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Ошибка при обновлении статуса урока');
-      }
-      
+    mutationFn: async ({ scheduleId, status }: { scheduleId: number, status: string }) => {
+      const res = await apiRequest(`/api/schedules/${scheduleId}/status`, "PATCH", { status });
       return res.json();
     },
-    onSuccess: (data) => {
-      toast({
-        title: "Статус урока обновлен",
-        description: `Урок от ${format(new Date(data.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })} отмечен как ${
-          data.status === 'conducted' ? 'проведенный' : 
-          data.status === 'cancelled' ? 'отмененный' : 'не проведенный'
-        }`,
-      });
+    onSuccess: (updatedSchedule) => {
+      // После успешного запроса обновляем кеш актуальными данными
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
       
-      // Обновляем кэш расписаний
-      queryClient.invalidateQueries({
-        queryKey: ["/api/schedules", { classId, subjectId, subgroupId }],
-      });
-      
+      // Закрываем диалог
       setIsStatusDialogOpen(false);
       setSelectedSchedule(null);
-    },
-    onError: (error) => {
+      
       toast({
-        title: "Ошибка при обновлении статуса урока",
-        description: error instanceof Error ? error.message : 'Неизвестная ошибка',
+        title: "Статус урока обновлен",
+        description: updatedSchedule.status === "conducted" 
+          ? "Урок отмечен как проведенный" 
+          : "Урок отмечен как не проведенный",
+      });
+    },
+    onError: (error: any) => {
+      // Показываем ошибку пользователю
+      toast({
+        title: "Ошибка",
+        description: "Не удалось обновить статус урока",
+        variant: "destructive",
+      });
+
+      // Если ошибка из-за того, что урок еще не закончился, показываем подробности
+      if (error.response) {
+        error.response.json().then((data: any) => {
+          if (data.message === "Cannot mark lesson as conducted before it ends") {
+            toast({
+              title: "Урок еще не закончился",
+              description: "Вы не можете отметить урок как проведенный до его окончания",
+              variant: "destructive",
+            });
+          }
+        }).catch(() => {});
+      }
+    }
+  });
+  
+  // Mutation to delete grade
+  const deleteGradeMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest(`/api/grades/${id}`, "DELETE");
+      return res.json();
+    },
+    onMutate: async (id) => {
+      // Отменяем исходящие запросы
+      await queryClient.cancelQueries({ queryKey: ["/api/grades"] });
+      
+      // Сохраняем предыдущее состояние
+      const previousGrades = queryClient.getQueryData<Grade[]>(["/api/grades"]) || [];
+      const previousGradesWithFilter = queryClient.getQueryData<Grade[]>(["/api/grades", { classId, subjectId }]) || [];
+      
+      // Функция фильтрации для удаления оценки
+      const filterGradeData = (oldData: Grade[] = []) => {
+        return oldData.filter(grade => grade.id !== id);
+      };
+      
+      // Оптимистично обновляем кеш удаляя оценку из обоих запросов
+      queryClient.setQueryData<Grade[]>(["/api/grades"], filterGradeData);
+      queryClient.setQueryData<Grade[]>(["/api/grades", { classId, subjectId }], filterGradeData);
+      
+      return { previousGrades, previousGradesWithFilter };
+    },
+    onSuccess: () => {
+      // Обновляем все запросы связанные с оценками
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades"]
+      });
+      
+      // Инвалидируем запрос с конкретными параметрами класса и предмета (для основного журнала)
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId }]
+      });
+      
+      // Если оценка удалена в подгруппе, инвалидируем запрос этой подгруппы
+      if (subgroupId) {
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/grades", { classId, subjectId, subgroupId }]
+        });
+      }
+      
+      console.log("Запрос данных обновлен после удаления оценки:", { 
+        classId, 
+        subjectId, 
+        subgroupId
+      });
+      
+      toast({
+        title: "Оценка удалена",
+        description: "Оценка успешно удалена из журнала",
+      });
+    },
+    onError: (error, id, context) => {
+      // При ошибке возвращаем предыдущее состояние
+      if (context?.previousGrades) {
+        queryClient.setQueryData(["/api/grades"], context.previousGrades);
+      }
+      if (context?.previousGradesWithFilter) {
+        queryClient.setQueryData(["/api/grades", { classId, subjectId }], context.previousGradesWithFilter);
+      }
+      
+      toast({
+        title: "Ошибка",
+        description: "Не удалось удалить оценку. Попробуйте позже.",
         variant: "destructive",
       });
     },
+    onSettled: () => {
+      // Добавляем дополнительную инвалидацию для запроса с параметрами подгруппы
+      queryClient.invalidateQueries({ queryKey: ["/api/grades"] });
+      
+      // Явно инвалидируем запрос с параметрами для текущего класса, предмета и подгруппы
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/grades", { classId, subjectId, subgroupId }] 
+      });
+      
+      console.log("Запрос данных после удаления оценки:", { classId, subjectId, subgroupId });
+    },
   });
   
-  // Edit existing grade
+  // Function to get schedule by its ID
+  const getScheduleById = (scheduleId: number) => {
+    return schedules.find(s => s.id === scheduleId);
+  };
+  
+  // Open schedule status dialog
+  const openStatusDialog = (scheduleId: number) => {
+    const schedule = getScheduleById(scheduleId);
+    if (schedule) {
+      setSelectedSchedule(schedule);
+      setIsStatusDialogOpen(true);
+    }
+  };
+  
+  // Handle schedule status update
+  const handleScheduleStatusUpdate = (status: string) => {
+    if (!selectedSchedule) return;
+    
+    updateScheduleStatusMutation.mutate({
+      scheduleId: selectedSchedule.id,
+      status
+    });
+  };
+  
+  // Функция для обработки выбора действия в контекстном диалоге
+  const handleContextAction = (action: 'status' | 'assignment' | 'attendance') => {
+    if (!selectedSchedule) return;
+    
+    // Закрываем контекстный диалог
+    setIsContextDialogOpen(false);
+    
+    // Открываем соответствующий диалог в зависимости от выбранного действия
+    if (action === 'status') {
+      openStatusDialog(selectedSchedule.id);
+    } else if (action === 'assignment') {
+      openAssignmentDialog(selectedSchedule.id);
+    } else if (action === 'attendance') {
+      // Проверяем, что урок проведен
+      if (selectedSchedule.status === 'conducted') {
+        setIsAttendanceDialogOpen(true);
+      } else {
+        toast({
+          title: "Ошибка",
+          description: "Отметка посещаемости доступна только для проведенных уроков",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+  
+  // Open dialog to create a new assignment
+  const openAssignmentDialog = (scheduleId?: number) => {
+    // Сбрасываем информацию о редактировании задания
+    setEditingAssignmentId(null);
+    setSelectedAssignmentForEdit(null);
+    
+    // Если передан ID урока, находим его в списке
+    if (scheduleId) {
+      const schedule = getScheduleById(scheduleId);
+      if (schedule) {
+        // Убрана проверка статуса урока - теперь можно добавлять задания для любых уроков
+        setSelectedSchedule(schedule);
+      }
+    } else {
+      setSelectedSchedule(null);
+    }
+    
+    // Сбрасываем форму и устанавливаем значения по умолчанию
+    assignmentForm.reset({
+      assignmentType: undefined,
+      maxScore: "",
+      description: "",
+      scheduleId: scheduleId || undefined,
+      subjectId: subjectId,
+      classId: classId,
+      teacherId: user?.id,
+      subgroupId: subgroupId || undefined,
+    });
+    
+    setIsAssignmentDialogOpen(true);
+  };
+  
+  // Open dialog to edit an existing assignment
+  const openEditAssignmentDialog = (assignment: Assignment) => {
+    setEditingAssignmentId(assignment.id);
+    setSelectedAssignmentForEdit(assignment);
+    
+    // Находим урок, к которому привязано задание
+    if (assignment.scheduleId) {
+      const schedule = getScheduleById(assignment.scheduleId);
+      if (schedule) {
+        setSelectedSchedule(schedule);
+      }
+    }
+    
+    // Заполняем форму данными задания
+    assignmentForm.reset({
+      assignmentType: assignment.assignmentType as any,
+      maxScore: assignment.maxScore.toString(),
+      description: assignment.description || "",
+      scheduleId: assignment.scheduleId || undefined,
+      subjectId: assignment.subjectId,
+      classId: assignment.classId,
+      teacherId: assignment.teacherId,
+      subgroupId: assignment.subgroupId || undefined,
+    });
+    
+    setIsAssignmentDialogOpen(true);
+  };
+  
+  // Handle assignment deletion
+  const handleDeleteAssignment = (id: number) => {
+    if (window.confirm("Вы действительно хотите удалить задание? Все оценки, связанные с этим заданием, будут удалены.")) {
+      deleteAssignmentMutation.mutate(id);
+    }
+  };
+  
+  // Open grade dialog to edit existing grade
   const openEditGradeDialog = (grade: Grade) => {
     setSelectedStudentId(grade.studentId);
     setSelectedDate(null);
     setEditingGradeId(grade.id);
     
     // Если есть scheduleId и в накопительной системе, нужно найти задание
-    if (grade.scheduleId && classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && grade.assignmentId) {
-      setSelectedAssignmentId(grade.assignmentId);
+    if (grade.scheduleId && classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+      // Ищем урок
+      const slot = lessonSlots.find(slot => slot.scheduleId === grade.scheduleId);
+      
+      if (slot && slot.assignments && slot.assignments.length > 0) {
+        // Если есть привязка к заданию, используем ее
+        if ('assignmentId' in grade && grade.assignmentId) {
+          const assignment = slot.assignments.find(a => a.id === grade.assignmentId);
+          if (assignment) {
+            setSelectedAssignment(assignment);
+            setSelectedAssignmentId(assignment.id);
+          }
+        } 
+        // Иначе берем первое задание (для обратной совместимости)
+        else if (slot.assignments.length > 0) {
+          setSelectedAssignment(slot.assignments[0]);
+          setSelectedAssignmentId(slot.assignments[0].id);
+        }
+      }
     } else {
+      // Сбрасываем выбранное задание
+      setSelectedAssignment(null);
       setSelectedAssignmentId(null);
     }
     
-    // Устанавливаем значения формы
+    // Сбрасываем и заполняем форму данными существующей оценки
     gradeForm.reset({
       studentId: grade.studentId,
       grade: grade.grade,
+      comment: grade.comment || "", // Преобразуем null в пустую строку для полей формы
       gradeType: grade.gradeType,
-      comment: grade.comment || '',
-      classId: classId,
-      subjectId: subjectId,
-      teacherId: user?.id,
-      // В модели Grade нет поля date, но оно может приходить от API
+      subjectId: grade.subjectId,
+      classId: grade.classId,
+      teacherId: grade.teacherId,
       scheduleId: grade.scheduleId || null,
-      subgroupId: grade.subgroupId || subgroupId,
-      assignmentId: grade.assignmentId || null,
+      subgroupId: grade.subgroupId || null, // Важно! Сохраняем связь с подгруппой при редактировании
+      assignmentId: 'assignmentId' in grade ? grade.assignmentId : null, // Для накопительной системы
     });
     
     setIsGradeDialogOpen(true);
@@ -921,826 +1176,749 @@ export default function ClassGradeDetailsPage() {
     setSelectedDate(date || null);
     setEditingGradeId(null);
     
-    // Для накопительной системы, если есть scheduleId, нужно найти возможные задания
-    let assignmentId = null;
+    // Сбросим выбранное задание
+    setSelectedAssignment(null);
+    setSelectedAssignmentId(null);
     
-    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && scheduleId) {
-      const scheduleAssignments = assignments.filter(a => a.scheduleId === scheduleId);
+    // Убираем ограничение для добавления заданий на непроведенные уроки
+    // Теперь учитель может добавлять задания на любые уроки, включая непроведенные
+    let canAddGrade = true;
+    
+    // Оставляем ссылку на расписание, чтобы использовать её в форме для установки статуса "plannedFor"
+    const schedule = scheduleId ? getScheduleById(scheduleId) : null;
+    
+    if (canAddGrade) {
+      // Сбрасываем форму и устанавливаем значения по умолчанию
+      gradeForm.reset({
+        studentId: studentId,
+        grade: undefined,
+        comment: "",
+        gradeType: "Текущая",
+        subjectId: subjectId,
+        classId: classId,
+        teacherId: user?.id,
+        date: date || null,
+        scheduleId: scheduleId || null,
+        subgroupId: subgroupId || null, // Важно! Сохраняем связь с подгруппой при создании новой оценки
+        assignmentId: null, // Сбрасываем ID задания
+      });
       
-      // Если есть только одно задание для этого урока, автоматически выбираем его
-      if (scheduleAssignments.length === 1) {
-        assignmentId = scheduleAssignments[0].id;
-        setSelectedAssignmentId(assignmentId);
-      } else {
-        // Сбросим выбранное задание, если задач несколько
-        setSelectedAssignmentId(null);
-      }
-    } else {
-      // Сбросим выбранное задание
-      setSelectedAssignmentId(null);
+      setIsGradeDialogOpen(true);
     }
-    
-    // Устанавливаем значения формы
-    gradeForm.reset({
-      studentId,
-      classId,
-      subjectId,
-      teacherId: user?.id,
-      gradeType: assignmentId ? (assignments.find(a => a.id === assignmentId)?.assignmentType || "classwork") : "classwork",
-      comment: '',
-      date,
-      scheduleId: scheduleId || null,
-      subgroupId,
-      assignmentId: assignmentId,
-    });
-    
-    setIsGradeDialogOpen(true);
   };
   
   // Handle grade form submission
-  const onGradeSubmit = (data: z.infer<ReturnType<typeof getGradeFormSchema>>) => {
-    // Если используется накопительная система и есть задание, проверим ограничение на максимальный балл
-    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && data.assignmentId) {
-      const assignment = assignments.find(a => a.id === data.assignmentId);
-      
-      // Всегда проверяем максимальный балл
-      if (assignment) {
-        const maxScore = parseInt(assignment.maxScore);
-        
-        if (data.grade > maxScore) {
-          // Если оценка превышает максимальный балл, автоматически корректируем её
-          const correctedData = {
-            ...data,
-            grade: maxScore
-          };
-          
-          toast({
-            title: "Оценка скорректирована",
-            description: `Оценка была автоматически снижена до максимального балла (${maxScore})`,
-          });
-          
-          if (editingGradeId) {
-            // Updating existing grade with corrected data
-            updateGradeMutation.mutate({ id: editingGradeId, data: correctedData });
-          } else {
-            // Creating new grade with corrected data
-            addGradeMutation.mutate(correctedData);
-          }
-          return;
-        }
-      } else {
-        console.error("Задание не найдено при сохранении оценки. AssignmentId:", data.assignmentId);
-        
-        // Уведомляем пользователя об ошибке
-        toast({
-          title: "Ошибка при сохранении оценки",
-          description: "Выбранное задание не найдено. Пожалуйста, выберите другое задание.",
-          variant: "destructive"
-        });
-        return;
-      }
-    } else if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && !data.assignmentId) {
-      // Если накопительная система, но не выбрано задание - это ошибка
-      toast({
-        title: "Ошибка при сохранении оценки",
-        description: "Для накопительной системы оценок необходимо выбрать задание.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // Если не нужна коррекция или это не накопительная система
+  const onGradeSubmit = (data: z.infer<typeof gradeFormSchema>) => {
     if (editingGradeId) {
       // Updating existing grade
-      updateGradeMutation.mutate({ id: editingGradeId, data });
+      updateGradeMutation.mutate({
+        id: editingGradeId, 
+        data
+      });
     } else {
-      // Creating new grade
-      addGradeMutation.mutate(data);
+      // Проверяем, существует ли уже оценка для данного ученика и задания
+      const studentId = data.studentId;
+      const assignmentId = data.assignmentId;
+      const scheduleId = data.scheduleId;
+      
+      // Проверяем, не пытаемся ли мы выставить оценку за запланированное задание 
+      // в непроведенном уроке
+      if (assignmentId) {
+        const assignment = assignments.find(a => a.id === assignmentId);
+        const schedule = schedules.find(s => s.id === scheduleId);
+        
+        if (assignment?.plannedFor && schedule?.status !== 'conducted') {
+          toast({
+            title: "Ошибка",
+            description: "Невозможно выставить оценку за запланированное задание, пока урок не проведен",
+            variant: "destructive"
+          });
+          return; // Прерываем выполнение функции
+        }
+      }
+      
+      // Если у нас есть scheduleId и assignmentId и урок проведен, проверяем на дублирование
+      if (assignmentId && scheduleId) {
+        const schedule = lessonSlots.find(s => s.scheduleId === scheduleId);
+        const isConducted = schedule?.status === "conducted";
+        
+        if (isConducted) {
+          const existingGrade = grades.find(g => 
+            g.studentId === studentId && 
+            g.assignmentId === assignmentId
+          );
+          
+          if (existingGrade) {
+            toast({
+              title: "Оценка уже существует",
+              description: "Для этого ученика уже выставлена оценка за данное задание. Отредактируйте существующую оценку.",
+              variant: "destructive",
+            });
+            return; // Прерываем выполнение функции
+          }
+        }
+      }
+      
+      // Adding new grade - обеспечиваем, что scheduleId, assignmentId и subgroupId всегда будут корректно установлены,
+      // так как это критически важно для правильного отображения оценок в журналах
+      const finalData = {
+        ...data,
+        scheduleId: data.scheduleId || null,
+        subgroupId: data.subgroupId || null, // Сохраняем связь с подгруппой
+        assignmentId: data.assignmentId || null // Для накопительной системы - ID задания
+      };
+      addGradeMutation.mutate(finalData);
     }
   };
   
   // Handle grade deletion
   const handleDeleteGrade = (id: number) => {
-    if (confirm('Вы уверены, что хотите удалить эту оценку?')) {
+    if (window.confirm("Вы действительно хотите удалить оценку?")) {
       deleteGradeMutation.mutate(id);
     }
   };
   
-  // Open assignment dialog
-  const openAssignmentDialog = (scheduleId: number) => {
-    setEditingAssignmentId(null);
-    setSelectedAssignmentForEdit(null);
-    
-    // Получаем расписание
-    const schedule = schedules.find(s => s.id === scheduleId);
-    
-    if (schedule) {
-      const assignmentForm = document.getElementById('assignment-form') as HTMLFormElement;
-      if (assignmentForm) {
-        assignmentForm.reset();
-      }
-      
-      setIsAssignmentDialogOpen(true);
-      
-      // Делаем небольшую задержку, чтобы убедиться, что форма открылась и элементы существуют
-      setTimeout(() => {
-        // Заполняем скрытые поля формы
-        const scheduleIdInput = document.getElementById('assignment-scheduleId') as HTMLInputElement;
-        
-        if (scheduleIdInput) {
-          scheduleIdInput.value = schedule.id.toString();
-          console.log("scheduleId установлен:", schedule.id);
-        } else {
-          console.error("scheduleIdInput элемент не найден в форме задания");
-        }
-        
-        const classIdInput = document.getElementById('assignment-classId') as HTMLInputElement;
-        const subjectIdInput = document.getElementById('assignment-subjectId') as HTMLInputElement;
-        const teacherIdInput = document.getElementById('assignment-teacherId') as HTMLInputElement;
-        const subgroupIdInput = document.getElementById('assignment-subgroupId') as HTMLInputElement;
-        
-        if (classIdInput) classIdInput.value = classId.toString();
-        if (subjectIdInput) subjectIdInput.value = subjectId.toString();
-        if (teacherIdInput) teacherIdInput.value = (user?.id || 0).toString();
-        if (subgroupIdInput && schedule.subgroupId) subgroupIdInput.value = schedule.subgroupId.toString();
-      }, 100);
-    } else {
-      toast({
-        title: "Ошибка",
-        description: "Не удалось найти расписание для добавления задания",
-        variant: "destructive",
-      });
-    }
+  // Function to format date as "DD Month" (e.g. "15 марта")
+  const formatFullDate = (dateString: string) => {
+    return format(new Date(dateString), "d MMMM", { locale: ru });
   };
   
-  // Open assignment edit dialog
-  const openEditAssignmentDialog = (assignment: Assignment) => {
-    setEditingAssignmentId(assignment.id);
-    setSelectedAssignmentForEdit(assignment);
+  // Get all grades for a specific student and schedule slot
+  const getStudentGradeForSlot = (studentId: number, slot: { date: string, scheduleId: number }, allGrades: Grade[]) => {
+    // Фильтруем оценки для конкретного ученика
+    const studentGrades = allGrades.filter(g => g.studentId === studentId);
     
-    const assignmentForm = document.getElementById('assignment-form') as HTMLFormElement;
-    if (assignmentForm) {
-      // Заполняем поля формы
-      const assignmentTypeInput = document.getElementById('assignment-type') as HTMLSelectElement;
-      const maxScoreInput = document.getElementById('assignment-maxScore') as HTMLInputElement;
-      const descriptionInput = document.getElementById('assignment-description') as HTMLTextAreaElement;
-      const plannedForInput = document.getElementById('assignment-plannedFor') as HTMLInputElement;
-      
-      if (assignmentTypeInput) assignmentTypeInput.value = assignment.assignmentType;
-      if (maxScoreInput) maxScoreInput.value = assignment.maxScore.toString();
-      if (descriptionInput) descriptionInput.value = assignment.description || '';
-      if (plannedForInput) plannedForInput.checked = assignment.plannedFor || false;
-      
-      // Заполняем скрытые поля формы
-      const scheduleIdInput = document.getElementById('assignment-scheduleId') as HTMLInputElement;
-      const classIdInput = document.getElementById('assignment-classId') as HTMLInputElement;
-      const subjectIdInput = document.getElementById('assignment-subjectId') as HTMLInputElement;
-      const teacherIdInput = document.getElementById('assignment-teacherId') as HTMLInputElement;
-      const subgroupIdInput = document.getElementById('assignment-subgroupId') as HTMLInputElement;
-      
-      if (scheduleIdInput) scheduleIdInput.value = assignment.scheduleId.toString();
-      if (classIdInput) classIdInput.value = assignment.classId.toString();
-      if (subjectIdInput) subjectIdInput.value = assignment.subjectId.toString();
-      if (teacherIdInput) teacherIdInput.value = assignment.teacherId.toString();
-      if (subgroupIdInput && assignment.subgroupId) subgroupIdInput.value = assignment.subgroupId.toString();
-    }
-    
-    setIsAssignmentDialogOpen(true);
-  };
-  
-  // Handle assignment form submission
-  const onAssignmentSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    
-    const formData = new FormData(event.currentTarget);
-    const assignmentTypeValue = formData.get('assignmentType') as string;
-    
-    // Проверка корректности типа задания
-    if (!Object.values(AssignmentTypeEnum).includes(assignmentTypeValue as AssignmentTypeEnum)) {
-      toast({
-        title: "Ошибка при добавлении задания",
-        description: "Неправильный тип задания",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Проверка обязательных значений
-    const scheduleIdValue = formData.get('scheduleId');
-    if (!scheduleIdValue) {
-      toast({
-        title: "Ошибка при добавлении задания",
-        description: "Не указан ID урока (scheduleId)",
-        variant: "destructive",
-      });
-      console.error("scheduleId отсутствует в форме");
-      return;
-    }
-    
-    // Создаем правильно типизированные данные
-    const data = {
-      assignmentType: assignmentTypeValue as AssignmentTypeEnum,
-      maxScore: formData.get('maxScore') as string,
-      description: formData.get('description') as string || "",
-      scheduleId: parseInt(scheduleIdValue as string),
-      classId: parseInt(formData.get('classId') as string),
-      subjectId: parseInt(formData.get('subjectId') as string),
-      teacherId: parseInt(formData.get('teacherId') as string),
-      subgroupId: formData.get('subgroupId') ? parseInt(formData.get('subgroupId') as string) : null,
-      plannedFor: formData.get('plannedFor') === 'on',
-    };
-    
-    console.log("Отправка данных задания:", data);
-    
-    if (editingAssignmentId) {
-      // Updating existing assignment
-      updateAssignmentMutation.mutate({ id: editingAssignmentId, data });
-    } else {
-      // Creating new assignment
-      addAssignmentMutation.mutate(data as z.infer<typeof assignmentFormSchema>);
-    }
-  };
-  
-  // Handle assignment deletion
-  const handleDeleteAssignment = (id: number) => {
-    if (confirm('Вы уверены, что хотите удалить это задание? Все связанные оценки также будут удалены.')) {
-      deleteAssignmentMutation.mutate(id);
-    }
-  };
-  
-  // Open dialog to change lesson status
-  const openLessonStatusDialog = (schedule: Schedule) => {
-    setSelectedSchedule(schedule);
-    setIsStatusDialogOpen(true);
-  };
-  
-  // Handle schedule status update
-  const handleScheduleStatusUpdate = (status: string) => {
-    if (selectedSchedule) {
-      updateScheduleStatusMutation.mutate({ id: selectedSchedule.id, status });
-    }
-  };
-  
-  // Function to check if a new grade can be added to a lesson
-  const canAddGradeToLesson = (scheduleId: number, slot: LessonSlot) => {
-    // Проверяем, проведен ли урок. Оценки можно выставлять только за проведенные уроки
-    if (slot.status !== 'conducted') {
-      return false;
-    }
-    
-    // В накопительной системе, можно добавлять оценки только если есть задания для проведенного урока
-    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      return slot.assignments && slot.assignments.length > 0;
-    }
-    
-    // В обычной системе можно добавлять оценки к любому проведенному уроку
-    return true;
-  };
-  
-  // Function to check if a student already has a grade for a specific assignment
-  const hasStudentGradeForAssignment = (studentId: number, assignmentId: number): boolean => {
-    if (!filteredGrades) return false;
-    
-    return filteredGrades.some(g => 
-      g.studentId === studentId && 
-      g.assignmentId === assignmentId
+    // Проверяем оценки - теперь только те, которые привязаны к конкретному scheduleId
+    return studentGrades.filter(g => 
+      // Проверяем только оценки, привязанные к конкретному уроку по scheduleId
+      g.scheduleId === slot.scheduleId
     );
   };
   
-  // Function to check if a student has at least one available assignment without a grade
-  const hasAvailableAssignmentsForGrading = (studentId: number, slot: LessonSlot): boolean => {
-    // Если это не накопительная система, то всегда можно добавить оценку
-    if (classData?.gradingSystem !== GradingSystemEnum.CUMULATIVE) {
+  // Функция для получения читаемого названия типа оценки
+  const getGradeTypeName = (gradeType: string): string => {
+    const gradeTypes: Record<string, string> = {
+      'test': 'Контрольная работа',
+      'exam': 'Экзамен',
+      'homework': 'Домашняя работа',
+      'project': 'Проект',
+      'classwork': 'Классная работа',
+      'Текущая': 'Текущая оценка',
+      'Контрольная': 'Контрольная работа',
+      'Экзамен': 'Экзамен',
+      'Практическая': 'Практическая работа',
+      'Домашняя': 'Домашняя работа'
+    };
+    
+    return gradeTypes[gradeType] || gradeType;
+  };
+
+  // Фильтрация оценок в зависимости от подгруппы
+  const filteredGrades = useMemo(() => {
+    // Защита от пустых данных
+    if (!grades || !grades.length) {
+      return [];
+    }
+    
+    // Логируем для отладки
+    console.log("Фильтрация оценок:", {
+      subgroupId,
+      gradeCount: grades.length,
+      scheduleCount: schedules.length,
+      subjectId,
+      studentSubgroupCount: studentSubgroups.length
+    });
+    
+    // Если выбрана конкретная подгруппа (просмотр журнала подгруппы)
+    if (subgroupId) {
+      // 1. Получаем ID студентов этой подгруппы
+      const subgroupStudentIds = studentSubgroups
+        .filter(ss => ss.subgroupId === subgroupId)
+        .map(ss => ss.studentId);
+      
+      console.log(`Студенты в подгруппе ${subgroupId}:`, subgroupStudentIds);
+      
+      // 2. Получаем все расписания (уроки) для этой подгруппы
+      const subgroupScheduleIds = schedules
+        .filter(schedule => schedule.subgroupId === subgroupId)
+        .map(schedule => schedule.id);
+      
+      console.log(`Расписания для подгруппы ${subgroupId}:`, subgroupScheduleIds);
+      
+      // 3. Фильтруем оценки только для этой подгруппы
+      const result = grades.filter(grade => {
+        // Базовая проверка - оценка должна быть для этого предмета
+        if (grade.subjectId !== subjectId) {
+          return false;
+        }
+        
+        // Используем два основных критерия проверки:
+        
+        // КРИТЕРИЙ 1: Оценка привязана к уроку этой конкретной подгруппы
+        const isLinkedToSubgroupSchedule = grade.scheduleId && 
+                                           subgroupScheduleIds.includes(grade.scheduleId);
+        
+        if (isLinkedToSubgroupSchedule) {
+          return true; // Это главный критерий - показываем такие оценки всегда
+        }
+        
+        // КРИТЕРИЙ 2: Студент в этой подгруппе и оценка либо:
+        // - явно маркирована этой подгруппой через subgroupId
+        // - не привязана ни к какому расписанию вообще (общая оценка)
+        if (subgroupStudentIds.includes(grade.studentId)) {
+          // Есть явная метка подгруппы, и это именно наша подгруппа
+          if (grade.subgroupId === subgroupId) {
+            return true;
+          }
+          
+          // Оценка без привязки к расписанию, но студент в нашей подгруппе
+          // Показываем ТОЛЬКО если нет явной привязки к другой подгруппе
+          if (!grade.scheduleId && grade.subgroupId === null) {
+            return true;
+          }
+        }
+        
+        return false;
+      });
+      
+      console.log(`Отфильтровано ${result.length} оценок для подгруппы ${subgroupId}`);
+      return result;
+    } 
+    // Если просматриваем журнал основного предмета (не подгруппы)
+    else {
+      // 1. Собираем все ID подгрупп, связанных с этим предметом
+      const relatedSubgroupIds = schedules
+        .filter(schedule => 
+          schedule.subjectId === subjectId && 
+          schedule.subgroupId !== null
+        )
+        .map(schedule => schedule.subgroupId)
+        .filter((id): id is number => id !== null);
+      
+      // Убираем дубликаты, если есть
+      const uniqueSubgroupIds = [...new Set(relatedSubgroupIds)];
+      console.log(`Подгруппы для предмета ${subjectId}:`, uniqueSubgroupIds);
+      
+      // 2. Собираем все расписания (уроки) этих подгрупп
+      const subgroupScheduleIds = schedules
+        .filter(schedule => 
+          schedule.subjectId === subjectId && 
+          schedule.subgroupId !== null
+        )
+        .map(schedule => schedule.id);
+      
+      console.log(`Расписания подгрупп предмета ${subjectId}:`, subgroupScheduleIds);
+      
+      // 3. Собираем ID студентов, входящих в эти подгруппы
+      const subgroupStudentIds = new Set<number>();
+      
+      // Обрабатываем каждую подгруппу связанную с этим предметом
+      uniqueSubgroupIds.forEach(sgId => {
+        const studentsInSubgroup = studentSubgroups
+          .filter(ss => ss.subgroupId === sgId)
+          .map(ss => ss.studentId);
+        
+        studentsInSubgroup.forEach(id => subgroupStudentIds.add(id));
+      });
+      
+      console.log(`Студенты в подгруппах предмета ${subjectId}:`, [...subgroupStudentIds]);
+      
+      // 4. Фильтруем оценки для основного предмета, исключая подгруппы
+      const result = grades.filter(grade => {
+        // Базовая проверка - оценка должна быть для этого предмета
+        if (grade.subjectId !== subjectId) {
+          return false;
+        }
+        
+        // КРИТЕРИЙ 1: Оценка не должна быть связана с уроком в подгруппе
+        if (grade.scheduleId && subgroupScheduleIds.includes(grade.scheduleId)) {
+          return false; // Оценка связана с уроком подгруппы, не показываем в основном журнале
+        }
+        
+        // КРИТЕРИЙ 2: Оценка не должна быть явно помечена как оценка подгруппы
+        if (grade.subgroupId !== null && uniqueSubgroupIds.includes(grade.subgroupId)) {
+          return false; // Явная метка подгруппы, не показываем в основном журнале
+        }
+        
+        // КРИТЕРИЙ 3: Если студент состоит в подгруппе по этому предмету,
+        // то не показываем его оценки без расписания в основном журнале
+        // (они должны быть только в журнале подгруппы)
+        if (subgroupStudentIds.has(grade.studentId) && !grade.scheduleId) {
+          return false;
+        }
+        
+        // В остальных случаях показываем оценку в основном журнале
+        return true;
+      });
+      
+      console.log(`Отфильтровано ${result.length} оценок для основного предмета ${subjectId}`);
+      return result;
+    }
+  }, [grades, subgroupId, schedules, filteredStudents, subjectId, studentSubgroups]);
+
+  // Calculate average grade for a student with weight based on grade type
+  const calculateAverageGrade = (studentId: number) => {
+    const studentGrades = filteredGrades.filter(g => g.studentId === studentId);
+    if (studentGrades.length === 0) return "-";
+    
+    // Если используется накопительная система оценивания
+    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+      // Для накопительной системы используем другой алгоритм расчета
+      // Считаем сумму полученных баллов и максимально возможных для всех заданий
+      
+      let totalEarnedScore = 0;
+      let totalMaxScore = 0;
+      
+      // Для каждой оценки находим соответствующее задание, чтобы получить максимальный балл
+      studentGrades.forEach(grade => {
+        // Находим урок, на который эта оценка
+        const slot = lessonSlots.find(slot => slot.scheduleId === grade.scheduleId);
+        if (slot && slot.assignments && slot.assignments.length > 0) {
+          // Если нет конкретной связи с заданием, берем первое задание урока
+          const assignmentId = grade.assignmentId || slot.assignments[0].id;
+          
+          // Находим задание с соответствующим ID
+          const assignment = slot.assignments.find(a => a.id === assignmentId);
+          
+          if (assignment) {
+            // Если нашли задание, добавляем баллы
+            totalEarnedScore += grade.grade;
+            totalMaxScore += Number(assignment.maxScore);
+          }
+        }
+      });
+      
+      // Если нет максимального балла, возвращаем прочерк
+      if (totalMaxScore === 0) return "-";
+      
+      // Вычисляем процент выполнения и форматируем его
+      const percentage = (totalEarnedScore / totalMaxScore) * 100;
+      return `${percentage.toFixed(1)}%`;
+    } else {
+      // Для пятибалльной системы оценивания - используем старый алгоритм с весами
+      
+      // Весовые коэффициенты для разных типов оценок
+      const weights: Record<string, number> = {
+        'test': 2,
+        'exam': 3,
+        'homework': 1,
+        'project': 2,
+        'classwork': 1,
+        'Текущая': 1,
+        'Контрольная': 2,
+        'Экзамен': 3,
+        'Практическая': 1.5,
+        'Домашняя': 1
+      };
+      
+      let weightedSum = 0;
+      let totalWeight = 0;
+      
+      studentGrades.forEach(grade => {
+        const weight = weights[grade.gradeType] || 1;
+        weightedSum += grade.grade * weight;
+        totalWeight += weight;
+      });
+      
+      // Если нет оценок с весами, возвращаем "-"
+      if (totalWeight === 0) return "-";
+      
+      const average = weightedSum / totalWeight;
+      return average.toFixed(1);
+    }
+  };
+  
+  // Determine if a lesson is conducted
+  const isLessonConducted = (scheduleId: number) => {
+    const schedule = schedules.find(s => s.id === scheduleId);
+    return schedule?.status === 'conducted';
+  };
+  
+  // Проверяет, можно ли добавить оценку для урока в накопительной системе
+  const canAddGradeToLesson = (scheduleId: number, slot: LessonSlot) => {
+    // Для пятибалльной системы больше не требуется, чтобы урок был проведен
+    if (!classData || classData.gradingSystem !== GradingSystemEnum.CUMULATIVE) {
+      // Убрана проверка statusa урока - можно добавлять оценки на любой урок
       return true;
     }
     
-    // Если нет заданий, нельзя добавить оценку
-    if (!slot.assignments || slot.assignments.length === 0) {
-      return false;
-    }
-    
-    // Проверяем, есть ли хотя бы одно задание без оценки
-    return slot.assignments.some(assignment => 
-      !hasStudentGradeForAssignment(studentId, assignment.id)
-    );
+    // Для накопительной системы важно, чтобы были задания, но не требуется, чтобы урок был проведен
+    // Это позволяет добавлять задания и для непроведенных уроков
+    return slot.assignments && slot.assignments.length > 0;
   };
   
-  // Handle header click to show context menu or open assignment dialog
+  // Функция для определения должен ли клик по заголовку колонки открыть диалог статуса или диалог добавления задания
   const handleHeaderClick = (slot: LessonSlot) => {
-    // Если это накопительная система, открываем диалог добавления задания
-    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && canEditGrades) {
-      openAssignmentDialog(slot.scheduleId);
-    }
+    if (!canEditGrades) return;
+    
+    // Находим урок и проверяем его статус
+    const schedule = getScheduleById(slot.scheduleId);
+    if (!schedule) return;
+    
+    // Открываем диалог с выбором действия (просмотр/изменение статуса или добавление задания)
+    // Используем контекстное меню или диалог с выбором
+    setSelectedSchedule(schedule);
+    setIsContextDialogOpen(true);
   };
   
-  // Open dialog to view and mark attendance
-  const openAttendanceDialog = (scheduleId: number) => {
-    const schedule = schedules.find(s => s.id === scheduleId);
-    if (schedule) {
-      setSelectedSchedule(schedule);
-      setIsAttendanceDialogOpen(true);
-    }
-  };
+  // Loading state
+  const isLoading = isClassLoading || isSubjectLoading || isStudentsLoading || isSchedulesLoading || isGradesLoading;
   
-  // Функция для экспорта данных в Excel (для демонстрации)
-  const exportToExcel = () => {
-    toast({
-      title: "Экспорт в Excel",
-      description: "Функция экспорта данных в Excel будет реализована в будущем.",
+  // Redirect if user is not logged in
+  useEffect(() => {
+    if (!user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
+  
+  // Функция экспорта данных таблицы в CSV
+  const exportToCSV = () => {
+    if (!classData || !subjectData || !filteredStudents.length) return;
+    
+    // Создаем заголовок таблицы
+    let csvContent = "Ученик,";
+    
+    // Добавляем даты уроков в заголовок
+    lessonSlots.forEach(slot => {
+      csvContent += `${slot.formattedDate},`;
     });
+    
+    csvContent += "Средний балл\n";
+    
+    // Добавляем данные по каждому ученику
+    filteredStudents.forEach(student => {
+      const studentName = `${student.lastName} ${student.firstName}`;
+      csvContent += `${studentName},`;
+      
+      // Добавляем оценки по каждому уроку
+      lessonSlots.forEach(slot => {
+        const grades = getStudentGradeForSlot(student.id, slot, filteredGrades);
+        if (grades.length > 0) {
+          // Если есть несколько оценок для одного урока, разделяем их точкой с запятой
+          csvContent += grades.map(g => g.grade).join(";");
+        }
+        csvContent += ",";
+      });
+      
+      // Добавляем средний балл
+      csvContent += calculateAverageGrade(student.id) + "\n";
+    });
+    
+    // Создаем Blob для скачивания
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // Создаем временную ссылку для скачивания файла
+    const link = document.createElement("a");
+    const fileName = `Оценки_${subjectData?.name}_${classData?.name}_${new Date().toLocaleDateString()}.csv`;
+    
+    link.setAttribute("href", url);
+    link.setAttribute("download", fileName);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
-  
-  // Render
-  if (isClassLoading || isSubjectLoading) {
-    return (
-      <MainLayout>
-        <div className="flex h-full items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <span className="ml-2 text-lg">Загрузка данных...</span>
-        </div>
-      </MainLayout>
-    );
-  }
-  
+
   return (
     <MainLayout>
-      <div className="container mx-auto p-4">
-        {/* Page Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+      <div className="container mx-auto py-6 space-y-6">
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-3xl font-bold tracking-tight">
               Журнал оценок
+              {subgroupData ? (
+                <span className="text-emerald-600 ml-2">
+                  ({subgroupData.name})
+                </span>
+              ) : null}
             </h1>
-            <div className="mt-1 flex items-center space-x-2 text-muted-foreground">
-              <GraduationCapIcon className="h-4 w-4" />
-              <span>{classData?.name || 'Класс'}</span>
-              <span>•</span>
-              <BookOpenIcon className="h-4 w-4" />
-              <span>{subjectData?.name || 'Предмет'}</span>
-              {subgroupData && (
-                <>
-                  <span>•</span>
-                  <span className="text-yellow-600 font-medium">Подгруппа: {subgroupData.name}</span>
-                </>
-              )}
-            </div>
+            <p className="text-muted-foreground">
+              {subgroupData 
+                ? `Просмотр и редактирование оценок учеников подгруппы "${subgroupData.name}"`
+                : "Просмотр и редактирование оценок учеников класса"}
+            </p>
           </div>
-          
-          <div className="mt-4 md:mt-0 flex flex-col md:flex-row gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => navigate(`/dashboard`)}
+          <div className="flex gap-2">
+            {/* Показываем кнопку создания задания только если выбран накопительный тип оценивания */}
+            {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && canEditGrades && (
+              <Button
+                variant="default"
+                className="gap-2"
+                onClick={() => openAssignmentDialog()}
+                disabled={isLoading}
+              >
+                <PlusCircle className="h-4 w-4" />
+                Добавить задание
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={exportToCSV}
+              disabled={isLoading || !filteredStudents.length}
             >
-              Назад
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={exportToExcel}
-            >
-              <Download className="h-4 w-4 mr-2" />
+              <Download className="h-4 w-4" />
               Экспорт
             </Button>
           </div>
         </div>
         
-        {/* Main Content */}
-        {isGradesLoading || isStudentsLoading || isSchedulesLoading || 
-         (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && isAssignmentsLoading) ? (
-          <div className="flex h-48 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2 text-lg">Загрузка данных журнала...</span>
+        {isLoading ? (
+          <div className="flex justify-center items-center h-[300px]">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
           </div>
         ) : (
           <div className="space-y-6">
-            {/* If no slots found */}
-            {lessonSlots.length === 0 && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Нет уроков</AlertTitle>
-                <AlertDescription>
-                  Расписание для этого предмета и класса не найдено. Добавьте уроки в расписание.
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {lessonSlots.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>
-                    Оценки учеников
-                    {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && (
-                      <span className="ml-2 text-sm text-yellow-600 font-normal">
-                        (Накопительная система)
-                      </span>
-                    )}
+                  <CardTitle className="flex items-center gap-2">
+                    <GraduationCapIcon className="h-5 w-5" />
+                    Информация о классе
                   </CardTitle>
-                  <CardDescription>
-                    {subgroupData ? (
-                      <>
-                        Журнал оценок для подгруппы <span className="font-semibold">{subgroupData.name}</span> класса <span className="font-semibold">{classData?.name}</span> по предмету <span className="font-semibold">{subjectData?.name}</span>
-                      </>
-                    ) : (
-                      <>
-                        Журнал оценок класса <span className="font-semibold">{classData?.name}</span> по предмету <span className="font-semibold">{subjectData?.name}</span>
-                      </>
-                    )}
-                  </CardDescription>
                 </CardHeader>
-                <CardContent className="overflow-auto pb-6">
-                  <div className="overflow-auto">
-                    <Table className="min-w-[800px] border">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="min-w-[200px] bg-muted/50 sticky left-0 z-10">
-                            Ученик
-                          </TableHead>
-                          {lessonSlots.map((slot) => {
-                            const hasAssignments = slot.assignments && slot.assignments.length > 0;
-                            const isLessonConducted = slot.status === 'conducted';
-                            
-                            return (
-                              <TableHead 
-                                key={`${slot.date}-${slot.scheduleId}`} 
-                                className={`text-center min-w-[100px] ${isLessonConducted ? 'bg-green-50' : ''}`}
-                              >
-                                <div className="flex flex-col items-center">
-                                  <button 
-                                    className="flex flex-col items-center hover:bg-muted/30 p-1 rounded-md w-full"
-                                    onClick={() => handleHeaderClick(slot)}
-                                    title={isLessonConducted ? "Открыть меню урока" : "Изменить статус урока"}
-                                  >
-                                    <div className="flex items-center font-medium">
-                                      {slot.formattedDate}
-                                      {isLessonConducted && (
-                                        <span className="ml-1 text-green-600">
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                          </svg>
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {slot.startTime ? slot.startTime.slice(0, 5) : '-'}
-                                    </div>
-                                  </button>
-                                  
-                                  {/* Assignments for this slot */}
-                                  {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && hasAssignments && (
-                                    <div className="mt-1 flex flex-wrap gap-1 justify-center">
-                                      {slot.assignments?.map((assignment) => (
-                                        <span 
-                                          key={assignment.id}
-                                          className={`inline-block text-xs px-1.5 py-0.5 rounded cursor-pointer ${getAssignmentTypeColor(assignment.assignmentType)}`}
-                                          title={`${getAssignmentTypeName(assignment.assignmentType)} (максимум ${assignment.maxScore} баллов)`}
-                                          onClick={() => openEditAssignmentDialog(assignment)}
-                                        >
-                                          {getAssignmentTypeName(assignment.assignmentType).slice(0, 1)}
-                                          {assignment.maxScore}
-                                        </span>
-                                      ))}
-                                      
-                                      {canEditGrades && (
-                                        <button 
-                                          className="inline-block text-xs px-1 rounded-full bg-muted hover:bg-muted-foreground/20"
-                                          onClick={() => openAssignmentDialog(slot.scheduleId)}
-                                          title="Добавить задание"
-                                        >
-                                          +
-                                        </button>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* Action buttons */}
-                                  <div className="mt-1 flex gap-1">
-                                    {canEditGrades && (
-                                      <button 
-                                        className="text-xs px-2 py-0.5 rounded bg-muted hover:bg-muted-foreground/20"
-                                        onClick={() => openLessonStatusDialog(schedules.find(s => s.id === slot.scheduleId) as Schedule)}
-                                        title="Изменить статус урока"
+                <CardContent>
+                  {classData && (
+                    <div className="space-y-2">
+                      <div>
+                        <h3 className="font-medium">Класс:</h3>
+                        <p className="text-lg text-muted-foreground">{classData.name}</p>
+                      </div>
+                      <div>
+                        <h3 className="font-medium">Всего учеников:</h3>
+                        <p className="text-lg text-muted-foreground">
+                          {subgroupId 
+                            ? `${filteredStudents.length} (из подгруппы)`
+                            : students.length}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpenIcon className="h-5 w-5" />
+                    Информация о предмете
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {subjectData && (
+                    <div className="space-y-2">
+                      <div>
+                        <h3 className="font-medium">Предмет:</h3>
+                        <p className="text-lg text-muted-foreground">{subjectData.name}</p>
+                      </div>
+                      <div>
+                        <h3 className="font-medium">Всего уроков:</h3>
+                        <p className="text-lg text-muted-foreground">{lessonSlots.length}</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarIcon className="h-5 w-5" />
+                  Оценки по предмету
+                  {subgroupId && subgroupData && (
+                    <span className="ml-2 text-sm bg-primary/10 text-primary px-2 py-1 rounded-md">
+                      Подгруппа: {subgroupData.name}
+                    </span>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  {subgroupId 
+                    ? `Журнал показывает только учеников из выбранной подгруппы. `
+                    : ''}
+                  Нажмите на ячейку с "+" чтобы добавить оценку. Нажмите на дату урока, чтобы изменить его статус.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-auto">
+                  <Table className="border">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="bg-muted/50 sticky left-0">
+                          Ученик
+                        </TableHead>
+                        {lessonSlots.map((slot) => {
+                          const isLessonConducted = schedules.find(s => s.id === slot.scheduleId)?.status === 'conducted';
+                          return (
+                            <TableHead 
+                              key={`${slot.date}-${slot.scheduleId}`} 
+                              className="text-center cursor-pointer"
+                              onClick={() => canEditGrades ? handleHeaderClick(slot) : null}
+                            >
+                              <div className="flex flex-col items-center justify-center">
+                                {slot.formattedDate}
+                                {slot.startTime && <span className="text-xs">({slot.startTime.slice(0, 5)})</span>}
+                                {/* Отображаем задания в заголовке если они есть */}
+                                {slot.assignments && slot.assignments.length > 0 && classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && (
+                                  <div className="flex flex-wrap mt-1 mb-1 gap-1 justify-center text-xs">
+                                    {slot.assignments.map(assignment => (
+                                      <span 
+                                        key={assignment.id}
+                                        className={`${getAssignmentTypeColor(assignment.assignmentType)} text-gray-800 px-1.5 py-0.5 rounded-sm border border-gray-300 cursor-pointer hover:border-primary hover:bg-primary/10 transition-colors`}
+                                        title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. Нажмите для редактирования.`}
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // Предотвращаем открытие диалога статуса
+                                          openEditAssignmentDialog(assignment);
+                                        }}
                                       >
-                                        Статус
-                                      </button>
-                                    )}
+                                        {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {isLessonConducted && (
+                                  <div className="flex items-center">
+                                    <span className="text-green-600 ml-1">
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                      </svg>
+                                    </span>
                                     
-                                    {isLessonConducted && (
-                                      <button 
-                                        className="text-xs px-2 py-0.5 rounded bg-muted hover:bg-muted-foreground/20"
-                                        onClick={() => openAttendanceDialog(slot.scheduleId)}
-                                        title="Посмотреть и отметить посещаемость"
+                                    {/* Кнопка для добавления задания (только для накопительной системы) */}
+                                    {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && canEditGrades && (
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation(); // Предотвращаем открытие диалога статуса
+                                          openAssignmentDialog(slot.scheduleId);
+                                        }}
+                                        className="ml-1 text-primary hover:text-primary-dark focus:outline-none"
+                                        title="Добавить задание"
                                       >
-                                        Пос.
+                                        <PlusCircle className="h-3 w-3" />
                                       </button>
                                     )}
                                   </div>
-                                </div>
-                              </TableHead>
-                            );
-                          })}
-                          <TableHead className="text-center sticky right-0 bg-muted/50">
-                            Средний балл
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredStudents.map((student) => (
-                          <TableRow key={student.id}>
-                            <TableCell className="font-medium bg-muted/20">
-                              {student.lastName} {student.firstName}
-                            </TableCell>
-                            {lessonSlots.map((slot) => {
-                              const studentGrades = getStudentGradeForSlot(student.id, slot, filteredGrades);
-                              
-                              // Проверяем накопительную систему и наличие нескольких заданий
-                              if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
+                                )}
+                              </div>
+                            </TableHead>
+                          );
+                        })}
+                        <TableHead className="text-center sticky right-0 bg-muted/50">
+                          Средний балл
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredStudents.map((student) => (
+                        <TableRow key={student.id}>
+                          <TableCell className="font-medium bg-muted/20">
+                            {student.lastName} {student.firstName}
+                          </TableCell>
+                          {lessonSlots.map((slot) => {
+                            const studentGrades = getStudentGradeForSlot(student.id, slot, filteredGrades);
+                            return (
+                              <TableCell 
+                                key={`${slot.date}-${slot.scheduleId}`} 
+                                className={`text-center ${
+                                  classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
                                   slot.assignments && 
-                                  slot.assignments.length > 1) {
-                                // Если есть несколько заданий, создаем подколонки
-                                return (
-                                  <TableCell 
-                                    key={`${slot.date}-${slot.scheduleId}`}
-                                    className="text-center p-0 border"
-                                  >
-                                    <div className="flex divide-x divide-gray-200">
-                                      {slot.assignments.map((assignment) => {
-                                        // Находим оценку для студента по этому заданию
-                                        const gradeForAssignment = filteredGrades.find(
-                                          g => g.studentId === student.id && 
-                                               g.scheduleId === slot.scheduleId && 
-                                               g.assignmentId === assignment.id
-                                        );
+                                  slot.assignments.length > 0 
+                                    ? slot.assignments.length === 1 
+                                      ? getAssignmentTypeColor(slot.assignments[0].assignmentType) 
+                                      : 'bg-gray-50 border-gray-200' 
+                                    : ''
+                                }`}
+                              >
+                                {studentGrades.length > 0 ? (
+                                  <div className="flex flex-wrap justify-center gap-1 items-center">
+                                    {studentGrades.map((grade) => (
+                                      <div key={grade.id} className="relative group">
+                                        <span 
+                                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-help
+                                            ${grade.gradeType === 'test' || grade.gradeType === 'Контрольная' ? 'bg-blue-600' : 
+                                            grade.gradeType === 'exam' || grade.gradeType === 'Экзамен' ? 'bg-purple-600' : 
+                                            grade.gradeType === 'homework' || grade.gradeType === 'Домашняя' ? 'bg-amber-600' : 
+                                            grade.gradeType === 'project' ? 'bg-emerald-600' : 
+                                            grade.gradeType === 'classwork' || grade.gradeType === 'Практическая' ? 'bg-green-600' :
+                                            'bg-primary'} text-primary-foreground`}
+                                          title={`${getGradeTypeName(grade.gradeType)}${grade.comment ? ': ' + grade.comment : ''}`}
+                                        >
+                                          {grade.grade}
+                                        </span>
                                         
-                                        return (
-                                          <div 
-                                            key={assignment.id}
-                                            className={`${getAssignmentTypeColor(assignment.assignmentType)} flex-1 p-1 min-w-[50px]`}
-                                          >
-                                            {canEditGrades ? (
-                                              gradeForAssignment ? (
-                                                // Если оценка уже есть, показываем её с возможностью редактирования
-                                                <div className="relative group">
-                                                  <span 
-                                                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium cursor-help`}
-                                                    title={`${getAssignmentTypeName(assignment.assignmentType)}${gradeForAssignment.comment ? ': ' + gradeForAssignment.comment : ''}`}
-                                                  >
-                                                    {gradeForAssignment.grade}
-                                                  </span>
-                                                  
-                                                  <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
-                                                    <Button
-                                                      variant="outline"
-                                                      size="icon"
-                                                      className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
-                                                      onClick={() => openEditGradeDialog(gradeForAssignment)}
-                                                      title="Редактировать оценку"
-                                                    >
-                                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M12 20h9"></path>
-                                                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                                                      </svg>
-                                                    </Button>
-                                                    <Button
-                                                      variant="outline"
-                                                      size="icon"
-                                                      className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
-                                                      onClick={() => handleDeleteGrade(gradeForAssignment.id)}
-                                                      title="Удалить оценку"
-                                                    >
-                                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M3 6h18"></path>
-                                                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                                                      </svg>
-                                                    </Button>
-                                                  </div>
-                                                </div>
-                                              ) : (
-                                                // Если оценки нет, показываем поле для прямого ввода
-                                                <Input
-                                                  type="number"
-                                                  className="w-10 h-7 text-center p-0 text-sm mx-auto bg-transparent"
-                                                  min={1}
-                                                  max={parseInt(assignment.maxScore)}
-                                                  placeholder=""
-                                                  title={`${getAssignmentTypeName(assignment.assignmentType)} (макс. ${assignment.maxScore})`}
-                                                  onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                      const value = (e.target as HTMLInputElement).value;
-                                                      if (value && !isNaN(parseInt(value))) {
-                                                        // Создаем новую оценку прямо здесь
-                                                        const gradeValue = parseInt(value);
-                                                        const newGrade = {
-                                                          studentId: student.id,
-                                                          grade: gradeValue,
-                                                          classId: classId,
-                                                          subjectId: subjectId,
-                                                          teacherId: user?.id as number,
-                                                          scheduleId: slot.scheduleId,
-                                                          assignmentId: assignment.id,
-                                                          gradeType: assignment.assignmentType,
-                                                          date: slot.date,
-                                                          comment: '',
-                                                          subgroupId: subgroupId
-                                                        };
-                                                        console.log("Добавление оценки:", newGrade);
-                                                        addGradeMutation.mutate(newGrade);
-                                                        (e.target as HTMLInputElement).value = '';
-                                                      }
-                                                    }
-                                                  }}
-                                                />
-                                              )
-                                            ) : gradeForAssignment ? (
-                                              // Если нет прав на редактирование, просто показываем оценку
-                                              <span 
-                                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                                                title={`${getAssignmentTypeName(assignment.assignmentType)}${gradeForAssignment.comment ? ': ' + gradeForAssignment.comment : ''}`}
-                                              >
-                                                {gradeForAssignment.grade}
-                                              </span>
-                                            ) : (
-                                              "-"
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </TableCell>
-                                );
-                              } else {
-                                // Для одиночного задания или обычной системы оценок
-                                return (
-                                  <TableCell 
-                                    key={`${slot.date}-${slot.scheduleId}`} 
-                                    className={`text-center ${
-                                      classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
-                                      slot.assignments && 
-                                      slot.assignments.length === 1 
-                                        ? getAssignmentTypeColor(slot.assignments[0].assignmentType) 
-                                        : ''
-                                    }`}
-                                  >
-                                    {studentGrades.length > 0 ? (
-                                      <div className="flex flex-wrap justify-center gap-1 items-center">
-                                        {studentGrades.map((grade) => (
-                                          <div key={grade.id} className="relative group">
-                                            <span 
-                                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-help
-                                                ${grade.gradeType === 'test' || grade.gradeType === 'Контрольная' ? 'bg-blue-600' : 
-                                                grade.gradeType === 'exam' || grade.gradeType === 'Экзамен' ? 'bg-purple-600' : 
-                                                grade.gradeType === 'homework' || grade.gradeType === 'Домашняя' ? 'bg-amber-600' : 
-                                                grade.gradeType === 'project' ? 'bg-emerald-600' : 
-                                                grade.gradeType === 'classwork' || grade.gradeType === 'Практическая' ? 'bg-green-600' :
-                                                'bg-primary'} text-primary-foreground`}
-                                              title={`${getGradeTypeName(grade.gradeType)}${grade.comment ? ': ' + grade.comment : ''}`}
+                                        {canEditGrades && (
+                                          <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
+                                            <Button
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
+                                              onClick={() => openEditGradeDialog(grade)}
+                                              title="Редактировать оценку"
                                             >
-                                              {grade.grade}
-                                            </span>
-                                            
-                                            {canEditGrades && (
-                                              <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
-                                                <Button
-                                                  variant="outline"
-                                                  size="icon"
-                                                  className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
-                                                  onClick={() => openEditGradeDialog(grade)}
-                                                  title="Редактировать оценку"
-                                                >
-                                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M12 20h9"></path>
-                                                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                                                  </svg>
-                                                </Button>
-                                                <Button
-                                                  variant="outline"
-                                                  size="icon"
-                                                  className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
-                                                  onClick={() => handleDeleteGrade(grade.id)}
-                                                  title="Удалить оценку"
-                                                >
-                                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                    <path d="M3 6h18"></path>
-                                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                                                  </svg>
-                                                </Button>
-                                              </div>
-                                            )}
+                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M12 20h9"></path>
+                                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                                              </svg>
+                                            </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="icon"
+                                              className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
+                                              onClick={() => handleDeleteGrade(grade.id)}
+                                              title="Удалить оценку"
+                                            >
+                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <path d="M3 6h18"></path>
+                                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                              </svg>
+                                            </Button>
                                           </div>
-                                        ))}
-                                        {/* Кнопка "+" для добавления еще одной оценки в тот же дату и урок */}
-                                        {canEditGrades && 
-                                         canAddGradeToLesson(slot.scheduleId, slot) && 
-                                         hasAvailableAssignmentsForGrading(student.id, slot) && (
-                                          <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            className="h-5 w-5 p-0 rounded-full ml-1"
-                                            onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
-                                            title="Добавить еще одну оценку"
-                                          >
-                                            +
-                                          </Button>
                                         )}
                                       </div>
-                                    ) : canEditGrades && 
-                                       canAddGradeToLesson(slot.scheduleId, slot) && 
-                                       hasAvailableAssignmentsForGrading(student.id, slot) ? (
-                                      // Если заданий нет или одно задание, добавляем возможность прямого ввода
-                                      classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
-                                      slot.assignments && 
-                                      slot.assignments.length === 1 ? (
-                                        <Input
-                                          type="number"
-                                          className="w-10 h-7 text-center p-0 text-sm mx-auto bg-transparent"
-                                          min={1}
-                                          max={parseInt(slot.assignments[0].maxScore)}
-                                          placeholder=""
-                                          title={`${getAssignmentTypeName(slot.assignments[0].assignmentType)} (макс. ${slot.assignments[0].maxScore})`}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                              const value = (e.target as HTMLInputElement).value;
-                                              if (value && !isNaN(parseInt(value))) {
-                                                // Проверяем, что введенная оценка не превышает максимальный балл
-                                                const gradeValue = parseInt(value);
-                                                
-                                                // Проверка существования slot.assignments
-                                                if (!slot.assignments || slot.assignments.length === 0) {
-                                                  toast({
-                                                    title: "Ошибка при добавлении оценки",
-                                                    description: "Невозможно добавить оценку: задание не найдено",
-                                                    variant: "destructive",
-                                                  });
-                                                  return;
-                                                }
-
-                                                // Теперь мы знаем, что slot.assignments существует и содержит элементы
-                                                const assignment = slot.assignments[0];
-                                                const maxScore = parseInt(assignment.maxScore);
-                                                
-                                                // Создаем переменную для хранения финальной оценки
-                                                let finalGradeValue = gradeValue;
-                                                
-                                                // Если оценка превышает максимальный балл, снижаем её до максимального
-                                                if (finalGradeValue > maxScore) {
-                                                  finalGradeValue = maxScore;
-                                                  toast({
-                                                    title: "Оценка скорректирована",
-                                                    description: `Оценка была автоматически снижена до максимального балла (${maxScore})`,
-                                                  });
-                                                }
-                                                
-                                                // Создаем новую оценку
-                                                const newGrade = {
-                                                  studentId: student.id,
-                                                  grade: finalGradeValue, // Используем скорректированное значение оценки
-                                                  classId: classId,
-                                                  subjectId: subjectId,
-                                                  teacherId: user?.id as number,
-                                                  scheduleId: slot.scheduleId,
-                                                  assignmentId: assignment.id,
-                                                  gradeType: assignment.assignmentType,
-                                                  date: slot.date,
-                                                  comment: '',
-                                                  subgroupId: subgroupId
-                                                };
-                                                console.log("Добавление оценки:", newGrade);
-                                                addGradeMutation.mutate(newGrade);
-                                                (e.target as HTMLInputElement).value = '';
-                                              }
-                                            }
-                                          }}
-                                        />
-                                      ) : (
-                                        <Button 
-                                          variant="ghost" 
-                                          size="sm" 
-                                          className="h-7 w-7 p-0 rounded-full"
-                                          onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
-                                        >
-                                          +
-                                        </Button>
-                                      )
-                                    ) : (
-                                      "-"
+                                    ))}
+                                    {/* Кнопка "+" для добавления еще одной оценки в тот же дату и урок */}
+                                    {canEditGrades && canAddGradeToLesson(slot.scheduleId, slot) && (
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-5 w-5 p-0 rounded-full ml-1"
+                                        onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
+                                        title="Добавить еще одну оценку"
+                                      >
+                                        +
+                                      </Button>
                                     )}
-                                  </TableCell>
-                                );
-                              }
-                            })}
-                            <TableCell className="text-center font-medium sticky right-0 bg-muted/30">
-                              {calculateAverageGrade(student.id)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                                  </div>
+                                ) : canEditGrades && canAddGradeToLesson(slot.scheduleId, slot) ? (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-7 w-7 p-0 rounded-full"
+                                    onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
+                                  >
+                                    +
+                                  </Button>
+                                ) : (
+                                  "-"
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                          <TableCell className="text-center font-medium sticky right-0 bg-muted/30">
+                            {calculateAverageGrade(student.id)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+
           </div>
         )}
         
@@ -1752,7 +1930,7 @@ export default function ClassGradeDetailsPage() {
               <DialogDescription>
                 {selectedSchedule && `Изменение статуса урока: ${
                   format(new Date(selectedSchedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })
-                } (${selectedSchedule.startTime?.slice(0, 5)} - ${selectedSchedule.endTime?.slice(0, 5)})`}
+                } (${selectedSchedule.startTime.slice(0, 5)} - ${selectedSchedule.endTime.slice(0, 5)})`}
               </DialogDescription>
             </DialogHeader>
             
@@ -1770,10 +1948,15 @@ export default function ClassGradeDetailsPage() {
                       viewBox="0 0 20 20" 
                       fill="currentColor"
                     >
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
+                      <path 
+                        fillRule="evenodd" 
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" 
+                        clipRule="evenodd" 
+                      />
                     </svg>
                     <span>Не проведен</span>
                   </Button>
+                  
                   <Button 
                     variant={selectedSchedule?.status === 'conducted' ? 'default' : 'outline'} 
                     className="w-full py-8 flex flex-col items-center justify-center gap-2"
@@ -1785,152 +1968,188 @@ export default function ClassGradeDetailsPage() {
                       viewBox="0 0 20 20" 
                       fill="currentColor"
                     >
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      <path 
+                        fillRule="evenodd" 
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" 
+                        clipRule="evenodd" 
+                      />
                     </svg>
                     <span>Проведен</span>
                   </Button>
                 </div>
-                <Button 
-                  variant={selectedSchedule?.status === 'cancelled' ? 'default' : 'outline'} 
-                  className="w-full py-8 flex flex-col items-center justify-center gap-2"
-                  onClick={() => handleScheduleStatusUpdate('cancelled')}
-                >
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    className="h-8 w-8" 
-                    viewBox="0 0 20 20" 
-                    fill="currentColor"
-                  >
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <span>Отменен</span>
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-        
-        {/* Dialog for adding/editing grade */}
-        <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>{editingGradeId ? "Редактировать оценку" : "Добавить оценку"}</DialogTitle>
-              <DialogDescription>
-                {selectedStudentId ? 
-                  `${editingGradeId ? "Редактирование" : "Добавление"} оценки для ученика: ${
-                    filteredStudents.find(s => s.id === selectedStudentId)?.lastName || ''
-                  } ${filteredStudents.find(s => s.id === selectedStudentId)?.firstName || ''}`
-                  : "Выберите ученика и введите оценку"
-                }
-                {selectedDate && ` (${format(new Date(selectedDate), "dd.MM.yyyy", { locale: ru })})`}
-              </DialogDescription>
-            </DialogHeader>
-            
-            <Form {...gradeForm}>
-              <form onSubmit={gradeForm.handleSubmit(onGradeSubmit)} className="space-y-4">
-                <FormField
-                  control={gradeForm.control}
-                  name="studentId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ученик</FormLabel>
-                      <Select
-                        disabled={!!selectedStudentId} // Disable if student is preselected
-                        value={field.value?.toString()}
-                        onValueChange={(value) => field.onChange(parseInt(value))}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите ученика" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {filteredStudents.map((student) => (
-                            <SelectItem key={student.id} value={student.id.toString()}>
-                              {student.lastName} {student.firstName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 
-                {/* If class uses cumulative grading and there are assignments, show assignment selection */}
-                {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && (
-                  <FormField
-                    control={gradeForm.control}
-                    name="assignmentId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Задание</FormLabel>
-                        <Select
-                          value={field.value?.toString() || ''}
-                          onValueChange={(value) => {
-                            if (value) {
-                              // Set assignmentId
-                              field.onChange(parseInt(value));
-                              // Also update selectedAssignmentId state which is used by getGradeFormSchema
-                              setSelectedAssignmentId(parseInt(value));
-                              
-                              // Find the assignment to get its type and max score
-                              const assignment = assignments.find(a => a.id === parseInt(value));
-                              if (assignment) {
-                                // Update gradeType based on assignment type
-                                gradeForm.setValue('gradeType', assignment.assignmentType);
-                              }
-                            } else {
-                              field.onChange(null);
-                              setSelectedAssignmentId(null);
+                <p className="text-sm text-muted-foreground">
+                  Статус урока влияет на возможность выставления оценок.
+                  Оценки можно ставить только для проведенных уроков.
+                </p>
+                
+                {/* Check if the current time is before the lesson time */}
+                {selectedSchedule && new Date() < new Date(`${selectedSchedule.scheduleDate}T${selectedSchedule.endTime}`) && (
+                  <>
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Внимание</AlertTitle>
+                      <AlertDescription>
+                        Урок еще не завершился. Отметить урок как проведенный можно только после его окончания.
+                      </AlertDescription>
+                    </Alert>
+                    
+                    {/* Кнопка для добавления запланированного задания для будущего урока */}
+                    {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && (
+                      <div className="mt-4">
+                        <Alert className="bg-amber-50 border-amber-200">
+                          <CalendarIcon className="h-4 w-4 text-amber-600" />
+                          <AlertTitle className="text-amber-700">Запланировать задание</AlertTitle>
+                          <AlertDescription className="text-amber-700">
+                            Вы можете запланировать задание к этому уроку заранее. Запланированные задания не влияют на среднюю оценку до проведения урока.
+                          </AlertDescription>
+                        </Alert>
+                        
+                        <Button 
+                          variant="outline" 
+                          className="w-full mt-2 text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+                          onClick={() => {
+                            setIsStatusDialogOpen(false);
+                            // Автоматически устанавливаем флаг plannedFor для заданий будущих уроков
+                            if (selectedSchedule) {
+                              // Пре-заполняем форму для запланированного задания
+                              assignmentForm.reset({
+                                assignmentType: AssignmentTypeEnum.HOMEWORK,
+                                maxScore: "10",
+                                description: "",
+                                scheduleId: selectedSchedule.id,
+                                subjectId: subjectId,
+                                classId: classId,
+                                teacherId: user?.id || 0,
+                                subgroupId: subgroupId || null,
+                                plannedFor: true // Автоматически помечаем как запланированное
+                              });
+                              setSelectedSchedule(selectedSchedule);
+                              setIsAssignmentDialogOpen(true);
                             }
                           }}
                         >
+                          <CalendarIcon className="h-4 w-4 mr-2" />
+                          Запланировать задание
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsStatusDialogOpen(false)}
+              >
+                Закрыть
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Диалог для отметки посещаемости */}
+        <Dialog open={isAttendanceDialogOpen} onOpenChange={setIsAttendanceDialogOpen}>
+          <DialogContent className="sm:max-w-[800px]">
+            <DialogHeader>
+              <DialogTitle>Отметка посещаемости</DialogTitle>
+              <DialogDescription>
+                Отметьте присутствие студентов на уроке
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedSchedule && (
+              <AttendanceForm 
+                schedule={selectedSchedule}
+                onClose={() => setIsAttendanceDialogOpen(false)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+        
+        {/* Dialog for adding an assignment */}
+        <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{editingAssignmentId ? "Изменить задание" : "Добавить задание"}</DialogTitle>
+              <DialogDescription>
+                {editingAssignmentId 
+                  ? "Измените параметры существующего задания" 
+                  : "Создайте новое задание для накопительной системы оценивания."}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...assignmentForm}>
+              <form onSubmit={assignmentForm.handleSubmit(data => {
+                if (editingAssignmentId) {
+                  updateAssignmentMutation.mutate({
+                    id: editingAssignmentId,
+                    ...data
+                  });
+                } else {
+                  addAssignmentMutation.mutate(data);
+                }
+              })}>
+                <div className="grid gap-4 py-4">
+                  <FormField
+                    control={assignmentForm.control}
+                    name="assignmentType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Тип задания</FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Выберите задание" />
+                              <SelectValue placeholder="Выберите тип задания" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {/* Filter assignments by scheduleId if it's selected */}
-                            {(gradeForm.getValues('scheduleId') ?
-                              assignments.filter(a => a.scheduleId === gradeForm.getValues('scheduleId')) :
-                              assignments
-                            ).map((assignment) => (
-                              <SelectItem key={assignment.id} value={assignment.id.toString()}>
-                                {getAssignmentTypeName(assignment.assignmentType)} ({assignment.maxScore} б.)
-                              </SelectItem>
-                            ))}
+                            <SelectItem value={AssignmentTypeEnum.CONTROL_WORK}>Контрольная работа</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.TEST_WORK}>Проверочная работа</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.CURRENT_WORK}>Текущая работа</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.HOMEWORK}>Домашнее задание</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.CLASSWORK}>Работа на уроке</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.PROJECT_WORK}>Работа с проектом</SelectItem>
+                            <SelectItem value={AssignmentTypeEnum.CLASS_ASSIGNMENT}>Классная работа</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
-                        <FormDescription>
-                          В накопительной системе оценка должна быть привязана к заданию
-                        </FormDescription>
                       </FormItem>
                     )}
                   />
-                )}
-                
-                <div className="grid grid-cols-2 gap-4">
+                  
                   <FormField
-                    control={gradeForm.control}
-                    name="grade"
+                    control={assignmentForm.control}
+                    name="maxScore"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Оценка</FormLabel>
+                        <FormLabel>Максимальный балл</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={
-                              classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && selectedAssignmentId
-                                ? parseInt(assignments.find(a => a.id === selectedAssignmentId)?.maxScore || '5')
-                                : 5
-                            }
-                            {...field}
-                            value={field.value || ''}
-                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                          <Input {...field} placeholder="Введите максимальный балл" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={assignmentForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Описание (опционально)</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Введите описание задания"
+                            onChange={field.onChange}
+                            value={field.value || ""}
+                            ref={field.ref}
+                            name={field.name}
+                            onBlur={field.onBlur}
                           />
                         </FormControl>
                         <FormMessage />
@@ -1938,28 +2157,55 @@ export default function ClassGradeDetailsPage() {
                     )}
                   />
                   
-                  {classData?.gradingSystem !== GradingSystemEnum.CUMULATIVE && (
+                  <FormField
+                    control={assignmentForm.control}
+                    name="plannedFor"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Запланированное задание
+                          </FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            Оценки за это задание будут учитываться в среднем проценте только после проведения урока
+                          </p>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {!selectedSchedule && !editingAssignmentId && (
                     <FormField
-                      control={gradeForm.control}
-                      name="gradeType"
+                      control={assignmentForm.control}
+                      name="scheduleId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Тип оценки</FormLabel>
+                          <FormLabel>Урок</FormLabel>
                           <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
+                            onValueChange={(value) => field.onChange(parseInt(value))}
+                            value={field.value?.toString()}
                           >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Выберите тип оценки" />
+                                <SelectValue placeholder="Выберите урок" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="classwork">Работа на уроке</SelectItem>
-                              <SelectItem value="homework">Домашнее задание</SelectItem>
-                              <SelectItem value="test">Тест</SelectItem>
-                              <SelectItem value="exam">Экзамен</SelectItem>
-                              <SelectItem value="project">Проект</SelectItem>
+                              {schedules
+                                .filter(s => s.subjectId === subjectId && 
+                                             (subgroupId ? s.subgroupId === subgroupId : true))
+                                .map(schedule => (
+                                  <SelectItem key={schedule.id} value={schedule.id.toString()}>
+                                    {format(new Date(schedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })} - {schedule.startTime}
+                                    {schedule.subgroupId && ` (${allSubgroups.find(sg => sg.id === schedule.subgroupId)?.name || 'Подгруппа'})`}
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -1968,16 +2214,259 @@ export default function ClassGradeDetailsPage() {
                     />
                   )}
                 </div>
+                <DialogFooter className="flex justify-between">
+                  {editingAssignmentId && (
+                    <Button 
+                      type="button" 
+                      variant="destructive"
+                      onClick={() => {
+                        if (window.confirm("Вы уверены, что хотите удалить это задание? Все связанные оценки будут удалены.")) {
+                          deleteAssignmentMutation.mutate(editingAssignmentId);
+                          setIsAssignmentDialogOpen(false);
+                        }
+                      }}
+                      disabled={deleteAssignmentMutation.isPending}
+                    >
+                      {deleteAssignmentMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Удалить
+                    </Button>
+                  )}
+                  <Button 
+                    type="submit" 
+                    disabled={editingAssignmentId 
+                      ? updateAssignmentMutation.isPending 
+                      : addAssignmentMutation.isPending}
+                  >
+                    {(editingAssignmentId 
+                      ? updateAssignmentMutation.isPending 
+                      : addAssignmentMutation.isPending) && 
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {editingAssignmentId ? "Сохранить изменения" : "Создать задание"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Dialog for adding a grade */}
+        <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{editingGradeId ? "Редактировать оценку" : "Добавить оценку"}</DialogTitle>
+              <DialogDescription>
+                {selectedStudentId ? 
+                  `${editingGradeId ? "Редактирование" : "Добавление"} оценки для ученика: ${
+                    filteredStudents.find(s => s.id === selectedStudentId)?.lastName || ""
+                  } ${
+                    filteredStudents.find(s => s.id === selectedStudentId)?.firstName || ""
+                  }${selectedDate ? ` (${selectedDate})` : ""}` : 
+                  `${editingGradeId ? "Редактирование" : "Добавление"} оценки`
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Form {...gradeForm}>
+              <form onSubmit={gradeForm.handleSubmit(onGradeSubmit)} className="space-y-4">
+                {!selectedStudentId && (
+                  <FormField
+                    control={gradeForm.control}
+                    name="studentId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Ученик</FormLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(parseInt(value))}
+                          defaultValue={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Выберите ученика" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {filteredStudents.map((student) => (
+                              <SelectItem key={student.id} value={student.id.toString()}>
+                                {student.lastName} {student.firstName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                
+                {/* Разные элементы формы в зависимости от системы оценивания */}
+                {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE ? (
+                  <>
+                    {/* Форма выбора задания для накопительной системы */}
+                    <FormField
+                      control={gradeForm.control}
+                      name="assignmentId"
+                      render={({ field }) => {
+                        // Получаем задания для этого урока
+                        const scheduleId = gradeForm.getValues().scheduleId;
+                        const slot = lessonSlots.find(s => s.scheduleId === scheduleId);
+                        // Находим сам урок для проверки его статуса
+                        const schedule = schedules.find(s => s.id === scheduleId);
+                        const isLessonConducted = schedule?.status === 'conducted';
+                        
+                        // Фильтруем задания - показываем только те, которые не запланированные,
+                        // или запланированные, но урок уже проведен
+                        const availableAssignments = (slot?.assignments || []).filter(assignment => 
+                          !assignment.plannedFor || (assignment.plannedFor && isLessonConducted)
+                        );
+                        
+                        return (
+                          <FormItem>
+                            <FormLabel>Задание</FormLabel>
+                            <Select
+                              onValueChange={(value) => {
+                                // При выборе задания обновляем selectedAssignment
+                                const assignmentId = parseInt(value);
+                                field.onChange(assignmentId);
+                                const assignment = availableAssignments.find(a => a.id === assignmentId);
+                                if (assignment) {
+                                  setSelectedAssignment(assignment);
+                                  setSelectedAssignmentId(assignment.id);
+                                  // Автоматически устанавливаем тип оценки на основе типа задания
+                                  gradeForm.setValue('gradeType', assignment.assignmentType);
+                                }
+                              }}
+                              defaultValue={field.value?.toString()}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Выберите задание" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {availableAssignments.length > 0 ? (
+                                  availableAssignments.map((assignment) => (
+                                    <SelectItem key={assignment.id} value={assignment.id.toString()}>
+                                      {getAssignmentTypeName(assignment.assignmentType)} ({assignment.maxScore} б.)
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <SelectItem disabled value="none">
+                                    Нет доступных заданий
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                    
+                    {/* Поле для ввода баллов */}
+                    {selectedAssignment ? (
+                      <FormField
+                        control={gradeForm.control}
+                        name="grade"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Балл (макс. {selectedAssignment.maxScore})</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min="0"
+                                max={selectedAssignment.maxScore.toString()}
+                                {...field}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  const maxScore = parseFloat(selectedAssignment.maxScore.toString());
+                                  if (value > maxScore) {
+                                    // Ограничиваем значение максимальным баллом
+                                    field.onChange(maxScore);
+                                    toast({
+                                      title: "Внимание",
+                                      description: `Максимальный балл для этого задания: ${maxScore}`,
+                                    });
+                                  } else {
+                                    field.onChange(value);
+                                  }
+                                }}
+                                placeholder={`Введите балл (от 0 до ${selectedAssignment.maxScore})`}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Тип задания: {getAssignmentTypeName(selectedAssignment.assignmentType)}
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ) : (
+                      <div className="text-sm text-muted-foreground mb-4">
+                        Выберите задание для выставления баллов
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <FormField
+                    control={gradeForm.control}
+                    name="grade"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Оценка</FormLabel>
+                        <Select
+                          onValueChange={(value) => field.onChange(parseInt(value))}
+                          defaultValue={field.value?.toString()}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Выберите оценку" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {[1, 2, 3, 4, 5].map((grade) => (
+                              <SelectItem key={grade} value={grade.toString()}>
+                                {grade}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                
+                {/* Скрытое поле для типа оценки, автоматически заполняется при выборе задания */}
+                <input 
+                  type="hidden" 
+                  name="gradeType" 
+                  value={gradeForm.getValues().gradeType || "Текущая"} 
+                />
+                
+                {/* Информационное поле о типе оценки */}
+                {selectedAssignment && (
+                  <div className="text-sm text-muted-foreground mb-2 rounded-md p-2 bg-muted">
+                    <p className="font-medium">Тип работы: {getAssignmentTypeName(selectedAssignment.assignmentType)}</p>
+                  </div>
+                )}
+                
+                {!selectedAssignment && (
+                  <div className="text-sm text-muted-foreground mb-2 rounded-md p-2 bg-muted">
+                    <p className="font-medium">Тип оценки: Текущая</p>
+                    <p>Выберите задание чтобы изменить тип оценки</p>
+                  </div>
+                )}
                 
                 <FormField
                   control={gradeForm.control}
                   name="comment"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Комментарий (необязательно)</FormLabel>
+                      <FormLabel>Комментарий</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Введите комментарий к оценке"
+                        <Textarea
+                          placeholder="Комментарий к оценке"
+                          className="resize-none"
                           {...field}
                           value={field.value || ''}
                         />
@@ -1987,166 +2476,97 @@ export default function ClassGradeDetailsPage() {
                   )}
                 />
                 
-                {/* Hidden fields */}
-                <input type="hidden" {...gradeForm.register('classId')} />
-                <input type="hidden" {...gradeForm.register('subjectId')} />
-                <input type="hidden" {...gradeForm.register('teacherId')} />
-                <input type="hidden" {...gradeForm.register('scheduleId')} />
-                <input type="hidden" {...gradeForm.register('date')} />
-                {subgroupId && (
-                  <input type="hidden" {...gradeForm.register('subgroupId')} />
+                {selectedDate && (
+                  <div className="space-y-2">
+                    <FormLabel>Дата урока</FormLabel>
+                    <Input 
+                      type="date" 
+                      value={selectedDate || ''} 
+                      disabled 
+                    />
+                    <p className="text-xs text-gray-500">
+                      Оценка будет привязана к текущей дате
+                    </p>
+                  </div>
                 )}
                 
                 <DialogFooter>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsGradeDialogOpen(false)}
-                  >
-                    Отмена
-                  </Button>
-                  <Button 
-                    type="submit"
-                    disabled={addGradeMutation.isPending || updateGradeMutation.isPending}
-                  >
-                    {(addGradeMutation.isPending || updateGradeMutation.isPending) && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    {editingGradeId ? "Сохранить" : "Добавить"}
+                  <Button type="submit" disabled={addGradeMutation.isPending || updateGradeMutation.isPending}>
+                    {addGradeMutation.isPending || updateGradeMutation.isPending 
+                      ? 'Сохранение...' 
+                      : editingGradeId 
+                        ? 'Обновить' 
+                        : 'Сохранить'
+                    }
                   </Button>
                 </DialogFooter>
               </form>
             </Form>
           </DialogContent>
         </Dialog>
-        
-        {/* Dialog for adding/editing assignment */}
-        <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
+
+        {/* Контекстный диалог для выбора действия при клике на ячейку урока */}
+        <Dialog open={isContextDialogOpen} onOpenChange={setIsContextDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>
-                {editingAssignmentId ? "Редактировать задание" : "Добавить задание"}
-              </DialogTitle>
-              <DialogDescription>
-                {selectedSchedule && `Добавление задания к уроку: ${
-                  format(new Date(selectedSchedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })
-                } (${selectedSchedule.startTime?.slice(0, 5)} - ${selectedSchedule.endTime?.slice(0, 5)})`}
-                {subgroupData && ` - Подгруппа: ${subgroupData.name}`}
-              </DialogDescription>
-            </DialogHeader>
-            
-            <form id="assignment-form" onSubmit={onAssignmentSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="assignment-type" className="text-sm font-medium">
-                  Тип задания
-                </label>
-                <Select name="assignmentType" defaultValue="classwork">
-                  <SelectTrigger id="assignment-type">
-                    <SelectValue placeholder="Выберите тип задания" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={AssignmentTypeEnum.CLASSWORK}>Работа на уроке</SelectItem>
-                    <SelectItem value={AssignmentTypeEnum.HOMEWORK}>Домашнее задание</SelectItem>
-                    <SelectItem value={AssignmentTypeEnum.TEST_WORK}>Проверочная работа</SelectItem>
-                    <SelectItem value={AssignmentTypeEnum.CONTROL_WORK}>Контрольная работа</SelectItem>
-                    <SelectItem value={AssignmentTypeEnum.PROJECT_WORK}>Проект</SelectItem>
-                    <SelectItem value={AssignmentTypeEnum.CURRENT_WORK}>Текущая работа</SelectItem>
-                    <SelectItem value={AssignmentTypeEnum.CLASS_ASSIGNMENT}>Классная работа</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="assignment-maxScore" className="text-sm font-medium">
-                  Максимальный балл
-                </label>
-                <Input
-                  type="number"
-                  id="assignment-maxScore"
-                  name="maxScore"
-                  defaultValue="5"
-                  min="1"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="assignment-description" className="text-sm font-medium">
-                  Описание (необязательно)
-                </label>
-                <Textarea
-                  id="assignment-description"
-                  name="description"
-                  placeholder="Введите описание задания"
-                />
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox id="assignment-plannedFor" name="plannedFor" />
-                <label
-                  htmlFor="assignment-plannedFor"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Запланировано на будущее
-                </label>
-              </div>
-              
-              {/* Hidden fields */}
-              <input type="hidden" id="assignment-scheduleId" name="scheduleId" defaultValue="" />
-              <input type="hidden" id="assignment-classId" name="classId" value={classId} />
-              <input type="hidden" id="assignment-subjectId" name="subjectId" value={subjectId} />
-              <input type="hidden" id="assignment-teacherId" name="teacherId" value={user?.id} />
-              {subgroupId && (
-                <input type="hidden" id="assignment-subgroupId" name="subgroupId" value={subgroupId} />
-              )}
-              
-              <DialogFooter>
-                {editingAssignmentId && (
-                  <Button 
-                    type="button" 
-                    variant="destructive"
-                    onClick={() => {
-                      if (editingAssignmentId) {
-                        handleDeleteAssignment(editingAssignmentId);
-                        setIsAssignmentDialogOpen(false);
-                      }
-                    }}
-                  >
-                    Удалить
-                  </Button>
-                )}
-                <div className="flex-1"></div>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setIsAssignmentDialogOpen(false)}
-                >
-                  Отмена
-                </Button>
-                <Button 
-                  type="submit"
-                  disabled={addAssignmentMutation.isPending || updateAssignmentMutation.isPending}
-                >
-                  {(addAssignmentMutation.isPending || updateAssignmentMutation.isPending) && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  {editingAssignmentId ? "Сохранить" : "Добавить"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-        
-        {/* Dialog for viewing and marking attendance */}
-        <Dialog open={isAttendanceDialogOpen} onOpenChange={setIsAttendanceDialogOpen}>
-          <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-auto">
-            <DialogHeader>
-              <DialogTitle>Посещаемость</DialogTitle>
+              <DialogTitle>Выберите действие</DialogTitle>
               <DialogDescription>
                 {selectedSchedule && `Урок: ${
                   format(new Date(selectedSchedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })
-                } (${selectedSchedule.startTime?.slice(0, 5)} - ${selectedSchedule.endTime?.slice(0, 5)})`}
-                {subgroupData && ` - Подгруппа: ${subgroupData.name}`}
+                } в ${selectedSchedule.startTime || ""}`}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <Button 
+                onClick={() => handleContextAction('status')}
+                className="flex items-center justify-start gap-2"
+              >
+                <CalendarClock className="h-5 w-5" />
+                Изменить статус урока
+              </Button>
+              
+              <Button 
+                onClick={() => handleContextAction('assignment')}
+                className="flex items-center justify-start gap-2"
+                variant="outline"
+              >
+                <BookPlus className="h-5 w-5" />
+                Добавить задание
+              </Button>
+              
+              {selectedSchedule?.status === 'conducted' && (
+                <Button 
+                  onClick={() => handleContextAction('attendance')}
+                  className="flex items-center justify-start gap-2"
+                  variant="outline"
+                >
+                  <AlertCircle className="h-5 w-5" />
+                  Отметить посещаемость
+                </Button>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="secondary" 
+                onClick={() => setIsContextDialogOpen(false)}
+              >
+                Отмена
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Attendance Dialog */}
+        <Dialog open={isAttendanceDialogOpen} onOpenChange={setIsAttendanceDialogOpen}>
+          <DialogContent className="sm:max-w-[800px] max-h-[800px] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Отметка посещаемости</DialogTitle>
+              <DialogDescription>
+                {selectedSchedule && `Урок: ${
+                  format(new Date(selectedSchedule.scheduleDate || ''), "dd.MM.yyyy", { locale: ru })
+                } в ${selectedSchedule.startTime || ""}`}
               </DialogDescription>
             </DialogHeader>
             
