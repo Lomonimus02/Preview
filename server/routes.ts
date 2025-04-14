@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { dbStorage } from "./db-storage";
 import { db } from "./db";
+import { upload, getFileType, getFileUrl } from './utils/file-upload';
 
 // Используем хранилище БД для всех операций
 const dataStorage = dbStorage;
