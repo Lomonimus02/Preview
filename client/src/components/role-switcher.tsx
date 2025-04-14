@@ -88,7 +88,11 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
       });
       
       // Перенаправляем на главную страницу для обновления интерфейса
-      window.location.href = "/";
+      // Используем setTimeout чтобы дать время на обновление кэша
+      setTimeout(() => {
+        console.log("Переход на главную страницу после смены роли:", updatedUser);
+        window.location.href = "/";
+      }, 300);
     },
     onError: (error: Error) => {
       console.error("Ошибка при смене роли:", error);
@@ -228,11 +232,10 @@ export function RoleSwitcher({ className }: RoleSwitcherProps) {
                 key={role.id}
                 value={role.role}
                 onSelect={() => {
-                  if (role.role !== activeRole?.role) {
-                    switchRoleMutation.mutate(role.role);
-                  } else {
-                    setOpen(false);
-                  }
+                  console.log("Выбрана роль:", role.role, "Текущая активная роль:", activeRole?.role);
+                  // Обязательно вызываем мутацию даже если роль кажется той же самой
+                  // это может помочь синхронизировать состояние UI с сервером
+                  switchRoleMutation.mutate(role.role);
                 }}
                 className="flex items-center gap-2"
               >

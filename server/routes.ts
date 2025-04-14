@@ -442,11 +442,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      console.log(`Попытка смены роли для пользователя ${req.user.id} на роль ${role}`);
+      console.log(`===== ПЕРЕКЛЮЧЕНИЕ РОЛИ =====`);
+      console.log(`Попытка смены роли для пользователя ${req.user.id} (${req.user.username}) на роль ${role}`);
+      console.log(`Текущая роль пользователя: ${req.user.role}, активная роль: ${req.user.activeRole}`);
       
       // Получаем все доступные роли пользователя (дополнительные роли из user_roles)
       const userRoles = await dataStorage.getUserRoles(req.user.id);
-      console.log(`Получены роли пользователя: ${JSON.stringify(userRoles.map(r => r.role))}`);
+      console.log(`Получены роли пользователя:`, userRoles);
       
       // Проверяем, есть ли у пользователя указанная роль среди дополнительных ролей
       const userRole = userRoles.find(ur => ur.role === role);
@@ -468,6 +470,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         schoolId: req.user.schoolId 
       };
       
+      console.log(`Новая активная роль: ${newRole.role}, с schoolId: ${newRole.schoolId}`);
+      
       // Обновляем активную роль пользователя
       const updatedUser = await dataStorage.updateUser(req.user.id, { 
         activeRole: newRole.role,
@@ -475,9 +479,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         schoolId: newRole.schoolId
       });
       
+      console.log(`Обновленный пользователь:`, updatedUser);
+      
       // Обновляем данные пользователя в сессии
       req.user.activeRole = newRole.role;
       req.user.schoolId = newRole.schoolId;
+      
+      // Обновляем другие поля при необходимости (например, classId)
+      if (userRole && userRole.classId) {
+        console.log(`Обновляем classId на ${userRole.classId}`);
+        req.user.classId = userRole.classId;
+      }
       
       // Создаем запись о действии пользователя
       await dataStorage.createSystemLog({
