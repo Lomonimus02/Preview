@@ -42,8 +42,6 @@ import { HomeworkForm } from "./homework-form";
 import { AssignmentForm } from "../assignments/assignment-form";
 import { AttendanceForm } from "../attendance/attendance-form";
 
-// Функция не нужна, она уже есть ниже в коде
-
 // Функция-хелпер для проверки роли учителя или администратора школы
 const isTeacherOrAdmin = (user?: User | null): boolean => {
   if (!user) return false;
@@ -1094,17 +1092,15 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                 {selectedAssignment && (
                   <>
                     <div>
-                      <h4 className="text-gray-500 text-sm mb-1">Тип задания</h4>
+                      <h4 className="text-gray-500 text-sm mb-1">Тип оценки</h4>
                       <p className="font-medium">{getAssignmentTypeName(selectedAssignment.assignmentType)}</p>
                     </div>
-                    <div>
-                      <h4 className="text-gray-500 text-sm mb-1">Название</h4>
-                      <p className="font-medium">{selectedAssignment.title || "-"}</p>
-                    </div>
-                    <div>
-                      <h4 className="text-gray-500 text-sm mb-1">Описание</h4>
-                      <p className="text-sm">{selectedAssignment.description || "-"}</p>
-                    </div>
+                    {selectedAssignment.description && (
+                      <div>
+                        <h4 className="text-gray-500 text-sm mb-1">Описание</h4>
+                        <p className="text-sm">{selectedAssignment.description}</p>
+                      </div>
+                    )}
                     <div>
                       <h4 className="text-gray-500 text-sm mb-1">Максимальный балл</h4>
                       <p className="font-medium">{selectedAssignment.maxScore}</p>
