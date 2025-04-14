@@ -10,8 +10,8 @@ import express from "express";
 const dataStorage = dbStorage;
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { UserRoleEnum, studentClasses as studentClassesTable, attendance, studentSubgroups } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { UserRoleEnum, studentClasses as studentClassesTable, attendance, studentSubgroups, messages } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -4510,10 +4510,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Проверяем, существует ли сообщение
       const messages = await db
         .select()
-        .from(schema.messages)
+        .from(messages)
         .where(and(
-          eq(schema.messages.id, messageId),
-          eq(schema.messages.chatId, chatId)
+          eq(messages.id, messageId),
+          eq(messages.chatId, chatId)
         ))
         .limit(1);
       
