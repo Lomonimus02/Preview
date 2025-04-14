@@ -160,14 +160,45 @@ export const documents = pgTable("documents", {
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 });
 
-// Messages table
+// Типы чатов
+export enum ChatTypeEnum {
+  PRIVATE = "private",    // Личный чат между двумя пользователями
+  GROUP = "group"         // Групповой чат
+}
+
+// Чаты
+export const chats = pgTable("chats", {
+  id: serial("id").primaryKey(),
+  name: text("name"),                                     // Название чата (для групповых)
+  type: text("type").$type<ChatTypeEnum>().notNull(),    // Тип чата: личный или групповой
+  creatorId: integer("creator_id").notNull(),            // Создатель чата
+  schoolId: integer("school_id").notNull(),              // ID школы, чтобы ограничить чаты в рамках школы
+  avatarUrl: text("avatar_url"),                         // URL аватарки группового чата
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastMessageAt: timestamp("last_message_at"),           // Время последнего сообщения (для сортировки)
+});
+
+// Участники чата
+export const chatParticipants = pgTable("chat_participants", {
+  id: serial("id").primaryKey(),
+  chatId: integer("chat_id").notNull(),
+  userId: integer("user_id").notNull(),
+  isAdmin: boolean("is_admin").default(false),           // Администратор группового чата
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  lastReadMessageId: integer("last_read_message_id"),    // ID последнего прочитанного сообщения
+});
+
+// Сообщения
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
-  senderId: integer("sender_id").notNull(),
-  receiverId: integer("receiver_id").notNull(),
-  content: text("content").notNull(),
-  isRead: boolean("is_read").default(false).notNull(),
-  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  chatId: integer("chat_id").notNull(),                  // ID чата, вместо senderId/receiverId
+  senderId: integer("sender_id").notNull(),              // Кто отправил сообщение
+  content: text("content"),                              // Текст сообщения (может быть NULL, если есть вложение)
+  hasAttachment: boolean("has_attachment").default(false).notNull(), // Есть ли вложение
+  attachmentType: text("attachment_type"),               // Тип вложения: image, document, video
+  attachmentUrl: text("attachment_url"),                 // URL вложения
+  isRead: boolean("is_read").default(false).notNull(),   // Прочитано ли сообщение (устаревшее, используем lastReadMessageId)
+  sentAt: timestamp("sent_at").defaultNow().notNull(),   // Когда отправлено
 });
 
 // Notifications table
@@ -329,6 +360,18 @@ export const insertAttendanceSchema = createInsertSchema(attendance).omit({
 export const insertDocumentSchema = createInsertSchema(documents).omit({
   id: true,
   uploadedAt: true
+});
+
+export const insertChatSchema = createInsertSchema(chats).omit({
+  id: true,
+  createdAt: true,
+  lastMessageAt: true
+});
+
+export const insertChatParticipantSchema = createInsertSchema(chatParticipants).omit({
+  id: true,
+  joinedAt: true,
+  lastReadMessageId: true
 });
 
 export const insertMessageSchema = createInsertSchema(messages).omit({
