@@ -463,6 +463,23 @@ export class DatabaseStorage implements IStorage {
     } as unknown as Message;
   }
   
+  async deleteMessage(id: number): Promise<Message | undefined> {
+    // Получаем сообщение перед удалением
+    const message = await db.select().from(messages).where(eq(messages.id, id)).limit(1);
+    
+    if (message.length === 0) {
+      return undefined;
+    }
+    
+    // Удаляем сообщение
+    await db.delete(messages).where(eq(messages.id, id));
+    
+    return {
+      ...message[0],
+      message: message[0].content, // Преобразуем для совместимости с интерфейсом
+    } as unknown as Message;
+  }
+  
   // ===== Chat operations =====
   async createChat(chat: InsertChat): Promise<Chat> {
     const [newChat] = await db.insert(chats).values({
