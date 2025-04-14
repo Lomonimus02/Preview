@@ -990,7 +990,23 @@ export default function ClassGradeDetailsPage() {
         }
       } else {
         console.error("Задание не найдено при сохранении оценки. AssignmentId:", data.assignmentId);
+        
+        // Уведомляем пользователя об ошибке
+        toast({
+          title: "Ошибка при сохранении оценки",
+          description: "Выбранное задание не найдено. Пожалуйста, выберите другое задание.",
+          variant: "destructive"
+        });
+        return;
       }
+    } else if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && !data.assignmentId) {
+      // Если накопительная система, но не выбрано задание - это ошибка
+      toast({
+        title: "Ошибка при сохранении оценки",
+        description: "Для накопительной системы оценок необходимо выбрать задание.",
+        variant: "destructive"
+      });
+      return;
     }
     
     // Если не нужна коррекция или это не накопительная система
