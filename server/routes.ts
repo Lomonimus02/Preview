@@ -4315,6 +4315,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Получение участников чата
+  app.get("/api/chats/:chatId/participants", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = parseInt(req.params.chatId);
+      if (isNaN(chatId)) {
+        return res.status(400).json({ message: "Invalid chat ID" });
+      }
+      
+      // Проверяем, существует ли чат
+      const chat = await dataStorage.getChat(chatId);
+      if (!chat) {
+        return res.status(404).json({ message: "Chat not found" });
+      }
+      
+      // Проверяем, является ли пользователь участником чата
+      const participants = await dataStorage.getChatParticipants(chatId);
+      const isParticipant = participants.some(p => p.userId === req.user.id);
+      
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant of this chat" });
+      }
+      
+      // Получаем информацию о всех участниках чата
+      const participantDetails = await Promise.all(
+        participants.map(async (p) => {
+          const user = await dataStorage.getUser(p.userId);
+          return {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            username: user.username,
+            role: user.role,
+            joinedAt: p.joinedAt
+          };
+        })
+      );
+      
+      res.json(participantDetails);
+    } catch (error) {
+      console.error("Error getting chat participants:", error);
+      res.status(500).json({ message: "Failed to get chat participants" });
+    }
+  });
+
   // Получение сообщений в чате
   app.get("/api/chats/:chatId/messages", isAuthenticated, async (req, res) => {
     try {
