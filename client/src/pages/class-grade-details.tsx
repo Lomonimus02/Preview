@@ -2097,14 +2097,19 @@ export default function ClassGradeDetailsPage() {
                                       ))}
                                       {/* Убрали кнопку "+" для добавления еще одной оценки, используем прямой ввод */}
                                     </div>
-                                  ) : canEditGrades ? (
-                                    // Для пустой ячейки показываем поле для ввода
+                                  ) : canEditGrades && ((classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && slot.assignments && slot.assignments.length > 0) 
+                                      || classData?.gradingSystem !== GradingSystemEnum.CUMULATIVE) ? (
+                                    // Для пустой ячейки показываем поле для ввода только если:
+                                    // 1) В накопительной системе - есть задания для этого урока
+                                    // 2) В обычной системе - всегда показываем
                                     <div 
                                       className="w-10 h-7 border border-dashed rounded flex items-center justify-center text-gray-400 cursor-pointer hover:border-primary hover:text-primary transition-colors"
                                       onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
                                       title="Нажмите для добавления оценки"
                                     >
-                                      {`/5`}
+                                      {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && slot.assignments && slot.assignments.length > 0 
+                                        ? `/${slot.assignments[0].maxScore}` 
+                                        : `/5`}
                                     </div>
                                   ) : (
                                     "-"
