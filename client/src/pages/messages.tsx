@@ -17,7 +17,10 @@ import {
   PaperclipIcon,
   Image,
   FileIcon,
-  X
+  X,
+  Play,
+  Download,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -662,22 +665,65 @@ export default function MessagesPage() {
                                 {message.hasAttachment && message.attachmentUrl && (
                                   <div className="mt-2">
                                     {message.attachmentType === 'image' ? (
-                                      <img 
-                                        src={message.attachmentUrl} 
-                                        alt="Изображение" 
-                                        className="max-w-full rounded"
-                                      />
+                                      <a 
+                                        href={message.attachmentUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="block"
+                                      >
+                                        <img 
+                                          src={message.attachmentUrl} 
+                                          alt="Изображение" 
+                                          className="max-w-full rounded hover:opacity-90 transition-opacity"
+                                        />
+                                      </a>
                                     ) : message.attachmentType === 'video' ? (
-                                      <video 
-                                        src={message.attachmentUrl}
-                                        controls
-                                        className="max-w-full rounded"
-                                      />
-                                    ) : (
-                                      <div className="flex items-center p-2 bg-white/20 rounded">
-                                        <FileIcon className="h-4 w-4 mr-2" />
-                                        <span className="text-sm truncate">Документ</span>
+                                      <div className="rounded overflow-hidden">
+                                        <div className="relative">
+                                          <video 
+                                            src={message.attachmentUrl}
+                                            controls
+                                            className="max-w-full w-full rounded"
+                                            controlsList="nodownload"
+                                            preload="metadata"
+                                            poster={message.attachmentUrl + '?poster=true'}
+                                          />
+                                          <div className="absolute inset-0 bg-black/10 pointer-events-none flex items-center justify-center">
+                                            <Play className="h-8 w-8 text-white opacity-80" />
+                                          </div>
+                                        </div>
+                                        <div className="flex mt-1 gap-1">
+                                          <a 
+                                            href={message.attachmentUrl} 
+                                            download
+                                            className="flex items-center p-1 bg-white/20 justify-center text-xs rounded flex-1 hover:bg-white/30 transition-colors"
+                                          >
+                                            <Download className="h-3 w-3 mr-1" />
+                                            <span>Скачать</span>
+                                          </a>
+                                          <a 
+                                            href={message.attachmentUrl} 
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center p-1 bg-white/20 justify-center text-xs rounded flex-1 hover:bg-white/30 transition-colors"
+                                          >
+                                            <ExternalLink className="h-3 w-3 mr-1" />
+                                            <span>Открыть</span>
+                                          </a>
+                                        </div>
                                       </div>
+                                    ) : (
+                                      <a 
+                                        href={message.attachmentUrl} 
+                                        download
+                                        className="flex items-center p-2 bg-white/20 rounded hover:bg-white/30 transition-colors"
+                                      >
+                                        <FileIcon className="h-4 w-4 mr-2" />
+                                        <span className="text-sm truncate flex-grow">
+                                          {message.attachmentUrl.split('/').pop() || 'Документ'}
+                                        </span>
+                                        <span className="text-xs opacity-70 ml-2">Скачать</span>
+                                      </a>
                                     )}
                                   </div>
                                 )}
@@ -707,23 +753,64 @@ export default function MessagesPage() {
                 
                 <CardFooter className="p-4 border-t">
                   {selectedAttachment && (
-                    <div className="flex items-center mb-2 p-2 bg-gray-100 rounded-md w-full">
-                      {selectedAttachment.type.startsWith('image/') ? (
-                        <Image className="h-4 w-4 mr-2 text-gray-600" />
-                      ) : (
-                        <FileIcon className="h-4 w-4 mr-2 text-gray-600" />
-                      )}
-                      <span className="text-sm text-gray-600 flex-grow truncate">
-                        {selectedAttachment.name}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={cancelAttachment}
-                        className="ml-2 h-6 w-6 p-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                    <div className="mb-3 border border-dashed border-gray-300 rounded-lg p-3 bg-gray-50">
+                      <div className="flex items-start">
+                        {selectedAttachment.type.startsWith('image/') ? (
+                          <div className="w-14 h-14 relative overflow-hidden rounded bg-white border flex-shrink-0 mr-3">
+                            <img 
+                              src={URL.createObjectURL(selectedAttachment)} 
+                              alt="Предпросмотр" 
+                              className="object-cover w-full h-full"
+                            />
+                          </div>
+                        ) : selectedAttachment.type.startsWith('video/') ? (
+                          <div className="w-14 h-14 flex items-center justify-center bg-gray-200 rounded flex-shrink-0 mr-3 relative">
+                            <video className="h-6 w-6 text-gray-600" />
+                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-[8px] px-1 rounded">
+                              MP4
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 flex items-center justify-center bg-gray-100 rounded flex-shrink-0 mr-3 relative border">
+                            <FileIcon className="h-6 w-6 text-gray-500" />
+                            <div className="absolute bottom-1 right-1 bg-gray-200 text-gray-700 text-[8px] px-1 rounded">
+                              {selectedAttachment.name.split('.').pop()?.toUpperCase() || 'FILE'}
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex flex-col flex-grow min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-700 truncate max-w-[200px]">
+                              {selectedAttachment.name}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={cancelAttachment}
+                              className="h-6 w-6 p-0 ml-1"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                          
+                          <div className="flex items-center mt-1">
+                            <span className="text-xs text-gray-500">
+                              {(selectedAttachment.size / 1024 < 1024) 
+                                ? `${(selectedAttachment.size / 1024).toFixed(1)} КБ` 
+                                : `${(selectedAttachment.size / 1024 / 1024).toFixed(2)} МБ`}
+                            </span>
+                            <span className="mx-1.5 w-1 h-1 bg-gray-400 rounded-full inline-block"></span>
+                            <span className="text-xs text-gray-500">
+                              {selectedAttachment.type.split('/')[0]}
+                            </span>
+                          </div>
+                          
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                            <div className="bg-primary h-1.5 rounded-full" style={{ width: '100%' }}></div>
+                          </div>
+                          <span className="text-xs text-gray-500 mt-0.5">Готов к отправке</span>
+                        </div>
+                      </div>
                     </div>
                   )}
                   
@@ -738,15 +825,25 @@ export default function MessagesPage() {
                         onChange={handleFileChange}
                         className="hidden"
                       />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={openFileDialog}
-                        className="h-10 w-10"
-                      >
-                        <PaperclipIcon className="h-4 w-4" />
-                      </Button>
+                      <div className="relative group">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={openFileDialog}
+                          className="h-10 w-10 relative"
+                        >
+                          <PaperclipIcon className="h-4 w-4" />
+                        </Button>
+                        <div className="absolute bottom-full mb-2 left-0 bg-white shadow-md rounded-md p-2 hidden group-hover:block min-w-[250px] text-xs z-10">
+                          <p className="font-medium mb-1">Поддерживаемые типы файлов:</p>
+                          <ul className="space-y-1">
+                            <li className="flex items-center"><Image className="h-3 w-3 mr-1" />Изображения (jpg, png, gif, jpeg)</li>
+                            <li className="flex items-center"><video className="h-3 w-3 mr-1" />Видео (mp4, avi, mov, mkv)</li>
+                            <li className="flex items-center"><FileIcon className="h-3 w-3 mr-1" />Документы (pdf, doc, docx, xls, xlsx, txt)</li>
+                          </ul>
+                        </div>
+                      </div>
                       <FormField
                         control={messageForm.control}
                         name="content"
