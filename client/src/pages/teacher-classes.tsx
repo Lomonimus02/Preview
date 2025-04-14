@@ -508,6 +508,7 @@ export default function TeacherClasses() {
                                     key={schedule.id} 
                                     className={`text-center cursor-pointer ${isLessonConducted ? 'bg-green-50' : 'bg-gray-50'}`}
                                     onClick={() => openLessonStatusDialog(schedule)}
+                                    colSpan={schedule.assignments && schedule.assignments.length > 0 ? schedule.assignments.length : 1}
                                   >
                                     <div className="flex flex-col items-center justify-center">
                                       {schedule.scheduleDate ? new Date(schedule.scheduleDate).toLocaleDateString('ru-RU') : 'Без даты'}
@@ -524,6 +525,23 @@ export default function TeacherClasses() {
                                         </span>
                                       )}
                                     </div>
+                                    {/* Подзаголовки с типами заданий */}
+                                    {schedule.assignments && schedule.assignments.length > 0 && (
+                                      <div className="flex flex-row justify-center space-x-2 mt-1">
+                                        {schedule.assignments.map(assignment => (
+                                          <span 
+                                            key={assignment.id} 
+                                            className="text-xs font-medium px-1 py-0.5 rounded bg-opacity-70"
+                                            style={{ 
+                                              backgroundColor: getAssignmentTypeColor(assignment.assignmentType).bgColor,
+                                              color: getAssignmentTypeColor(assignment.assignmentType).textColor
+                                            }}
+                                          >
+                                            {getAssignmentTypeName(assignment.assignmentType)}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
                                   </TableHead>
                                 );
                               })}
