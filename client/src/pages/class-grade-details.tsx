@@ -1005,18 +1005,28 @@ export default function ClassGradeDetailsPage() {
       
       setIsAssignmentDialogOpen(true);
       
-      // Заполняем скрытые поля формы
-      const scheduleIdInput = document.getElementById('assignment-scheduleId') as HTMLInputElement;
-      const classIdInput = document.getElementById('assignment-classId') as HTMLInputElement;
-      const subjectIdInput = document.getElementById('assignment-subjectId') as HTMLInputElement;
-      const teacherIdInput = document.getElementById('assignment-teacherId') as HTMLInputElement;
-      const subgroupIdInput = document.getElementById('assignment-subgroupId') as HTMLInputElement;
-      
-      if (scheduleIdInput) scheduleIdInput.value = schedule.id.toString();
-      if (classIdInput) classIdInput.value = classId.toString();
-      if (subjectIdInput) subjectIdInput.value = subjectId.toString();
-      if (teacherIdInput) teacherIdInput.value = (user?.id || 0).toString();
-      if (subgroupIdInput && schedule.subgroupId) subgroupIdInput.value = schedule.subgroupId.toString();
+      // Делаем небольшую задержку, чтобы убедиться, что форма открылась и элементы существуют
+      setTimeout(() => {
+        // Заполняем скрытые поля формы
+        const scheduleIdInput = document.getElementById('assignment-scheduleId') as HTMLInputElement;
+        
+        if (scheduleIdInput) {
+          scheduleIdInput.value = schedule.id.toString();
+          console.log("scheduleId установлен:", schedule.id);
+        } else {
+          console.error("scheduleIdInput элемент не найден в форме задания");
+        }
+        
+        const classIdInput = document.getElementById('assignment-classId') as HTMLInputElement;
+        const subjectIdInput = document.getElementById('assignment-subjectId') as HTMLInputElement;
+        const teacherIdInput = document.getElementById('assignment-teacherId') as HTMLInputElement;
+        const subgroupIdInput = document.getElementById('assignment-subgroupId') as HTMLInputElement;
+        
+        if (classIdInput) classIdInput.value = classId.toString();
+        if (subjectIdInput) subjectIdInput.value = subjectId.toString();
+        if (teacherIdInput) teacherIdInput.value = (user?.id || 0).toString();
+        if (subgroupIdInput && schedule.subgroupId) subgroupIdInput.value = schedule.subgroupId.toString();
+      }, 100);
     } else {
       toast({
         title: "Ошибка",
@@ -2045,7 +2055,7 @@ export default function ClassGradeDetailsPage() {
               </div>
               
               {/* Hidden fields */}
-              <input type="hidden" id="assignment-scheduleId" name="scheduleId" />
+              <input type="hidden" id="assignment-scheduleId" name="scheduleId" defaultValue="" />
               <input type="hidden" id="assignment-classId" name="classId" value={classId} />
               <input type="hidden" id="assignment-subjectId" name="subjectId" value={subjectId} />
               <input type="hidden" id="assignment-teacherId" name="teacherId" value={user?.id} />
