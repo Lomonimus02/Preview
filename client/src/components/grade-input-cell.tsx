@@ -43,6 +43,12 @@ export const GradeInputCell: React.FC<GradeInputCellProps> = ({
       return false;
     }
     
+    // Проверяем, что оценка не меньше 0
+    if (gradeValue < 0) {
+      setError('Оценка не может быть отрицательной');
+      return false;
+    }
+    
     // Проверяем, что оценка не больше максимального балла
     if (gradeValue > maxScore) {
       const errorMessage = `Оценка не может быть больше ${maxScore} баллов`;

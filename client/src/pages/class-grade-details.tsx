@@ -1296,10 +1296,10 @@ export default function ClassGradeDetailsPage() {
     const maxScore = parseInt(assignment.maxScore);
     
     // Проверка на корректность ввода и на максимальный балл
-    if (isNaN(grade) || grade < 1) {
+    if (isNaN(grade) || grade < 0) {
       toast({
         title: "Некорректная оценка",
-        description: "Оценка должна быть положительным числом",
+        description: "Оценка должна быть неотрицательным числом",
         variant: "destructive"
       });
       return;
@@ -1471,7 +1471,7 @@ export default function ClassGradeDetailsPage() {
         .filter((id): id is number => id !== null);
       
       // Убираем дубликаты, если есть
-      const uniqueSubgroupIds = [...new Set(relatedSubgroupIds)];
+      const uniqueSubgroupIds = Array.from(new Set(relatedSubgroupIds));
       console.log(`Подгруппы для предмета ${subjectId}:`, uniqueSubgroupIds);
       
       // 2. Собираем все расписания (уроки) этих подгрупп
@@ -1518,7 +1518,7 @@ export default function ClassGradeDetailsPage() {
         // КРИТЕРИЙ 3: Если студент состоит в подгруппе по этому предмету,
         // то не показываем его оценки без расписания в основном журнале
         // (они должны быть только в журнале подгруппы)
-        if (subgroupStudentIds.has(grade.studentId) && !grade.scheduleId) {
+        if (Array.from(subgroupStudentIds).includes(grade.studentId) && !grade.scheduleId) {
           return false;
         }
         
@@ -1815,7 +1815,7 @@ export default function ClassGradeDetailsPage() {
                   {subgroupId 
                     ? `Журнал показывает только учеников из выбранной подгруппы. `
                     : ''}
-                  Нажмите на ячейку с "+" чтобы добавить оценку. Нажмите на дату урока, чтобы изменить его статус.
+                  Нажмите на пустую ячейку, чтобы добавить оценку. Нажмите на дату урока, чтобы изменить его статус.
                 </CardDescription>
               </CardHeader>
               <CardContent>
