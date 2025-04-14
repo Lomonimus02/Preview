@@ -341,7 +341,17 @@ export default function MessagesPage() {
   // Прокрутка вниз при получении новых сообщений
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      // Находим реальный элемент прокрутки внутри ScrollArea
+      const scrollViewport = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollViewport) {
+        // Плавная прокрутка вниз
+        setTimeout(() => {
+          scrollViewport.scrollTo({
+            top: scrollViewport.scrollHeight,
+            behavior: 'smooth'
+          });
+        }, 100);
+      }
     }
   }, [chatMessages]);
   
