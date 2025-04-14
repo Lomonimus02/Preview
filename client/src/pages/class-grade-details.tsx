@@ -18,6 +18,7 @@ import {
   AssignmentTypeEnum,
   Assignment
 } from "@shared/schema";
+import { GradeInputCell } from "@/components/grade-input-cell";
 import { z } from "zod";
 
 
