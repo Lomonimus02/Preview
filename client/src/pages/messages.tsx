@@ -203,7 +203,7 @@ export default function MessagesPage() {
       }
       
       // Отправляем сообщение
-      const res = await apiRequest("POST", `/api/chats/${data.chatId}/messages`, {
+      const res = await apiRequest(`/api/chats/${data.chatId}/messages`, "POST", {
         content: data.content,
         hasAttachment,
         attachmentType,
@@ -230,7 +230,7 @@ export default function MessagesPage() {
   // Мутация для создания нового чата
   const createChatMutation = useMutation({
     mutationFn: async (data: NewChatFormValues) => {
-      const res = await apiRequest("POST", "/api/chats", data);
+      const res = await apiRequest("/api/chats", "POST", data);
       return res.json();
     },
     onSuccess: (newChat) => {
@@ -255,7 +255,7 @@ export default function MessagesPage() {
   // Мутация для обновления статуса прочтения
   const updateReadStatusMutation = useMutation({
     mutationFn: async ({ chatId, messageId }: { chatId: number, messageId: number }) => {
-      const res = await apiRequest("PUT", `/api/chats/${chatId}/read-status`, { messageId });
+      const res = await apiRequest(`/api/chats/${chatId}/read-status`, "PUT", { messageId });
       return res.json();
     },
     onSuccess: () => {
