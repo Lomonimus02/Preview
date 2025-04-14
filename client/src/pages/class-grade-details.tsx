@@ -1037,11 +1037,21 @@ export default function ClassGradeDetailsPage() {
     event.preventDefault();
     
     const formData = new FormData(event.currentTarget);
-    const assignmentType = formData.get('assignmentType') as string;
+    const assignmentTypeValue = formData.get('assignmentType') as string;
     
-    // Преобразуем строковый тип задания в AssignmentTypeEnum
+    // Проверка корректности типа задания
+    if (!Object.values(AssignmentTypeEnum).includes(assignmentTypeValue as AssignmentTypeEnum)) {
+      toast({
+        title: "Ошибка при добавлении задания",
+        description: "Неправильный тип задания",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Создаем правильно типизированные данные
     const data = {
-      assignmentType: assignmentType as AssignmentTypeEnum, // Теперь тип явно приведен к enum
+      assignmentType: assignmentTypeValue as AssignmentTypeEnum,
       maxScore: formData.get('maxScore') as string,
       description: formData.get('description') as string || null,
       scheduleId: parseInt(formData.get('scheduleId') as string),
@@ -1575,8 +1585,10 @@ export default function ClassGradeDetailsPage() {
                                                   });
                                                   return;
                                                 }
-                                                
-                                                const maxScore = parseInt(slot.assignments[0].maxScore);
+
+                                                // Теперь мы знаем, что slot.assignments существует и содержит элементы
+                                                const assignment = slot.assignments[0];
+                                                const maxScore = parseInt(assignment.maxScore);
                                                 
                                                 if (gradeValue > maxScore) {
                                                   toast({
@@ -1595,8 +1607,8 @@ export default function ClassGradeDetailsPage() {
                                                   subjectId: subjectId,
                                                   teacherId: user?.id as number,
                                                   scheduleId: slot.scheduleId,
-                                                  assignmentId: slot.assignments[0].id,
-                                                  gradeType: slot.assignments[0].assignmentType,
+                                                  assignmentId: assignment.id,
+                                                  gradeType: assignment.assignmentType,
                                                   date: slot.date,
                                                   comment: '',
                                                   subgroupId: subgroupId
