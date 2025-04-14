@@ -6,7 +6,7 @@ import { useRoleCheck } from "@/hooks/use-role-check";
 import { UserRoleEnum, Grade, Class, Subject, User, Schedule } from "@shared/schema";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, BookOpen, UserCheck, Calendar as CalendarIcon, Search, Filter, Check, X } from "lucide-react";
+import { AlertCircle, BookOpen, UserCheck, Calendar as CalendarIcon, Search, Filter, Check, X, Loader2, Plus } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -630,18 +630,34 @@ export default function TeacherClasses() {
                                     colSpan={schedule.assignments && schedule.assignments.length > 0 ? schedule.assignments.length : 1}
                                   >
                                     <div className="flex flex-col items-center justify-center">
-                                      {schedule.scheduleDate ? new Date(schedule.scheduleDate).toLocaleDateString('ru-RU') : 'Без даты'}
+                                      <div className="flex items-center">
+                                        <span>{schedule.scheduleDate ? new Date(schedule.scheduleDate).toLocaleDateString('ru-RU') : 'Без даты'}</span>
+                                        {isLessonConducted && (
+                                          <span className="text-green-600 ml-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                            </svg>
+                                          </span>
+                                        )}
+                                      </div>
                                       {schedule.startTime && 
                                         <span className="text-xs text-gray-500">
                                           ({schedule.startTime.slice(0, 5)})
                                         </span>
                                       }
                                       {isLessonConducted && (
-                                        <span className="text-green-600 ml-1">
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                          </svg>
-                                        </span>
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm" 
+                                          className="mt-1 text-xs px-2 py-0 h-6"
+                                          onClick={(e) => {
+                                            e.stopPropagation(); // Предотвращаем всплытие события
+                                            openAssignmentDialog(schedule);
+                                          }}
+                                        >
+                                          <Plus className="h-3 w-3 mr-1" />
+                                          Задание
+                                        </Button>
                                       )}
                                     </div>
                                     {/* Подзаголовки с типами заданий */}
