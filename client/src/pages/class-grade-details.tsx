@@ -505,9 +505,38 @@ export default function ClassGradeDetailsPage() {
     const studentGrades = filteredGrades.filter(g => g.studentId === studentId);
     if (studentGrades.length === 0) return "-";
     
-    const sum = studentGrades.reduce((acc, g) => acc + g.grade, 0);
-    return (sum / studentGrades.length).toFixed(1);
-  }, [filteredGrades]);
+    // Для накопительной системы оценок вычисляем процент от максимума
+    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+      let totalSum = 0;
+      let totalMaxScore = 0;
+      
+      // Проходим по всем оценкам студента и собираем сумму и максимально возможную сумму
+      for (const grade of studentGrades) {
+        if (grade.assignmentId) {
+          // Находим соответствующее задание для этой оценки
+          const assignment = assignments.find(a => a.id === grade.assignmentId);
+          if (assignment) {
+            totalSum += grade.grade;
+            totalMaxScore += parseInt(assignment.maxScore);
+          }
+        } else {
+          // Если нет связи с заданием, считаем обычным образом
+          totalSum += grade.grade;
+          totalMaxScore += 5; // Предполагаем максимум для обычной оценки
+        }
+      }
+      
+      if (totalMaxScore === 0) return "-"; // Защита от деления на ноль
+      
+      // Возвращаем процент от максимального балла
+      const percentage = (totalSum / totalMaxScore) * 100;
+      return percentage.toFixed(1) + "%";
+    } else {
+      // Для обычной системы - простое среднее арифметическое
+      const sum = studentGrades.reduce((acc, g) => acc + g.grade, 0);
+      return (sum / studentGrades.length).toFixed(1);
+    }
+  }, [filteredGrades, assignments, classData?.gradingSystem]);
   
   // Функция для построения схемы формы для добавления оценки
   // с учетом типа оценочной системы и выбранного задания
@@ -1042,12 +1071,17 @@ export default function ClassGradeDetailsPage() {
   
   // Function to check if a new grade can be added to a lesson
   const canAddGradeToLesson = (scheduleId: number, slot: LessonSlot) => {
-    // В накопительной системе, можно добавлять оценки только если есть задания
+    // Проверяем, проведен ли урок. Оценки можно выставлять только за проведенные уроки
+    if (slot.status !== 'conducted') {
+      return false;
+    }
+    
+    // В накопительной системе, можно добавлять оценки только если есть задания для проведенного урока
     if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
       return slot.assignments && slot.assignments.length > 0;
     }
     
-    // В обычной системе можно добавлять оценки к любому уроку
+    // В обычной системе можно добавлять оценки к любому проведенному уроку
     return true;
   };
   
