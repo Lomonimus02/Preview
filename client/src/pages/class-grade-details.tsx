@@ -387,6 +387,28 @@ export default function ClassGradeDetailsPage() {
         return assignmentType;
     }
   }, []);
+  
+  // Функция для получения названия типа оценки
+  const getGradeTypeName = useCallback((gradeType: string) => {
+    switch(gradeType) {
+      case 'test':
+      case 'Контрольная':
+        return 'Контрольная работа';
+      case 'exam':
+      case 'Экзамен':
+        return 'Экзамен';
+      case 'homework':
+      case 'Домашняя':
+        return 'Домашнее задание';
+      case 'project':
+        return 'Проект';
+      case 'classwork':
+      case 'Практическая':
+        return 'Работа на уроке';
+      default:
+        return gradeType;
+    }
+  }, []);
 
   // Get unique lesson slots (date + scheduleId pairs) from schedules for this class and subject
   // Используем useState вместо useMemo, чтобы можно было обновлять данные
@@ -1316,7 +1338,7 @@ export default function ClassGradeDetailsPage() {
                                                 // Если оценки нет, показываем поле для прямого ввода
                                                 <Input
                                                   type="number"
-                                                  className="w-10 h-7 text-center p-0 text-sm mx-auto"
+                                                  className="w-10 h-7 text-center p-0 text-sm mx-auto bg-transparent"
                                                   min={1}
                                                   max={parseInt(assignment.maxScore)}
                                                   placeholder=""
@@ -1340,6 +1362,7 @@ export default function ClassGradeDetailsPage() {
                                                           comment: '',
                                                           subgroupId: subgroupId
                                                         };
+                                                        console.log("Добавление оценки:", newGrade);
                                                         addGradeMutation.mutate(newGrade);
                                                         (e.target as HTMLInputElement).value = '';
                                                       }
@@ -1445,7 +1468,7 @@ export default function ClassGradeDetailsPage() {
                                       slot.assignments.length === 1 ? (
                                         <Input
                                           type="number"
-                                          className="w-10 h-7 text-center p-0 text-sm mx-auto"
+                                          className="w-10 h-7 text-center p-0 text-sm mx-auto bg-transparent"
                                           min={1}
                                           max={parseInt(slot.assignments[0].maxScore)}
                                           placeholder=""
@@ -1469,6 +1492,7 @@ export default function ClassGradeDetailsPage() {
                                                   comment: '',
                                                   subgroupId: subgroupId
                                                 };
+                                                console.log("Добавление оценки:", newGrade);
                                                 addGradeMutation.mutate(newGrade);
                                                 (e.target as HTMLInputElement).value = '';
                                               }
@@ -1914,10 +1938,8 @@ export default function ClassGradeDetailsPage() {
             
             {selectedSchedule && (
               <AttendanceForm 
-                scheduleId={selectedSchedule.id} 
-                classId={classId}
-                subgroupId={subgroupId}
-                onSaved={() => setIsAttendanceDialogOpen(false)}
+                schedule={selectedSchedule}
+                onClose={() => setIsAttendanceDialogOpen(false)}
               />
             )}
           </DialogContent>
