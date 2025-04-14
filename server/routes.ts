@@ -4192,9 +4192,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })
         );
         
+        // Находим данные текущего пользователя в чате
+        const currentUserParticipant = participants.find(p => p.userId === userId);
+        const lastReadId = currentUserParticipant?.lastReadMessageId || 0;
+        
+        // Получаем количество непрочитанных сообщений
+        const messages = await dataStorage.getChatMessages(chat.id);
+        const unreadCount = messages.filter(m => 
+          m.senderId !== userId && // Не от текущего пользователя
+          m.id > lastReadId // ID больше последнего прочитанного
+        ).length;
+        
         return {
           ...chat,
-          participants: participantDetails
+          participants: participantDetails,
+          unreadCount: unreadCount // Добавляем счетчик непрочитанных сообщений
         };
       }));
       
@@ -4535,7 +4547,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Обновляем статус прочтения
       await dataStorage.markLastReadMessage(chatId, req.user.id, messageId);
       
-      res.status(200).json({ success: true });
+      // Получаем обновленные данные о непрочитанных сообщениях
+      // Это позволит обновить счетчик непрочитанных сообщений на фронтенде
+      const messages = await dataStorage.getChatMessages(chatId);
+      const lastReadId = messageId;
+      const unreadCount = messages.filter(m => 
+        m.senderId !== req.user.id && // Не от текущего пользователя
+        m.id > lastReadId // ID больше последнего прочитанного
+      ).length;
+      
+      res.status(200).json({ 
+        success: true,
+        unreadCount: unreadCount 
+      });
     } catch (error) {
       console.error("Error updating read status:", error);
       res.status(500).json({ message: "Failed to update read status" });
