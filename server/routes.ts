@@ -4508,20 +4508,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Проверяем, существует ли сообщение
-      const messages = await db
+      const messagesResult = await db
         .select()
-        .from(messages)
+        .from(schema.messages)
         .where(and(
-          eq(messages.id, messageId),
-          eq(messages.chatId, chatId)
+          eq(schema.messages.id, messageId),
+          eq(schema.messages.chatId, chatId)
         ))
         .limit(1);
       
-      if (messages.length === 0) {
+      if (messagesResult.length === 0) {
         return res.status(404).json({ message: "Message not found" });
       }
       
-      const message = messages[0];
+      const message = messagesResult[0];
       
       // Проверяем, что пользователь является отправителем сообщения или администратором
       const isAdmin = [
