@@ -302,10 +302,9 @@ export default function MessagesPage() {
       return res.json();
     },
     onSuccess: (data) => {
-      // Обновляем информацию о всех чатах
-      // Заменяем на более точечное обновление, если серверный API возвращает unreadCount
-      if (data && 'unreadCount' !== undefined) {
-        // Обновляем кеш с точным количеством непрочитанных сообщений
+      // Проверяем, что данные содержат информацию о непрочитанных сообщениях
+      if (data && typeof data.unreadCount !== 'undefined') {
+        // Обновляем кеш с точным количеством непрочитанных сообщений для конкретного чата
         queryClient.setQueryData(["/api/chats"], (oldData: any) => {
           if (!oldData) return oldData;
           
@@ -319,9 +318,17 @@ export default function MessagesPage() {
             return chat;
           });
         });
+        
+        // Обновляем общее количество непрочитанных сообщений для уведомлений в навигации
+        if (typeof data.totalUnreadCount !== 'undefined') {
+          // Здесь можно обновить глобальное состояние или кеш для уведомлений навигации
+          // Например, через контекст или глобальное состояние
+          queryClient.setQueryData(["/api/notifications/count"], () => data.totalUnreadCount);
+        }
       } else {
         // Запасной вариант: полное обновление
         queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications/count"] });
       }
     },
   });
