@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { dbStorage } from "./db-storage";
 import { db } from "./db";
 import { upload, getFileType, getFileUrl } from './utils/file-upload';
+import path from "path";
+import express from "express";
 
 // Используем хранилище БД для всех операций
 const dataStorage = dbStorage;
@@ -10,8 +12,6 @@ import { setupAuth } from "./auth";
 import { z } from "zod";
 import { UserRoleEnum, studentClasses as studentClassesTable, attendance, studentSubgroups } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import path from "path";
-import express from "express";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes

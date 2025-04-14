@@ -197,9 +197,30 @@ export default function MessagesPage() {
           attachmentType = 'document';
         }
         
-        // В реальном приложении здесь должен быть код для загрузки файла на сервер
-        // и получения постоянного URL. Для демонстрации пока убираем эту часть.
-        attachmentUrl = "https://example.com/placeholder-attachment.png"; // Временный плейсхолдер
+        // Загружаем файл на сервер
+        const formData = new FormData();
+        formData.append('file', data.attachmentFile);
+        
+        try {
+          const uploadResponse = await fetch(`/api/chats/${data.chatId}/upload`, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include'
+          });
+          
+          if (!uploadResponse.ok) {
+            throw new Error('Не удалось загрузить файл');
+          }
+          
+          const uploadResult = await uploadResponse.json();
+          attachmentUrl = uploadResult.fileUrl;
+          attachmentType = uploadResult.fileType;
+          
+          console.log('Файл успешно загружен:', uploadResult);
+        } catch (error) {
+          console.error('Ошибка при загрузке файла:', error);
+          throw new Error('Не удалось загрузить файл: ' + (error.message || 'неизвестная ошибка'));
+        }
       }
       
       // Отправляем сообщение
@@ -207,14 +228,14 @@ export default function MessagesPage() {
         content: data.content,
         hasAttachment,
         attachmentType,
+        attachmentUrl
       });
       
       const res = await apiRequest(`/api/chats/${data.chatId}/messages`, "POST", {
         content: data.content,
         hasAttachment,
         attachmentType,
-        // Не передаем URL вложения, так как серверу не нужно получать клиентский URL
-        // Вместо этого файл должен загружаться через FormData или другой метод
+        attachmentUrl
       });
       
       return res.json();
