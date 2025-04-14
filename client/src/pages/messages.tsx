@@ -447,21 +447,8 @@ export default function MessagesPage() {
   
   // Получение количества непрочитанных сообщений для чата
   const getUnreadCount = (chat: Chat) => {
-    if (!chat.participants) return 0;
-    
-    const myParticipation = chat.participants.find(p => p.id === user?.id);
-    if (!myParticipation) return 0;
-    
-    const lastReadId = myParticipation.lastReadMessageId || 0;
-    
-    // Запрашиваем сообщения для этого чата
-    const chatMsgs = chatMessages.filter(m => m.chatId === chat.id);
-    
-    // Считаем количество сообщений, которые пришли после последнего прочитанного
-    return chatMsgs.filter(m => 
-      m.senderId !== user?.id && // Не от текущего пользователя
-      m.id > lastReadId // ID больше последнего прочитанного
-    ).length;
+    // Используем информацию, которая приходит вместе с чатом
+    return chat.unreadCount || 0;
   };
   
   // Форматирование времени сообщения
