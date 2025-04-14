@@ -2095,29 +2095,17 @@ export default function ClassGradeDetailsPage() {
                                           )}
                                         </div>
                                       ))}
-                                      {/* Кнопка "+" для добавления еще одной оценки в тот же дату и урок */}
-                                      {canEditGrades && (
-                                        <Button 
-                                          variant="ghost" 
-                                          size="sm" 
-                                          className="h-5 w-5 p-0 rounded-full ml-1"
-                                          onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
-                                          title="Добавить еще одну оценку"
-                                        >
-                                          <PlusCircle className="h-3 w-3" />
-                                        </Button>
-                                      )}
+                                      {/* Убрали кнопку "+" для добавления еще одной оценки, используем прямой ввод */}
                                     </div>
                                   ) : canEditGrades ? (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm"
-                                      className="h-6 w-6 p-0 rounded-full"
+                                    // Для пустой ячейки показываем поле для ввода
+                                    <div 
+                                      className="w-10 h-7 border border-dashed rounded flex items-center justify-center text-gray-400 cursor-pointer hover:border-primary hover:text-primary transition-colors"
                                       onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
-                                      title="Добавить оценку"
+                                      title="Нажмите для добавления оценки"
                                     >
-                                      <PlusCircle className="h-3 w-3" />
-                                    </Button>
+                                      {`/5`}
+                                    </div>
                                   ) : (
                                     "-"
                                   )}

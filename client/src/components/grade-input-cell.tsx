@@ -117,7 +117,7 @@ export const GradeInputCell: React.FC<GradeInputCellProps> = ({
 
   return (
     <div className="relative group flex items-center justify-center">
-      {existingGrade && (
+      {existingGrade ? (
         <>
           <span
             className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${bgColor}`}
@@ -141,17 +141,16 @@ export const GradeInputCell: React.FC<GradeInputCellProps> = ({
             </button>
           )}
         </>
-      )}
-
-      {!existingGrade && canEdit && (
-        <button
+      ) : canEdit ? (
+        // Для пустой ячейки показываем просто текстовое поле для ввода
+        <div 
+          className="w-10 h-7 border border-dashed rounded flex items-center justify-center text-gray-400 cursor-pointer hover:border-primary hover:text-primary transition-colors"
           onClick={() => setIsEditing(true)}
-          className="text-gray-500 hover:text-primary focus:outline-none"
-          title="Добавить оценку"
+          title="Нажмите для добавления оценки"
         >
-          <PlusCircle className="h-4 w-4 mx-auto" />
-        </button>
-      )}
+          {`/${maxScore}`}
+        </div>
+      ) : null}
     </div>
   );
 };
