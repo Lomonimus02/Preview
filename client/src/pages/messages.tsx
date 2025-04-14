@@ -150,6 +150,9 @@ export default function MessagesPage() {
     refetchInterval: 10000, // Обновляем каждые 10 секунд
   });
   
+  // Получение выбранного чата (перемещено выше для использования в других запросах)
+  const selectedChat = selectedChatId ? chats.find(c => c.id === selectedChatId) : null;
+  
   // Получение списка сообщений для выбранного чата
   const { data: chatMessages = [], isLoading: messagesLoading } = useQuery<ChatMessage[]>({
     queryKey: [`/api/chats/${selectedChatId}/messages`],
@@ -422,8 +425,7 @@ export default function MessagesPage() {
     return false;
   });
   
-  // Получение выбранного чата
-  const selectedChat = selectedChatId ? chats.find(c => c.id === selectedChatId) : null;
+  // Определение выбранного чата перемещено выше
   
   // Получаем сообщения для выбранного чата, отсортированные по времени
   const sortedMessages = [...chatMessages].sort(
@@ -1146,6 +1148,59 @@ export default function MessagesPage() {
               </form>
             </Form>
           </Tabs>
+        </DialogContent>
+      </Dialog>
+      {/* Диалог со списком участников группового чата */}
+      <Dialog open={isParticipantsDialogOpen} onOpenChange={setIsParticipantsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Участники чата</DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            {participantsLoading ? (
+              <div className="flex justify-center items-center py-8">
+                <Clock className="h-5 w-5 text-primary animate-spin" />
+              </div>
+            ) : chatParticipants.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>Участники не найдены</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[60vh] overflow-auto pr-2">
+                {chatParticipants.map(participant => (
+                  <div 
+                    key={participant.id}
+                    className="flex items-center p-2 hover:bg-gray-50 rounded-md"
+                  >
+                    <Avatar className="h-10 w-10 mr-3">
+                      <AvatarFallback className="bg-primary text-white">
+                        {participant.firstName.charAt(0)}{participant.lastName.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium">
+                        {participant.firstName} {participant.lastName}
+                      </p>
+                      <p className="text-sm text-gray-500 truncate">
+                        {participant.username} • {participant.role}
+                      </p>
+                    </div>
+                    {/* Отображаем метку создателя чата */}
+                    {selectedChat && selectedChat.creatorId === participant.id && (
+                      <Badge variant="outline" className="ml-2 bg-primary/10">
+                        Создатель
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button onClick={() => setIsParticipantsDialogOpen(false)}>Закрыть</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </MainLayout>
