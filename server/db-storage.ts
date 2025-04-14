@@ -3,6 +3,7 @@ import { db } from './db';
 import { eq, and, or, inArray, sql } from 'drizzle-orm';
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import * as schema from '@shared/schema';
 import {
   User, InsertUser,
   School, InsertSchool,
@@ -465,14 +466,14 @@ export class DatabaseStorage implements IStorage {
   
   async deleteMessage(id: number): Promise<Message | undefined> {
     // Получаем сообщение перед удалением
-    const message = await db.select().from(messages).where(eq(messages.id, id)).limit(1);
+    const message = await db.select().from(schema.messages).where(eq(schema.messages.id, id)).limit(1);
     
     if (message.length === 0) {
       return undefined;
     }
     
-    // Удаляем сообщение
-    await db.delete(messages).where(eq(messages.id, id));
+    // Удаляем сообщение используя имя таблицы из схемы
+    await db.delete(schema.messages).where(eq(schema.messages.id, id));
     
     return {
       ...message[0],
