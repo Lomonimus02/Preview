@@ -73,6 +73,15 @@ export default function TeacherClasses() {
     gradeType?: string;
   } | null>(null);
   
+  // Стейт для диалога создания задания
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
+  const [assignmentData, setAssignmentData] = useState<{
+    scheduleId: number;
+    assignmentType: string;
+    maxScore: string;
+    description: string;
+  } | null>(null);
+  
   // Мутации для обновления данных
   const updateScheduleStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status: string }) => {
