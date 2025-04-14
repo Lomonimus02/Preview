@@ -140,6 +140,7 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [isNewChatDialogOpen, setIsNewChatDialogOpen] = useState(false);
+  const [isParticipantsDialogOpen, setIsParticipantsDialogOpen] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
   
   // Получение списка чатов пользователя
@@ -154,6 +155,12 @@ export default function MessagesPage() {
     queryKey: [`/api/chats/${selectedChatId}/messages`],
     enabled: !!selectedChatId,
     refetchInterval: 5000, // Обновляем каждые 5 секунд
+  });
+  
+  // Получение списка участников выбранного чата
+  const { data: chatParticipants = [], isLoading: participantsLoading } = useQuery<ChatUser[]>({
+    queryKey: [`/api/chats/${selectedChatId}/participants`],
+    enabled: !!selectedChatId && selectedChat?.type === 'group',
   });
   
   // Получение списка пользователей для создания чата
@@ -632,7 +639,21 @@ export default function MessagesPage() {
                         )}
                       </Avatar>
                       <div>
-                        <CardTitle className="text-lg">{getChatName(selectedChat)}</CardTitle>
+                        <CardTitle 
+                          className="text-lg cursor-pointer hover:text-primary"
+                          onClick={() => {
+                            if (selectedChat.type === 'group') {
+                              setIsParticipantsDialogOpen(true);
+                            }
+                          }}
+                        >
+                          {getChatName(selectedChat)}
+                          {selectedChat.type === 'group' && (
+                            <span className="ml-1 text-xs">
+                              <ExternalLink className="inline h-3 w-3" />
+                            </span>
+                          )}
+                        </CardTitle>
                         {selectedChat.type === 'group' && selectedChat.participants && (
                           <p className="text-xs text-gray-500">
                             {selectedChat.participants.length} участников
