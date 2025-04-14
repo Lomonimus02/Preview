@@ -2431,7 +2431,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Schedule not found" });
       }
       
-      // Проверяем права доступа
+      // Если запрос также содержит studentId, проверяем, имеет ли пользователь доступ к этим данным
+      if (req.query.studentId) {
+        const studentId = parseInt(req.query.studentId as string);
+        
+        // Студент может просматривать только свою посещаемость
+        if (req.user.role === UserRoleEnum.STUDENT) {
+          if (req.user.id !== studentId) {
+            return res.status(403).json({ message: "You can only view your own attendance" });
+          }
+          
+          // Получаем данные о посещаемости для конкретного студента и урока
+          const studentAttendance = await dataStorage.getAttendanceBySchedule(scheduleId);
+          const filteredAttendance = studentAttendance.filter(record => record.studentId === studentId);
+          
+          return res.json(filteredAttendance);
+        }
+        
+        // Родитель может просматривать посещаемость своих детей
+        if (req.user.role === UserRoleEnum.PARENT) {
+          // Проверяем, является ли студент ребенком данного родителя
+          const relationships = await dataStorage.getParentStudents(req.user.id);
+          const childIds = relationships.map(r => r.studentId);
+          
+          if (!childIds.includes(studentId)) {
+            return res.status(403).json({ message: "You can only view your children's attendance" });
+          }
+          
+          // Получаем данные о посещаемости для конкретного студента и урока
+          const studentAttendance = await dataStorage.getAttendanceBySchedule(scheduleId);
+          const filteredAttendance = studentAttendance.filter(record => record.studentId === studentId);
+          
+          return res.json(filteredAttendance);
+        }
+      }
+      
+      // Проверяем права доступа для учителей и администраторов
       if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL, UserRoleEnum.CLASS_TEACHER].includes(req.user.role)) {
         let students = [];
         

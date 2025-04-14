@@ -461,6 +461,8 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   // Функция для загрузки данных о посещаемости студента
   const loadStudentAttendance = async (scheduleId: number, studentId: number) => {
     try {
+      console.log(`Загрузка данных о посещаемости для студента ${studentId} и урока ${scheduleId}`);
+      
       // Загружаем данные о посещаемости для текущего студента и урока
       const response = await fetch(`/api/attendance?scheduleId=${scheduleId}&studentId=${studentId}`);
       if (!response.ok) {
