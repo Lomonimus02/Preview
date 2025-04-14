@@ -494,11 +494,24 @@ export default function ClassGradeDetailsPage() {
   const getStudentGradeForSlot = useCallback((studentId: number, slot: LessonSlot, grades: Grade[]) => {
     if (!grades) return [];
     
-    return grades.filter(g => 
+    // Фильтруем все оценки для данного ученика и расписания
+    const studentGrades = grades.filter(g => 
       g.studentId === studentId && 
       g.scheduleId === slot.scheduleId
     );
-  }, []);
+    
+    // Проверяем, чтобы оценка в накопительной системе была связана с заданием
+    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+      // Проверяем, что все оценки имеют связанное задание
+      studentGrades.forEach(grade => {
+        if (!grade.assignmentId) {
+          console.warn("Найдена оценка без привязки к заданию в накопительной системе:", grade);
+        }
+      });
+    }
+    
+    return studentGrades;
+  }, [classData?.gradingSystem]);
 
   // Функция для расчета среднего балла студента
   const calculateAverageGrade = useCallback((studentId: number) => {
@@ -949,26 +962,34 @@ export default function ClassGradeDetailsPage() {
     // Если используется накопительная система и есть задание, проверим ограничение на максимальный балл
     if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && data.assignmentId) {
       const assignment = assignments.find(a => a.id === data.assignmentId);
-      if (assignment && data.grade > parseInt(assignment.maxScore)) {
-        // Если оценка превышает максимальный балл, автоматически корректируем её
-        const correctedData = {
-          ...data,
-          grade: parseInt(assignment.maxScore)
-        };
+      
+      // Всегда проверяем максимальный балл
+      if (assignment) {
+        const maxScore = parseInt(assignment.maxScore);
         
-        toast({
-          title: "Оценка скорректирована",
-          description: `Оценка была автоматически снижена до максимального балла (${assignment.maxScore})`,
-        });
-        
-        if (editingGradeId) {
-          // Updating existing grade with corrected data
-          updateGradeMutation.mutate({ id: editingGradeId, data: correctedData });
-        } else {
-          // Creating new grade with corrected data
-          addGradeMutation.mutate(correctedData);
+        if (data.grade > maxScore) {
+          // Если оценка превышает максимальный балл, автоматически корректируем её
+          const correctedData = {
+            ...data,
+            grade: maxScore
+          };
+          
+          toast({
+            title: "Оценка скорректирована",
+            description: `Оценка была автоматически снижена до максимального балла (${maxScore})`,
+          });
+          
+          if (editingGradeId) {
+            // Updating existing grade with corrected data
+            updateGradeMutation.mutate({ id: editingGradeId, data: correctedData });
+          } else {
+            // Creating new grade with corrected data
+            addGradeMutation.mutate(correctedData);
+          }
+          return;
         }
-        return;
+      } else {
+        console.error("Задание не найдено при сохранении оценки. AssignmentId:", data.assignmentId);
       }
     }
     
