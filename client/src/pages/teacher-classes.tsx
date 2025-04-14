@@ -164,10 +164,59 @@ export default function TeacherClasses() {
     }
   });
   
+  // Мутация для создания нового задания
+  const createAssignmentMutation = useMutation({
+    mutationFn: async (data: { 
+      scheduleId: number; 
+      assignmentType: string; 
+      maxScore: string; 
+      description: string;
+      teacherId: number;
+      classId: number;
+      subjectId: number;
+      subgroupId?: number;
+    }) => {
+      const res = await apiRequest(`/api/assignments`, "POST", data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Не удалось создать задание");
+      }
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/schedules"] });
+      toast({
+        title: "Задание создано",
+        description: "Новое задание успешно создано",
+        variant: "default"
+      });
+      setAssignmentDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
   // Открытие диалога для изменения статуса урока
   const openLessonStatusDialog = (schedule: Schedule) => {
     setCurrentSchedule(schedule);
     setLessonStatusDialogOpen(true);
+  };
+  
+  // Открытие диалога для создания задания
+  const openAssignmentDialog = (schedule: Schedule) => {
+    setCurrentSchedule(schedule);
+    setAssignmentData({
+      scheduleId: schedule.id,
+      assignmentType: 'classwork',
+      maxScore: '5',
+      description: ''
+    });
+    setAssignmentDialogOpen(true);
   };
   
   // Открытие диалога для выставления оценки
@@ -1104,6 +1153,249 @@ export default function TeacherClasses() {
               disabled={!gradeData?.grade || updateScheduleStatusMutation.isPending || createGradeMutation.isPending || updateGradeMutation.isPending}
             >
               {gradeData?.gradeId ? "Обновить" : "Сохранить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Диалог для создания нового задания */}
+      <Dialog open={assignmentDialogOpen} onOpenChange={setAssignmentDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Создать новое задание</DialogTitle>
+            <DialogDescription>
+              Создайте новое задание для данного урока
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="assignmentType">Тип задания</Label>
+              <Select
+                value={assignmentData?.assignmentType}
+                onValueChange={(value) =>
+                  setAssignmentData(prev => prev ? { ...prev, assignmentType: value } : null)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите тип задания" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="classwork">Классная работа</SelectItem>
+                  <SelectItem value="homework">Домашнее задание</SelectItem>
+                  <SelectItem value="test">Тест</SelectItem>
+                  <SelectItem value="exam">Экзамен</SelectItem>
+                  <SelectItem value="project">Проект</SelectItem>
+                  <SelectItem value="control_work">Контрольная работа</SelectItem>
+                  <SelectItem value="test_work">Проверочная работа</SelectItem>
+                  <SelectItem value="current_work">Текущая работа</SelectItem>
+                  <SelectItem value="project_work">Проектная работа</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="maxScore">Максимальный балл</Label>
+              <Input
+                id="maxScore"
+                type="number"
+                min="1"
+                max="100"
+                value={assignmentData?.maxScore || ""}
+                onChange={(e) =>
+                  setAssignmentData(prev => prev ? { ...prev, maxScore: e.target.value } : null)
+                }
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="description">Описание (необязательно)</Label>
+              <Textarea
+                id="description"
+                value={assignmentData?.description || ""}
+                onChange={(e) =>
+                  setAssignmentData(prev => prev ? { ...prev, description: e.target.value } : null)
+                }
+                placeholder="Введите описание задания"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="flex justify-between">
+            <Button variant="outline" onClick={() => setAssignmentDialogOpen(false)}>
+              Отмена
+            </Button>
+            <Button 
+              onClick={() => {
+                if (!assignmentData || !currentSchedule || !user) return;
+                
+                createAssignmentMutation.mutate({
+                  scheduleId: assignmentData.scheduleId,
+                  assignmentType: assignmentData.assignmentType,
+                  maxScore: assignmentData.maxScore,
+                  description: assignmentData.description || "",
+                  teacherId: user.id,
+                  classId: currentSchedule.classId,
+                  subjectId: currentSchedule.subjectId,
+                  subgroupId: currentSchedule.subgroupId
+                });
+              }}
+              disabled={createAssignmentMutation.isPending}
+            >
+              {createAssignmentMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Создание...
+                </>
+              ) : "Создать задание"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Диалог для установки статуса урока */}
+      <Dialog open={lessonStatusDialogOpen} onOpenChange={setLessonStatusDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Статус урока</DialogTitle>
+            <DialogDescription>
+              Установите статус урока, отметьте посещаемость и создайте новые задания
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {currentSchedule && (
+              <div className="bg-gray-50 p-3 rounded-md">
+                <p className="font-semibold mb-1">Информация об уроке:</p>
+                <p>Дата: {currentSchedule.scheduleDate}</p>
+                <p>Время: {currentSchedule.startTime} - {currentSchedule.endTime}</p>
+                <p>Кабинет: {currentSchedule.room}</p>
+                <p>Текущий статус: {currentSchedule.status}</p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="status">Изменить статус</Label>
+              <Select
+                onValueChange={(value) => {
+                  if (!currentSchedule) return;
+                  
+                  updateScheduleStatusMutation.mutate({
+                    id: currentSchedule.id,
+                    status: value
+                  });
+                }}
+                defaultValue={currentSchedule?.status}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Выберите статус" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="planned">Запланирован</SelectItem>
+                  <SelectItem value="conducted">Проведен</SelectItem>
+                  <SelectItem value="cancelled">Отменен</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label>Посещаемость</Label>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    if (!currentSchedule) return;
+                    setLessonStatusDialogOpen(false);
+                    
+                    // Здесь можно добавить переход на страницу с подробной посещаемостью
+                  }}
+                >
+                  Подробнее
+                </Button>
+              </div>
+              
+              {attendanceLoading ? (
+                <div className="flex justify-center p-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="max-h-40 overflow-y-auto">
+                  {studentAttendance.map((attendance) => (
+                    <div key={attendance.studentId} className="flex items-center justify-between py-1 border-b">
+                      <span>{getStudentName(attendance.studentId)}</span>
+                      <Select
+                        value={attendance.status || "not_marked"}
+                        onValueChange={(value) => {
+                          handleAttendanceChange(attendance.id, attendance.studentId, value);
+                        }}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="not_marked">Не отмечено</SelectItem>
+                          <SelectItem value="present">Присутствует</SelectItem>
+                          <SelectItem value="absent">Отсутствует</SelectItem>
+                          <SelectItem value="late">Опоздал</SelectItem>
+                          <SelectItem value="sick">Болен</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label>Задания</Label>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    if (!currentSchedule) return;
+                    setLessonStatusDialogOpen(false);
+                    openAssignmentDialog(currentSchedule);
+                  }}
+                >
+                  Добавить задание
+                </Button>
+              </div>
+              
+              <div className="max-h-40 overflow-y-auto">
+                {currentSchedule?.assignments && currentSchedule.assignments.length > 0 ? (
+                  <div className="space-y-2">
+                    {currentSchedule.assignments.map((assignment) => (
+                      <div key={assignment.id} className="p-2 border rounded-md">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">{getGradeTypeName(assignment.assignmentType)}</p>
+                            <p className="text-sm text-muted-foreground">Макс. балл: {assignment.maxScore}</p>
+                            {assignment.description && (
+                              <p className="text-sm mt-1">{assignment.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2">Нет заданий для этого урока</p>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setLessonStatusDialogOpen(false)}
+            >
+              Закрыть
             </Button>
           </DialogFooter>
         </DialogContent>
