@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { testConnection } from "./db";
 import dotenv from "dotenv";
 import { Server } from "http";
+import path from "path";
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -11,6 +12,9 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Настраиваем статические файлы для загрузок
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Флаг для отслеживания статуса БД
 let isDbHealthy = false;
