@@ -197,17 +197,24 @@ export default function MessagesPage() {
           attachmentType = 'document';
         }
         
-        // Здесь должен быть код для загрузки файла на сервер
-        // Для демонстрации мы просто создаем фейковый URL
-        attachmentUrl = URL.createObjectURL(data.attachmentFile);
+        // В реальном приложении здесь должен быть код для загрузки файла на сервер
+        // и получения постоянного URL. Для демонстрации пока убираем эту часть.
+        attachmentUrl = "https://example.com/placeholder-attachment.png"; // Временный плейсхолдер
       }
       
       // Отправляем сообщение
+      console.log(`Отправка сообщения в чат ${data.chatId}:`, {
+        content: data.content,
+        hasAttachment,
+        attachmentType,
+      });
+      
       const res = await apiRequest(`/api/chats/${data.chatId}/messages`, "POST", {
         content: data.content,
         hasAttachment,
         attachmentType,
-        attachmentUrl,
+        // Не передаем URL вложения, так как серверу не нужно получать клиентский URL
+        // Вместо этого файл должен загружаться через FormData или другой метод
       });
       
       return res.json();
