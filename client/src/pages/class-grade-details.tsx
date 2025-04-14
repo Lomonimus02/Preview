@@ -1271,6 +1271,63 @@ export default function ClassGradeDetailsPage() {
     }
   };
   
+  // Функция для прямого ввода оценки
+  const handleDirectGradeInput = (studentId: number, scheduleId: number, assignmentId: number, value: string) => {
+    // Преобразуем строку в число
+    const grade = parseInt(value, 10);
+    
+    // Проверка на корректность ввода
+    if (isNaN(grade) || grade < 1 || grade > 10) {
+      toast({
+        title: "Некорректная оценка",
+        description: "Оценка должна быть числом от 1 до 10",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Проверяем, существует ли уже оценка за данное задание для этого ученика
+    const existingGrade = grades.find(g => 
+      g.studentId === studentId && 
+      g.assignmentId === assignmentId
+    );
+    
+    if (existingGrade) {
+      // Если оценка уже существует, обновляем её
+      updateGradeMutation.mutate({
+        id: existingGrade.id,
+        data: { grade: grade }
+      });
+    } else {
+      // Получаем детали задания
+      const assignment = assignments.find(a => a.id === assignmentId);
+      if (!assignment) {
+        toast({
+          title: "Ошибка",
+          description: "Задание не найдено",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Если оценки нет, создаем новую
+      const newGrade: any = {
+        studentId: studentId,
+        subjectId: subjectId,
+        classId: classId,
+        teacherId: user?.id || 0,
+        grade: grade,
+        gradeType: assignment.assignmentType, // Используем тип задания как тип оценки
+        scheduleId: scheduleId,
+        subgroupId: subgroupId || null,
+        assignmentId: assignmentId, // Важно: привязываем оценку к конкретному заданию
+        comment: null
+      };
+      
+      addGradeMutation.mutate(newGrade);
+    }
+  };
+
   // Handle grade deletion
   const handleDeleteGrade = (id: number) => {
     if (window.confirm("Вы действительно хотите удалить оценку?")) {
