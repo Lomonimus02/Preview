@@ -944,6 +944,33 @@ export default function ClassGradeDetailsPage() {
   
   // Handle grade form submission
   const onGradeSubmit = (data: z.infer<ReturnType<typeof getGradeFormSchema>>) => {
+    // Если используется накопительная система и есть задание, проверим ограничение на максимальный балл
+    if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && data.assignmentId) {
+      const assignment = assignments.find(a => a.id === data.assignmentId);
+      if (assignment && data.grade > parseInt(assignment.maxScore)) {
+        // Если оценка превышает максимальный балл, автоматически корректируем её
+        const correctedData = {
+          ...data,
+          grade: parseInt(assignment.maxScore)
+        };
+        
+        toast({
+          title: "Оценка скорректирована",
+          description: `Оценка была автоматически снижена до максимального балла (${assignment.maxScore})`,
+        });
+        
+        if (editingGradeId) {
+          // Updating existing grade with corrected data
+          updateGradeMutation.mutate({ id: editingGradeId, data: correctedData });
+        } else {
+          // Creating new grade with corrected data
+          addGradeMutation.mutate(correctedData);
+        }
+        return;
+      }
+    }
+    
+    // Если не нужна коррекция или это не накопительная система
     if (editingGradeId) {
       // Updating existing grade
       updateGradeMutation.mutate({ id: editingGradeId, data });
@@ -1590,19 +1617,22 @@ export default function ClassGradeDetailsPage() {
                                                 const assignment = slot.assignments[0];
                                                 const maxScore = parseInt(assignment.maxScore);
                                                 
-                                                if (gradeValue > maxScore) {
+                                                // Создаем переменную для хранения финальной оценки
+                                                let finalGradeValue = gradeValue;
+                                                
+                                                // Если оценка превышает максимальный балл, снижаем её до максимального
+                                                if (finalGradeValue > maxScore) {
+                                                  finalGradeValue = maxScore;
                                                   toast({
-                                                    title: "Ошибка при добавлении оценки",
-                                                    description: `Оценка не может быть больше максимального балла (${maxScore})`,
-                                                    variant: "destructive",
+                                                    title: "Оценка скорректирована",
+                                                    description: `Оценка была автоматически снижена до максимального балла (${maxScore})`,
                                                   });
-                                                  return;
                                                 }
                                                 
                                                 // Создаем новую оценку
                                                 const newGrade = {
                                                   studentId: student.id,
-                                                  grade: gradeValue,
+                                                  grade: finalGradeValue, // Используем скорректированное значение оценки
                                                   classId: classId,
                                                   subjectId: subjectId,
                                                   teacherId: user?.id as number,
