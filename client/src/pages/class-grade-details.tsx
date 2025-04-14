@@ -1593,6 +1593,8 @@ export default function ClassGradeDetailsPage() {
     return schedule?.status === 'conducted';
   };
   
+
+  
   // Проверяет, можно ли добавить оценку для урока в накопительной системе
   const canAddGradeToLesson = (scheduleId: number, slot: LessonSlot) => {
     // Для пятибалльной системы больше не требуется, чтобы урок был проведен
