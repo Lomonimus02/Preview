@@ -1082,10 +1082,15 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
           
           {selectedGrade && (
             <div className="space-y-4">
-              <div className="flex justify-center">
+              <div className="flex flex-col items-center gap-2">
                 <div className="p-4 rounded-full bg-primary text-primary-foreground text-2xl font-bold w-16 h-16 flex items-center justify-center">
                   {selectedGrade.grade}
                 </div>
+                {selectedAssignment && parseInt(selectedAssignment.maxScore) > 0 && (
+                  <div className="text-sm text-gray-600">
+                    {`${Math.round((parseInt(selectedGrade.grade) / parseInt(selectedAssignment.maxScore)) * 100)}% от максимума`}
+                  </div>
+                )}
               </div>
               
               <div className="grid grid-cols-1 gap-3 p-4 bg-gray-50 rounded-lg">
