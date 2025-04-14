@@ -4497,6 +4497,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Удаление сообщения в чате
+  app.delete("/api/chats/:chatId/messages/:messageId", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = parseInt(req.params.chatId);
+      const messageId = parseInt(req.params.messageId);
+      
+      if (isNaN(chatId) || isNaN(messageId)) {
+        return res.status(400).json({ message: "Invalid chat ID or message ID" });
+      }
+      
+      // Проверяем, существует ли сообщение
+      const messages = await db
+        .select()
+        .from(schema.messages)
+        .where(and(
+          eq(schema.messages.id, messageId),
+          eq(schema.messages.chatId, chatId)
+        ))
+        .limit(1);
+      
+      if (messages.length === 0) {
+        return res.status(404).json({ message: "Message not found" });
+      }
+      
+      const message = messages[0];
+      
+      // Проверяем, что пользователь является отправителем сообщения или администратором
+      const isAdmin = [
+        UserRoleEnum.SUPER_ADMIN, 
+        UserRoleEnum.PRINCIPAL, 
+        UserRoleEnum.VICE_PRINCIPAL, 
+        UserRoleEnum.SCHOOL_ADMIN
+      ].includes(req.user.role);
+      
+      const isSender = message.senderId === req.user.id;
+      
+      if (!isSender && !isAdmin) {
+        return res.status(403).json({ message: "You can only delete your own messages" });
+      }
+      
+      // Удаляем сообщение
+      const deletedMessage = await dataStorage.deleteMessage(messageId);
+      
+      res.json({
+        message: "Message deleted",
+        deletedMessage 
+      });
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      res.status(500).json({ message: "Failed to delete message", error: error.message });
+    }
+  });
+  
   // Получение списка пользователей для добавления в чат
   app.get("/api/chat-users", isAuthenticated, async (req, res) => {
     try {
