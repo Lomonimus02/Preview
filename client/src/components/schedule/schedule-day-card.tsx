@@ -334,8 +334,9 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | undefined>(undefined);
+  const [studentAttendance, setStudentAttendance] = useState<any | null>(null);
   const [, navigate] = useLocation();
-  const { isTeacher, isSchoolAdmin } = useRoleCheck();
+  const { isTeacher, isSchoolAdmin, isStudent } = useRoleCheck();
   const { toast } = useToast();
   
   // Получение временных слотов для отображения в сетке расписания
@@ -457,6 +458,30 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   // Состояния для диалоговых окон уже определены выше
 
+  // Функция для загрузки данных о посещаемости студента
+  const loadStudentAttendance = async (scheduleId: number, studentId: number) => {
+    try {
+      // Загружаем данные о посещаемости для текущего студента и урока
+      const response = await fetch(`/api/attendance?scheduleId=${scheduleId}&studentId=${studentId}`);
+      if (!response.ok) {
+        throw new Error(`Ошибка при получении данных о посещаемости: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log("Данные о посещаемости для студента:", data);
+      
+      // Устанавливаем в состояние
+      if (data && data.length > 0) {
+        setStudentAttendance(data[0]);
+      } else {
+        setStudentAttendance(null);
+      }
+    } catch (error) {
+      console.error("Ошибка при загрузке данных о посещаемости:", error);
+      setStudentAttendance(null);
+    }
+  };
+
   const handleScheduleClick = (schedule: Schedule, actionType?: string, assignment?: Assignment) => {
     setSelectedSchedule(schedule);
     
@@ -473,6 +498,12 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
       // Открываем диалог для отметки посещаемости (только для проведенных уроков)
       setIsAttendanceDialogOpen(true);
     } else {
+      // Для студентов загружаем данные о посещаемости при открытии диалога
+      if (isStudent() && currentUser && schedule.status === 'conducted') {
+        loadStudentAttendance(schedule.id, currentUser.id);
+      } else {
+        setStudentAttendance(null);
+      }
       setIsDetailsOpen(true);
     }
   };
@@ -750,6 +781,56 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                       </p>
                     )}
                   </div>
+                </div>
+              )}
+              
+              {/* Отображение информации о посещаемости для студента */}
+              {isStudent() && selectedSchedule.status === 'conducted' && (
+                <div className="mt-4 p-4 rounded-lg border">
+                  <h3 className="text-lg font-medium mb-2">Посещаемость</h3>
+                  {studentAttendance ? (
+                    <div className="space-y-2">
+                      {studentAttendance.attendance ? (
+                        // Формат: { studentId, studentName, attendance: { id, status, ... } }
+                        <div className={`p-3 rounded-lg ${
+                          studentAttendance.attendance.status === 'present' ? 'bg-green-50 border border-green-100' : 
+                          studentAttendance.attendance.status === 'absent' ? 'bg-red-50 border border-red-100' :
+                          'bg-amber-50 border border-amber-100'
+                        }`}>
+                          <div className="font-medium mb-1">
+                            {studentAttendance.attendance.status === 'present' ? 'Присутствовал(а)' : 
+                            studentAttendance.attendance.status === 'absent' ? 'Отсутствовал(а)' : 'Опоздал(а)'}
+                          </div>
+                          {studentAttendance.attendance.comment && (
+                            <div className="text-sm text-gray-700">
+                              Комментарий: {studentAttendance.attendance.comment}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        // Формат: { id, studentId, status, ... }
+                        <div className={`p-3 rounded-lg ${
+                          studentAttendance.status === 'present' ? 'bg-green-50 border border-green-100' : 
+                          studentAttendance.status === 'absent' ? 'bg-red-50 border border-red-100' :
+                          'bg-amber-50 border border-amber-100'
+                        }`}>
+                          <div className="font-medium mb-1">
+                            {studentAttendance.status === 'present' ? 'Присутствовал(а)' : 
+                            studentAttendance.status === 'absent' ? 'Отсутствовал(а)' : 'Опоздал(а)'}
+                          </div>
+                          {studentAttendance.comment && (
+                            <div className="text-sm text-gray-700">
+                              Комментарий: {studentAttendance.comment}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-gray-500">
+                      Нет данных о посещаемости для этого урока
+                    </div>
+                  )}
                 </div>
               )}
               
