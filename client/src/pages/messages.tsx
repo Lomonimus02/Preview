@@ -92,6 +92,7 @@ interface Chat {
   createdAt: string;
   lastMessageAt: string | null;
   participants?: ChatUser[];
+  unreadCount?: number; // Количество непрочитанных сообщений
 }
 
 interface ChatMessage {
@@ -300,9 +301,28 @@ export default function MessagesPage() {
       const res = await apiRequest(`/api/chats/${chatId}/read-status`, "PUT", { messageId });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Обновляем информацию о всех чатах
-      queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
+      // Заменяем на более точечное обновление, если серверный API возвращает unreadCount
+      if (data && 'unreadCount' !== undefined) {
+        // Обновляем кеш с точным количеством непрочитанных сообщений
+        queryClient.setQueryData(["/api/chats"], (oldData: any) => {
+          if (!oldData) return oldData;
+          
+          return oldData.map((chat: Chat) => {
+            if (chat.id === selectedChatId) {
+              return {
+                ...chat,
+                unreadCount: data.unreadCount
+              };
+            }
+            return chat;
+          });
+        });
+      } else {
+        // Запасной вариант: полное обновление
+        queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
+      }
     },
   });
   
@@ -358,13 +378,20 @@ export default function MessagesPage() {
   // Обработка прочтения сообщений при выборе чата
   useEffect(() => {
     if (selectedChatId && chatMessages.length > 0) {
-      // Найдем последнее сообщение от другого пользователя
-      const lastMessage = [...chatMessages]
-        .reverse()
-        .find(msg => msg.senderId !== user?.id);
+      // Найдем последнее сообщение в чате
+      const messages = [...chatMessages].sort(
+        (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
+      );
       
-      // Если есть непрочитанное сообщение от другого пользователя
-      if (lastMessage && !lastMessage.isRead) {
+      const lastMessage = messages[0];
+      
+      // Проверим, есть ли непрочитанные сообщения от других пользователей
+      const hasUnreadMessages = messages.some(
+        msg => msg.senderId !== user?.id && !msg.isRead
+      );
+      
+      // Если есть непрочитанные сообщения, отмечаем их как прочитанные
+      if (lastMessage && hasUnreadMessages) {
         updateReadStatusMutation.mutate({
           chatId: selectedChatId,
           messageId: lastMessage.id,
