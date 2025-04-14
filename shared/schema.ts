@@ -467,6 +467,12 @@ export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
 
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type InsertChat = z.infer<typeof insertChatSchema>;
+export type Chat = typeof chats.$inferSelect;
+
+export type InsertChatParticipant = z.infer<typeof insertChatParticipantSchema>;
+export type ChatParticipant = typeof chatParticipants.$inferSelect;
+
 export type Message = typeof messages.$inferSelect;
 
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
