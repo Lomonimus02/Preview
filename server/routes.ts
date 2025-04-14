@@ -4158,6 +4158,314 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === Маршруты для чатов ===
+
+  // Получение всех чатов пользователя
+  app.get("/api/chats", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const chats = await dataStorage.getUserChats(userId);
+      
+      // Обогащаем чаты информацией об участниках
+      const enrichedChats = await Promise.all(chats.map(async (chat) => {
+        const participants = await dataStorage.getChatParticipants(chat.id);
+        
+        // Получаем информацию о пользователях-участниках
+        const participantDetails = await Promise.all(
+          participants.map(async (p) => {
+            const user = await dataStorage.getUser(p.userId);
+            return {
+              id: p.userId,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              isAdmin: p.isAdmin,
+              lastReadMessageId: p.lastReadMessageId
+            };
+          })
+        );
+        
+        return {
+          ...chat,
+          participants: participantDetails
+        };
+      }));
+      
+      res.json(enrichedChats);
+    } catch (error) {
+      console.error("Error getting user chats:", error);
+      res.status(500).json({ message: "Failed to get chats" });
+    }
+  });
+
+  // Создание нового чата
+  app.post("/api/chats", isAuthenticated, async (req, res) => {
+    try {
+      const { name, type, participantIds, schoolId } = req.body;
+      
+      if (!name || !type || !Array.isArray(participantIds) || participantIds.length === 0) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      
+      // Используем schoolId из тела запроса или из профиля пользователя
+      const chatSchoolId = schoolId || req.user.schoolId;
+      if (!chatSchoolId) {
+        return res.status(400).json({ message: "School ID is required" });
+      }
+      
+      // Создаем чат
+      const newChat = await dataStorage.createChat({
+        name,
+        type,
+        creatorId: req.user.id,
+        schoolId: chatSchoolId,
+        avatarUrl: req.body.avatarUrl || null
+      });
+      
+      // Добавляем создателя как администратора
+      await dataStorage.addChatParticipant({
+        chatId: newChat.id,
+        userId: req.user.id,
+        isAdmin: true
+      });
+      
+      // Добавляем остальных участников
+      await Promise.all(
+        participantIds
+          .filter(id => id !== req.user.id) // Исключаем создателя, который уже добавлен
+          .map(userId => 
+            dataStorage.addChatParticipant({
+              chatId: newChat.id,
+              userId,
+              isAdmin: false
+            })
+          )
+      );
+      
+      // Получаем полную информацию о чате с участниками
+      const participants = await dataStorage.getChatParticipants(newChat.id);
+      const participantDetails = await Promise.all(
+        participants.map(async (p) => {
+          const user = await dataStorage.getUser(p.userId);
+          return {
+            id: p.userId,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            isAdmin: p.isAdmin
+          };
+        })
+      );
+      
+      res.status(201).json({
+        ...newChat,
+        participants: participantDetails
+      });
+    } catch (error) {
+      console.error("Error creating chat:", error);
+      res.status(500).json({ message: "Failed to create chat" });
+    }
+  });
+
+  // Получение информации о конкретном чате
+  app.get("/api/chats/:chatId", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = parseInt(req.params.chatId);
+      const chat = await dataStorage.getChat(chatId);
+      
+      if (!chat) {
+        return res.status(404).json({ message: "Chat not found" });
+      }
+      
+      // Проверяем, является ли пользователь участником чата
+      const participants = await dataStorage.getChatParticipants(chatId);
+      const isParticipant = participants.some(p => p.userId === req.user.id);
+      
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant of this chat" });
+      }
+      
+      // Получаем детали об участниках
+      const participantDetails = await Promise.all(
+        participants.map(async (p) => {
+          const user = await dataStorage.getUser(p.userId);
+          return {
+            id: p.userId,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            isAdmin: p.isAdmin,
+            lastReadMessageId: p.lastReadMessageId
+          };
+        })
+      );
+      
+      res.json({
+        ...chat,
+        participants: participantDetails
+      });
+    } catch (error) {
+      console.error("Error getting chat details:", error);
+      res.status(500).json({ message: "Failed to get chat details" });
+    }
+  });
+
+  // Получение сообщений в чате
+  app.get("/api/chats/:chatId/messages", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = parseInt(req.params.chatId);
+      
+      // Проверяем, является ли пользователь участником чата
+      const participants = await dataStorage.getChatParticipants(chatId);
+      const isParticipant = participants.some(p => p.userId === req.user.id);
+      
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant of this chat" });
+      }
+      
+      // Получаем сообщения
+      const messages = await dataStorage.getChatMessages(chatId);
+      
+      // Обогащаем информацией об отправителях
+      const enrichedMessages = await Promise.all(
+        messages.map(async (message) => {
+          const sender = await dataStorage.getUser(message.senderId);
+          return {
+            ...message,
+            sender: {
+              id: sender.id,
+              firstName: sender.firstName,
+              lastName: sender.lastName
+            }
+          };
+        })
+      );
+      
+      res.json(enrichedMessages);
+    } catch (error) {
+      console.error("Error getting chat messages:", error);
+      res.status(500).json({ message: "Failed to get chat messages" });
+    }
+  });
+
+  // Отправка сообщения в чат
+  app.post("/api/chats/:chatId/messages", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = parseInt(req.params.chatId);
+      const { content, hasAttachment, attachmentType, attachmentUrl } = req.body;
+      
+      // Проверяем, что сообщение содержит текст или вложение
+      if (!content && !hasAttachment) {
+        return res.status(400).json({ message: "Message must contain text or attachment" });
+      }
+      
+      // Проверяем, является ли пользователь участником чата
+      const participants = await dataStorage.getChatParticipants(chatId);
+      const isParticipant = participants.some(p => p.userId === req.user.id);
+      
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant of this chat" });
+      }
+      
+      // Создаем сообщение
+      const newMessage = await dataStorage.createChatMessage({
+        chatId,
+        senderId: req.user.id,
+        content: content || null,
+        hasAttachment: !!hasAttachment,
+        attachmentType: attachmentType || null,
+        attachmentUrl: attachmentUrl || null
+      });
+      
+      // Получаем информацию об отправителе
+      const sender = await dataStorage.getUser(req.user.id);
+      
+      res.status(201).json({
+        ...newMessage,
+        sender: {
+          id: sender.id,
+          firstName: sender.firstName,
+          lastName: sender.lastName
+        }
+      });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
+  // Обновление статуса прочтения сообщений
+  app.put("/api/chats/:chatId/read-status", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = parseInt(req.params.chatId);
+      const { messageId } = req.body;
+      
+      if (!messageId) {
+        return res.status(400).json({ message: "Message ID is required" });
+      }
+      
+      // Проверяем, является ли пользователь участником чата
+      const participants = await dataStorage.getChatParticipants(chatId);
+      const participant = participants.find(p => p.userId === req.user.id);
+      
+      if (!participant) {
+        return res.status(403).json({ message: "You are not a participant of this chat" });
+      }
+      
+      // Обновляем статус прочтения
+      await dataStorage.markLastReadMessage(chatId, req.user.id, messageId);
+      
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error("Error updating read status:", error);
+      res.status(500).json({ message: "Failed to update read status" });
+    }
+  });
+
+  // Получение списка пользователей для добавления в чат
+  app.get("/api/chat-users", isAuthenticated, async (req, res) => {
+    try {
+      const { search, roleFilter } = req.query;
+      
+      // Получаем ID школы пользователя
+      const userSchoolId = req.user.schoolId;
+      if (!userSchoolId) {
+        return res.status(400).json({ message: "You are not associated with any school" });
+      }
+      
+      // Получаем всех пользователей школы
+      let users = await dataStorage.getUsersBySchool(userSchoolId);
+      
+      // Фильтруем по поисковому запросу, если он предоставлен
+      if (search) {
+        const searchLower = search.toString().toLowerCase();
+        users = users.filter(
+          user => 
+            user.firstName.toLowerCase().includes(searchLower) || 
+            user.lastName.toLowerCase().includes(searchLower) ||
+            user.username.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // Фильтруем по роли, если она предоставлена
+      if (roleFilter) {
+        users = users.filter(user => user.role === roleFilter);
+      }
+      
+      // Возвращаем только необходимые поля
+      const usersFormatted = users.map(user => ({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        role: user.role,
+        activeRole: user.activeRole
+      }));
+      
+      res.json(usersFormatted);
+    } catch (error) {
+      console.error("Error getting users for chat:", error);
+      res.status(500).json({ message: "Failed to get users for chat" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

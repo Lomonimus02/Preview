@@ -15,6 +15,9 @@ import {
   Attendance, InsertAttendance,
   Document, InsertDocument,
   Message, InsertMessage,
+  Chat, InsertChat,
+  ChatParticipant, InsertChatParticipant,
+  ChatTypeEnum,
   Notification, InsertNotification,
   ParentStudent, InsertParentStudent,
   SystemLog, InsertSystemLog,
@@ -27,7 +30,7 @@ import {
   ClassTimeSlot, InsertClassTimeSlot,
   users, schools, classes, subjects, schedules,
   homework, homeworkSubmissions, grades, attendance,
-  documents, messages, notifications, parentStudents,
+  documents, messages, chats, chatParticipants, notifications, parentStudents,
   systemLogs, teacherSubjects, studentClasses, userRoles,
   subgroups, studentSubgroups, assignments, cumulativeGrades,
   timeSlots, classTimeSlots
@@ -458,6 +461,108 @@ export class DatabaseStorage implements IStorage {
       ...updatedMessage,
       message: updatedMessage.content, // Преобразуем для совместимости с интерфейсом
     } as unknown as Message;
+  }
+  
+  // ===== Chat operations =====
+  async createChat(chat: InsertChat): Promise<Chat> {
+    const [newChat] = await db.insert(chats).values({
+      ...chat,
+      createdAt: new Date(),
+      lastMessageAt: null
+    }).returning();
+    return newChat;
+  }
+  
+  async getChat(id: number): Promise<Chat | undefined> {
+    const result = await db.select().from(chats).where(eq(chats.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async getUserChats(userId: number): Promise<Chat[]> {
+    // Получаем все участия в чатах для данного пользователя
+    const participations = await db.select().from(chatParticipants)
+      .where(eq(chatParticipants.userId, userId));
+    
+    if (participations.length === 0) {
+      return [];
+    }
+    
+    // Извлекаем ID чатов
+    const chatIds = participations.map(p => p.chatId);
+    
+    // Получаем чаты по их ID
+    return await db.select().from(chats)
+      .where(inArray(chats.id, chatIds))
+      .orderBy(sql`chats.last_message_at DESC NULLS LAST`);
+  }
+  
+  async getUsersChatBySchool(schoolId: number): Promise<Chat[]> {
+    return await db.select().from(chats).where(eq(chats.schoolId, schoolId));
+  }
+  
+  // ===== Chat participant operations =====
+  async addChatParticipant(participant: InsertChatParticipant): Promise<ChatParticipant> {
+    const [newParticipant] = await db.insert(chatParticipants).values({
+      ...participant,
+      joinedAt: new Date(),
+      lastReadMessageId: null
+    }).returning();
+    return newParticipant;
+  }
+  
+  async getChatParticipants(chatId: number): Promise<ChatParticipant[]> {
+    return await db.select().from(chatParticipants).where(eq(chatParticipants.chatId, chatId));
+  }
+  
+  async getUserChatParticipations(userId: number): Promise<ChatParticipant[]> {
+    return await db.select().from(chatParticipants).where(eq(chatParticipants.userId, userId));
+  }
+  
+  async removeChatParticipant(chatId: number, userId: number): Promise<void> {
+    await db.delete(chatParticipants)
+      .where(and(
+        eq(chatParticipants.chatId, chatId),
+        eq(chatParticipants.userId, userId)
+      ));
+  }
+  
+  // ===== Chat messages operations =====
+  async getChatMessages(chatId: number): Promise<Message[]> {
+    return await db.select().from(messages)
+      .where(eq(messages.chatId, chatId))
+      .orderBy(sql`messages.sent_at DESC`);
+  }
+  
+  async createChatMessage(message: InsertMessage): Promise<Message> {
+    // Установим значения по умолчанию для полей, если они не указаны
+    const messageData = {
+      chatId: message.chatId,
+      senderId: message.senderId,
+      content: message.content || null,
+      hasAttachment: message.hasAttachment || false,
+      attachmentType: message.attachmentType || null,
+      attachmentUrl: message.attachmentUrl || null,
+      isRead: false,
+      sentAt: new Date()
+    };
+    
+    const [newMessage] = await db.insert(messages).values(messageData).returning();
+    
+    // Обновляем время последнего сообщения в чате
+    await db.update(chats)
+      .set({ lastMessageAt: new Date() })
+      .where(eq(chats.id, message.chatId));
+    
+    return newMessage;
+  }
+  
+  async markLastReadMessage(chatId: number, userId: number, messageId: number): Promise<void> {
+    await db.update(chatParticipants)
+      .set({ lastReadMessageId: messageId })
+      .where(and(
+        eq(chatParticipants.chatId, chatId),
+        eq(chatParticipants.userId, userId)
+      ));
   }
 
   // ===== Notification operations =====
