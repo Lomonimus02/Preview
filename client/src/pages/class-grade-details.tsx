@@ -142,7 +142,9 @@ const createGradeFormSchema = (gradingSystem: GradingSystemEnum | undefined, ass
     return baseSchema.extend({
       grade: z.number({
         required_error: "Укажите балл",
-      }).min(0, "Минимальный балл - 0").max(assignmentMaxScore, `Максимальный балл - ${assignmentMaxScore}`),
+      }).min(0, "Минимальный балл - 0"),
+      // Убираем валидацию максимального балла и сделаем автоматическую коррекцию вместо отклонения формы
+      // .max(assignmentMaxScore, `Максимальный балл - ${assignmentMaxScore}`),
     });
   }
 
@@ -1076,18 +1078,32 @@ export default function ClassGradeDetailsPage() {
       return;
     }
     
+    // Проверка обязательных значений
+    const scheduleIdValue = formData.get('scheduleId');
+    if (!scheduleIdValue) {
+      toast({
+        title: "Ошибка при добавлении задания",
+        description: "Не указан ID урока (scheduleId)",
+        variant: "destructive",
+      });
+      console.error("scheduleId отсутствует в форме");
+      return;
+    }
+    
     // Создаем правильно типизированные данные
     const data = {
       assignmentType: assignmentTypeValue as AssignmentTypeEnum,
       maxScore: formData.get('maxScore') as string,
-      description: formData.get('description') as string || null,
-      scheduleId: parseInt(formData.get('scheduleId') as string),
+      description: formData.get('description') as string || "",
+      scheduleId: parseInt(scheduleIdValue as string),
       classId: parseInt(formData.get('classId') as string),
       subjectId: parseInt(formData.get('subjectId') as string),
       teacherId: parseInt(formData.get('teacherId') as string),
       subgroupId: formData.get('subgroupId') ? parseInt(formData.get('subgroupId') as string) : null,
       plannedFor: formData.get('plannedFor') === 'on',
     };
+    
+    console.log("Отправка данных задания:", data);
     
     if (editingAssignmentId) {
       // Updating existing assignment
