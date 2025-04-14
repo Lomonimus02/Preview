@@ -4547,18 +4547,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Обновляем статус прочтения
       await dataStorage.markLastReadMessage(chatId, req.user.id, messageId);
       
-      // Получаем обновленные данные о непрочитанных сообщениях
-      // Это позволит обновить счетчик непрочитанных сообщений на фронтенде
+      // Получаем обновленные данные о непрочитанных сообщениях в этом чате
       const messages = await dataStorage.getChatMessages(chatId);
-      const lastReadId = messageId;
       const unreadCount = messages.filter(m => 
         m.senderId !== req.user.id && // Не от текущего пользователя
-        m.id > lastReadId // ID больше последнего прочитанного
+        m.id > messageId // ID больше последнего прочитанного
       ).length;
+      
+      // Получаем обновленные данные о непрочитанных сообщениях во всех чатах пользователя
+      // Это нужно для обновления навигационного бейджа
+      const userChats = await dataStorage.getUserChats(req.user.id);
+      const totalUnreadCount = userChats.reduce((total, chat) => total + (chat.unreadCount || 0), 0);
       
       res.status(200).json({ 
         success: true,
-        unreadCount: unreadCount 
+        unreadCount: unreadCount,
+        totalUnreadCount: totalUnreadCount
       });
     } catch (error) {
       console.error("Error updating read status:", error);
