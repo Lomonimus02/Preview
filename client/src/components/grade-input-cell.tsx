@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PlusCircle, X } from 'lucide-react';
 import { Grade } from '@shared/schema';
+import { useToast } from '@/hooks/use-toast';
 
 interface GradeInputCellProps {
   studentId: number;
@@ -29,12 +30,46 @@ export const GradeInputCell: React.FC<GradeInputCellProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(existingGrade ? existingGrade.grade.toString() : '');
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const validateGrade = (value: string): boolean => {
+    // Преобразуем значение в число
+    const gradeValue = parseFloat(value);
+    
+    // Проверяем, что это число
+    if (isNaN(gradeValue)) {
+      setError('Оценка должна быть числом');
+      return false;
+    }
+    
+    // Проверяем, что оценка не больше максимального балла
+    if (gradeValue > maxScore) {
+      const errorMessage = `Оценка не может быть больше ${maxScore} баллов`;
+      setError(errorMessage);
+      toast({
+        title: "Ошибка при сохранении",
+        description: errorMessage,
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    // Сбрасываем ошибку, если проверка прошла успешно
+    setError(null);
+    return true;
+  };
 
   const handleBlur = () => {
     if (inputValue.trim()) {
-      onSave(studentId, scheduleId, assignmentId, inputValue);
+      // Валидируем оценку перед сохранением
+      if (validateGrade(inputValue)) {
+        onSave(studentId, scheduleId, assignmentId, inputValue);
+        setIsEditing(false);
+      }
+    } else {
+      setIsEditing(false);
     }
-    setIsEditing(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -42,6 +77,7 @@ export const GradeInputCell: React.FC<GradeInputCellProps> = ({
       handleBlur();
     } else if (e.key === 'Escape') {
       setInputValue(existingGrade ? existingGrade.grade.toString() : '');
+      setError(null);
       setIsEditing(false);
     }
   };
@@ -52,17 +88,23 @@ export const GradeInputCell: React.FC<GradeInputCellProps> = ({
 
   if (isEditing || (!existingGrade && canEdit)) {
     return (
-      <div className="flex items-center justify-center">
+      <div className="flex flex-col items-center justify-center">
         <input
           type="text"
-          className={`w-10 h-7 text-center border rounded focus:outline-none focus:ring-1 focus:ring-primary ${existingGrade ? '' : 'border-dashed bg-transparent'}`}
+          className={`w-10 h-7 text-center border rounded focus:outline-none focus:ring-1 ${error ? 'border-red-500 focus:ring-red-500' : 'focus:ring-primary'} ${existingGrade ? '' : 'border-dashed bg-transparent'}`}
           value={inputValue}
-          placeholder={existingGrade ? existingGrade.grade.toString() : '+'}
+          placeholder={existingGrade ? existingGrade.grade.toString() : `/${maxScore}`}
           onChange={(e) => setInputValue(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
+          title={`Введите оценку (до ${maxScore} баллов)`}
           autoFocus
         />
+        {error && (
+          <span className="text-xs text-red-500 absolute mt-8">
+            {error}
+          </span>
+        )}
       </div>
     );
   }

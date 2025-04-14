@@ -522,6 +522,8 @@ export default function ClassGradeDetailsPage() {
         gradeType: newGradeData.gradeType || "Текущая",
         // Добавляем scheduleId для привязки к конкретному уроку
         scheduleId: newGradeData.scheduleId || null,
+        // Добавляем assignmentId для привязки к конкретному заданию
+        assignmentId: newGradeData.assignmentId || null,
         // Очень важно! Добавляем subgroupId, если оценка ставится в подгруппе
         subgroupId: newGradeData.subgroupId || null,
         // Используем строковое представление даты для отображения в UI
