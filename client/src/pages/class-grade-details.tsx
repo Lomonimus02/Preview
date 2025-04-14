@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
@@ -28,6 +28,8 @@ interface LessonSlot {
   scheduleId: number;
   formattedDate: string;
   startTime?: string;
+  endTime?: string;
+  status?: string; // Добавляем статус для проверки isLessonConducted
   assignments?: Assignment[];
 }
 import { format } from "date-fns";
@@ -1500,7 +1502,7 @@ export default function ClassGradeDetailsPage() {
         // КРИТЕРИЙ 3: Если студент состоит в подгруппе по этому предмету,
         // то не показываем его оценки без расписания в основном журнале
         // (они должны быть только в журнале подгруппы)
-        if (subgroupStudentIds.has(grade.studentId) && !grade.scheduleId) {
+        if (Array.from(subgroupStudentIds).includes(grade.studentId) && !grade.scheduleId) {
           return false;
         }
         
@@ -1806,61 +1808,116 @@ export default function ClassGradeDetailsPage() {
                         <TableHead className="bg-muted/50 sticky left-0">
                           Ученик
                         </TableHead>
+                        {/* Для каждого урока (lessonSlot) */}
                         {lessonSlots.map((slot) => {
                           const isLessonConducted = schedules.find(s => s.id === slot.scheduleId)?.status === 'conducted';
-                          return (
-                            <TableHead 
-                              key={`${slot.date}-${slot.scheduleId}`} 
-                              className="text-center cursor-pointer"
-                              onClick={() => canEditGrades ? handleHeaderClick(slot) : null}
-                            >
-                              <div className="flex flex-col items-center justify-center">
-                                {slot.formattedDate}
-                                {slot.startTime && <span className="text-xs">({slot.startTime.slice(0, 5)})</span>}
-                                {/* Отображаем задания в заголовке если они есть */}
-                                {slot.assignments && slot.assignments.length > 0 && classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && (
-                                  <div className="flex flex-wrap mt-1 mb-1 gap-1 justify-center text-xs">
-                                    {slot.assignments.map(assignment => (
-                                      <span 
-                                        key={assignment.id}
-                                        className={`${getAssignmentTypeColor(assignment.assignmentType)} text-gray-800 px-1.5 py-0.5 rounded-sm border border-gray-300 cursor-pointer hover:border-primary hover:bg-primary/10 transition-colors`}
-                                        title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. Нажмите для редактирования.`}
-                                        onClick={(e) => {
-                                          e.stopPropagation(); // Предотвращаем открытие диалога статуса
-                                          openEditAssignmentDialog(assignment);
-                                        }}
-                                      >
-                                        {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                {isLessonConducted && (
-                                  <div className="flex items-center">
-                                    <span className="text-green-600 ml-1">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                      </svg>
-                                    </span>
+                          
+                          // Проверяем, есть ли задания для накопительной системы
+                          if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
+                              slot.assignments && slot.assignments.length > 0) {
+                              
+                            // Для накопительной системы создаем отдельную колонку для каждого задания
+                            return (
+                              <React.Fragment key={`header-${slot.date}-${slot.scheduleId}`}>
+                                {/* Колонка с датой урока (объединяет все подколонки заданий) */}
+                                <TableHead 
+                                  colSpan={slot.assignments.length}
+                                  className="text-center border-b-2 border-primary/30 px-1 pt-1 pb-0"
+                                  onClick={() => canEditGrades ? handleHeaderClick(slot) : null}
+                                >
+                                  <div className="flex flex-col items-center justify-center mb-1">
+                                    <span className="font-medium">{slot.formattedDate}</span>
+                                    {slot.startTime && <span className="text-xs">({slot.startTime.slice(0, 5)})</span>}
                                     
-                                    {/* Кнопка для добавления задания (только для накопительной системы) */}
-                                    {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && canEditGrades && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation(); // Предотвращаем открытие диалога статуса
-                                          openAssignmentDialog(slot.scheduleId);
-                                        }}
-                                        className="ml-1 text-primary hover:text-primary-dark focus:outline-none"
-                                        title="Добавить задание"
-                                      >
-                                        <PlusCircle className="h-3 w-3" />
-                                      </button>
+                                    {/* Индикатор проведенного урока */}
+                                    {isLessonConducted && (
+                                      <div className="flex items-center">
+                                        <span className="text-green-600 ml-1">
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                          </svg>
+                                        </span>
+                                        
+                                        {/* Кнопка для добавления задания */}
+                                        {canEditGrades && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation(); // Предотвращаем открытие диалога статуса
+                                              openAssignmentDialog(slot.scheduleId);
+                                            }}
+                                            className="ml-1 text-primary hover:text-primary-dark focus:outline-none"
+                                            title="Добавить задание"
+                                          >
+                                            <PlusCircle className="h-3 w-3" />
+                                          </button>
+                                        )}
+                                      </div>
                                     )}
                                   </div>
-                                )}
-                              </div>
-                            </TableHead>
-                          );
+                                  
+                                  {/* Подколонки с отдельными заданиями */}
+                                  <div className="flex justify-center space-x-1">
+                                    {slot.assignments.map(assignment => (
+                                      <div 
+                                        key={assignment.id}
+                                        className="flex-1 text-xs"
+                                      >
+                                        <span 
+                                          className={`${getAssignmentTypeColor(assignment.assignmentType)} text-gray-800 px-1 py-0.5 rounded-sm border border-gray-300 block cursor-pointer hover:border-primary hover:bg-primary/10 transition-colors truncate`}
+                                          title={`${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. Нажмите для редактирования.`}
+                                          onClick={(e) => {
+                                            e.stopPropagation(); // Предотвращаем открытие диалога статуса
+                                            openEditAssignmentDialog(assignment);
+                                          }}
+                                        >
+                                          {getAssignmentTypeName(assignment.assignmentType).substring(0, 2)}
+                                          {' '}{assignment.maxScore}б
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </TableHead>
+                              </React.Fragment>
+                            );
+                          } else {
+                            // Для обычной системы оценивания или уроков без заданий - стандартный заголовок
+                            return (
+                              <TableHead 
+                                key={`${slot.date}-${slot.scheduleId}`} 
+                                className="text-center cursor-pointer"
+                                onClick={() => canEditGrades ? handleHeaderClick(slot) : null}
+                              >
+                                <div className="flex flex-col items-center justify-center">
+                                  {slot.formattedDate}
+                                  {slot.startTime && <span className="text-xs">({slot.startTime.slice(0, 5)})</span>}
+                                  
+                                  {isLessonConducted && (
+                                    <div className="flex items-center">
+                                      <span className="text-green-600 ml-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        </svg>
+                                      </span>
+                                      
+                                      {/* Кнопка для добавления задания (только для накопительной системы) */}
+                                      {classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && canEditGrades && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation(); // Предотвращаем открытие диалога статуса
+                                            openAssignmentDialog(slot.scheduleId);
+                                          }}
+                                          className="ml-1 text-primary hover:text-primary-dark focus:outline-none"
+                                          title="Добавить задание"
+                                        >
+                                          <PlusCircle className="h-3 w-3" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableHead>
+                            );
+                          }
                         })}
                         <TableHead className="text-center sticky right-0 bg-muted/50">
                           Средний балл
@@ -1873,96 +1930,182 @@ export default function ClassGradeDetailsPage() {
                           <TableCell className="font-medium bg-muted/20">
                             {student.lastName} {student.firstName}
                           </TableCell>
+                          {/* Для каждого урока (lessonSlot) */}
                           {lessonSlots.map((slot) => {
                             const studentGrades = getStudentGradeForSlot(student.id, slot, filteredGrades);
-                            return (
-                              <TableCell 
-                                key={`${slot.date}-${slot.scheduleId}`} 
-                                className={`text-center ${
-                                  classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
-                                  slot.assignments && 
-                                  slot.assignments.length > 0 
-                                    ? slot.assignments.length === 1 
-                                      ? getAssignmentTypeColor(slot.assignments[0].assignmentType) 
-                                      : 'bg-gray-50 border-gray-200' 
-                                    : ''
-                                }`}
-                              >
-                                {studentGrades.length > 0 ? (
-                                  <div className="flex flex-wrap justify-center gap-1 items-center">
-                                    {studentGrades.map((grade) => (
-                                      <div key={grade.id} className="relative group">
-                                        <span 
-                                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-help
-                                            ${grade.gradeType === 'test' || grade.gradeType === 'Контрольная' ? 'bg-blue-600' : 
-                                            grade.gradeType === 'exam' || grade.gradeType === 'Экзамен' ? 'bg-purple-600' : 
-                                            grade.gradeType === 'homework' || grade.gradeType === 'Домашняя' ? 'bg-amber-600' : 
-                                            grade.gradeType === 'project' ? 'bg-emerald-600' : 
-                                            grade.gradeType === 'classwork' || grade.gradeType === 'Практическая' ? 'bg-green-600' :
-                                            'bg-primary'} text-primary-foreground`}
-                                          title={`${getGradeTypeName(grade.gradeType)}${grade.comment ? ': ' + grade.comment : ''}`}
-                                        >
-                                          {grade.grade}
-                                        </span>
-                                        
-                                        {canEditGrades && (
-                                          <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
-                                            <Button
-                                              variant="outline"
-                                              size="icon"
-                                              className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
-                                              onClick={() => openEditGradeDialog(grade)}
-                                              title="Редактировать оценку"
-                                            >
-                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M12 20h9"></path>
-                                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-                                              </svg>
-                                            </Button>
-                                            <Button
-                                              variant="outline"
-                                              size="icon"
-                                              className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
-                                              onClick={() => handleDeleteGrade(grade.id)}
-                                              title="Удалить оценку"
-                                            >
-                                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <path d="M3 6h18"></path>
-                                                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-                                              </svg>
-                                            </Button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                    {/* Кнопка "+" для добавления еще одной оценки в тот же дату и урок */}
-                                    {canEditGrades && canAddGradeToLesson(slot.scheduleId, slot) && (
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="h-5 w-5 p-0 rounded-full ml-1"
-                                        onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
-                                        title="Добавить еще одну оценку"
+                            
+                            // Проверяем, используется ли накопительная система и есть ли задания для этого урока
+                            if (classData?.gradingSystem === GradingSystemEnum.CUMULATIVE && 
+                                slot.assignments && slot.assignments.length > 0) {
+                                  
+                              // Для накопительной системы с заданиями отображаем отдельные ячейки по одной для каждого задания
+                              return (
+                                <React.Fragment key={`${slot.date}-${slot.scheduleId}`}>
+                                  {slot.assignments.map((assignment) => {
+                                    // Найдем оценку студента за данное задание (если есть)
+                                    const assignmentGrade = studentGrades.find(g => g.assignmentId === assignment.id);
+                                    
+                                    return (
+                                      <TableCell 
+                                        key={`${slot.scheduleId}-${assignment.id}`}
+                                        className={`text-center p-1 border-r ${getAssignmentTypeColor(assignment.assignmentType)}`}
                                       >
-                                        +
-                                      </Button>
-                                    )}
-                                  </div>
-                                ) : canEditGrades && canAddGradeToLesson(slot.scheduleId, slot) ? (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    className="h-7 w-7 p-0 rounded-full"
-                                    onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
-                                  >
-                                    +
-                                  </Button>
-                                ) : (
-                                  "-"
-                                )}
-                              </TableCell>
-                            );
+                                        {assignmentGrade ? (
+                                          // Если оценка уже есть, показываем её с возможностью редактирования
+                                          <div className="relative group">
+                                            <span 
+                                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium cursor-help bg-white/80"
+                                              title={assignmentGrade.comment ? assignmentGrade.comment : 'Нажмите для редактирования'}
+                                            >
+                                              {assignmentGrade.grade}
+                                            </span>
+                                            
+                                            {canEditGrades && (
+                                              <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
+                                                <Button
+                                                  variant="outline"
+                                                  size="icon"
+                                                  className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
+                                                  onClick={() => openEditGradeDialog(assignmentGrade)}
+                                                  title="Редактировать оценку"
+                                                >
+                                                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M12 20h9"></path>
+                                                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                                                  </svg>
+                                                </Button>
+                                                <Button
+                                                  variant="outline"
+                                                  size="icon"
+                                                  className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
+                                                  onClick={() => handleDeleteGrade(assignmentGrade.id)}
+                                                  title="Удалить оценку"
+                                                >
+                                                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                    <path d="M3 6h18"></path>
+                                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                                  </svg>
+                                                </Button>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : canEditGrades && isLessonConducted(slot.scheduleId) ? (
+                                          // Если нет оценки, но учитель может выставлять и урок проведен - показываем поле ввода
+                                          <div className="flex items-center justify-center">
+                                            <input
+                                              type="text"
+                                              className="w-8 h-6 text-center text-xs border rounded"
+                                              placeholder={`/${assignment.maxScore}`}
+                                              maxLength={2}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  const value = e.currentTarget.value;
+                                                  handleDirectGradeInput(
+                                                    student.id, 
+                                                    slot.scheduleId, 
+                                                    assignment.id, 
+                                                    value
+                                                  );
+                                                  e.currentTarget.value = '';
+                                                }
+                                              }}
+                                              title={`Введите оценку из ${assignment.maxScore} и нажмите Enter`}
+                                            />
+                                          </div>
+                                        ) : (
+                                          // Если нет оценки и учитель не может выставлять - показываем пустую ячейку
+                                          <span className="text-gray-400">-</span>
+                                        )}
+                                      </TableCell>
+                                    );
+                                  })}
+                                </React.Fragment>
+                              );
+                            } else {
+                              // Для обычной системы оценивания (или если нет заданий) показываем одну ячейку
+                              return (
+                                <TableCell 
+                                  key={`${slot.date}-${slot.scheduleId}`} 
+                                  className="text-center p-2"
+                                >
+                                  {studentGrades.length > 0 ? (
+                                    <div className="flex flex-wrap justify-center gap-1 items-center">
+                                      {studentGrades.map((grade) => (
+                                        <div key={grade.id} className="relative group">
+                                          <span 
+                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-help
+                                              ${grade.gradeType === 'test' || grade.gradeType === 'Контрольная' ? 'bg-blue-600' : 
+                                              grade.gradeType === 'exam' || grade.gradeType === 'Экзамен' ? 'bg-purple-600' : 
+                                              grade.gradeType === 'homework' || grade.gradeType === 'Домашняя' ? 'bg-amber-600' : 
+                                              grade.gradeType === 'project' ? 'bg-emerald-600' : 
+                                              grade.gradeType === 'classwork' || grade.gradeType === 'Практическая' ? 'bg-green-600' :
+                                              'bg-primary'} text-primary-foreground`}
+                                            title={`${getGradeTypeName(grade.gradeType)}${grade.comment ? ': ' + grade.comment : ''}`}
+                                          >
+                                            {grade.grade}
+                                          </span>
+                                          
+                                          {canEditGrades && (
+                                            <div className="absolute invisible group-hover:visible -top-2 -right-2 flex space-x-1">
+                                              <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-5 w-5 p-0 bg-background border-muted-foreground/50"
+                                                onClick={() => openEditGradeDialog(grade)}
+                                                title="Редактировать оценку"
+                                              >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                  <path d="M12 20h9"></path>
+                                                  <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                                                </svg>
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-5 w-5 p-0 bg-background border-destructive text-destructive"
+                                                onClick={() => handleDeleteGrade(grade.id)}
+                                                title="Удалить оценку"
+                                              >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                  <path d="M3 6h18"></path>
+                                                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                                </svg>
+                                              </Button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                      {/* Кнопка "+" для добавления еще одной оценки в тот же дату и урок */}
+                                      {canEditGrades && (
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="h-5 w-5 p-0 rounded-full ml-1"
+                                          onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
+                                          title="Добавить еще одну оценку"
+                                        >
+                                          <PlusCircle className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ) : canEditGrades ? (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="h-6 w-6 p-0 rounded-full"
+                                      onClick={() => openGradeDialog(student.id, slot.date, slot.scheduleId)}
+                                      title="Добавить оценку"
+                                    >
+                                      <PlusCircle className="h-3 w-3" />
+                                    </Button>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </TableCell>
+                              );
+                            }
                           })}
                           <TableCell className="text-center font-medium sticky right-0 bg-muted/30">
                             {calculateAverageGrade(student.id)}
