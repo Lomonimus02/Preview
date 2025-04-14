@@ -296,6 +296,30 @@ export default function MessagesPage() {
     },
   });
   
+  // Мутация для удаления сообщения
+  const deleteMessageMutation = useMutation({
+    mutationFn: async ({ chatId, messageId }: { chatId: number, messageId: number }) => {
+      const res = await apiRequest(`/api/chats/${chatId}/messages/${messageId}`, "DELETE");
+      return res.json();
+    },
+    onSuccess: () => {
+      // Обновляем сообщения в текущем чате и список всех чатов
+      queryClient.invalidateQueries({ queryKey: [`/api/chats/${selectedChatId}/messages`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
+      toast({
+        title: "Сообщение удалено",
+        description: "Сообщение было успешно удалено"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить сообщение",
+        variant: "destructive",
+      });
+    },
+  });
+  
   // При загрузке страницы или изменении списка чатов
   useEffect(() => {
     // Если есть чаты, но не выбран ни один, выбираем первый
@@ -644,12 +668,31 @@ export default function MessagesPage() {
                               className={`flex ${isSentByUser ? 'justify-end' : 'justify-start'}`}
                             >
                               <div 
-                                className={`max-w-[80%] p-3 rounded-lg ${
+                                className={`max-w-[80%] p-3 rounded-lg relative group ${
                                   isSentByUser 
                                     ? 'bg-primary text-white rounded-tr-none' 
                                     : 'bg-gray-100 text-gray-800 rounded-tl-none'
                                 }`}
                               >
+                                {(isSentByUser || user?.role === 'principal' || user?.role === 'school_admin' || user?.role === 'super_admin') && (
+                                  <button
+                                    className={`absolute top-1 right-1 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${
+                                      isSentByUser ? 'hover:bg-primary-dark text-white' : 'hover:bg-gray-200 text-gray-500'
+                                    }`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (window.confirm('Вы уверены, что хотите удалить это сообщение?')) {
+                                        deleteMessageMutation.mutate({
+                                          chatId: selectedChatId!,
+                                          messageId: message.id
+                                        });
+                                      }
+                                    }}
+                                    title="Удалить сообщение"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                                 {selectedChat.type === 'group' && !isSentByUser && (
                                   <p className={`text-xs font-medium mb-1 ${
                                     isSentByUser ? 'text-primary-50' : 'text-gray-500'
