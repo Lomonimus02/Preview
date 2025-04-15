@@ -1415,28 +1415,25 @@ export default function MessagesPage() {
                       ) : (
                         <div>
                           {/* Виртуализированный список пользователей */}
-                          
-                          {/* Мемоизируем отфильтрованных пользователей */}
                           {(() => {
-                            const filteredUsers = useMemo(() => {
-                              return chatUsers
-                                .filter(u => u.id !== user?.id)
-                                .filter(u => {
-                                  if (!userSearchQuery) {
-                                    // Если нет поискового запроса, показываем либо всех (если showAllUsers=true), 
-                                    // либо только выбранных пользователей
-                                    return showAllUsers || newChatForm.getValues().participantIds.includes(u.id);
-                                  }
-                                  
-                                  // Поиск по имени, фамилии или полному имени
-                                  const searchTerm = userSearchQuery.toLowerCase();
-                                  return (
-                                    u.firstName.toLowerCase().includes(searchTerm) ||
-                                    u.lastName.toLowerCase().includes(searchTerm) ||
-                                    `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
-                                  );
-                                });
-                            }, [chatUsers, userSearchQuery, showAllUsers, user?.id, newChatForm]);
+                            // Определяем отфильтрованных пользователей
+                            const filteredUsers = chatUsers
+                              .filter(u => u.id !== user?.id)
+                              .filter(u => {
+                                if (!userSearchQuery) {
+                                  // Если нет поискового запроса, показываем либо всех (если showAllUsers=true), 
+                                  // либо только выбранных пользователей
+                                  return showAllUsers || newChatForm.getValues().participantIds.includes(u.id);
+                                }
+                                
+                                // Поиск по имени, фамилии или полному имени
+                                const searchTerm = userSearchQuery.toLowerCase();
+                                return (
+                                  u.firstName.toLowerCase().includes(searchTerm) ||
+                                  u.lastName.toLowerCase().includes(searchTerm) ||
+                                  `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
+                                );
+                              });
                             
                             // Если список пуст, показываем сообщение
                             if (filteredUsers.length === 0) {
@@ -1455,9 +1452,6 @@ export default function MessagesPage() {
                               estimateSize: () => 48, // Приблизительная высота элемента
                               overscan: 5, // Количество дополнительных элементов для рендеринга
                             });
-                            
-                            // По правилам React, объявляем компонент вне условных конструкций
-                            // Этот компонент не используется в новой реализации и удален
                             
                             // Рендерим виртуальный список
                             return (
