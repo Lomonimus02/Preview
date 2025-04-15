@@ -144,93 +144,100 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
   return (
     <div 
       className={`
-        mb-1 p-0.5 xs:p-1 rounded-lg cursor-pointer transition-all duration-200
+        mb-1 xs:mb-2 p-1 xs:p-2 rounded-lg cursor-pointer transition-all duration-200
         ${isCompleted 
           ? 'bg-green-50 border border-green-100' 
           : 'bg-emerald-50 border border-emerald-100 hover:border-emerald-200'
         }
       `}
       onClick={onClick}
-      title={`Кабинет: ${room || "—"} • Учитель: ${teacherName}`}
+      title={`Кабинет: ${room || "—"} • Учитель: ${teacherName}`} // Информация в тултипе
     >
       <div className="flex justify-between items-center">
-        <div className="text-emerald-700 font-medium text-[10px] xs:text-xs leading-tight">
-          <span className="inline-block min-w-[50px] xs:min-w-[60px]">{schedule.startTime} - {schedule.endTime}</span>
-          <span className="ml-0.5 xs:ml-1 text-emerald-900 truncate max-w-[80px] xs:max-w-[100px] sm:max-w-[120px] inline-block align-middle">
+        <div className="text-emerald-700 font-medium text-xs xs:text-sm md:text-base">
+          <span className="inline-block min-w-[60px] xs:min-w-[70px]">{schedule.startTime} - {schedule.endTime}</span>
+          <span className="ml-1 xs:ml-2 text-emerald-900 truncate max-w-[100px] xs:max-w-[120px] sm:max-w-[150px] md:max-w-none inline-block align-middle">
             {schedule.subgroupId
-              ? getSubgroupName()
+              ? getSubgroupName() // Используем функцию для получения названия подгруппы
               : subject?.name || "Предмет"}
           </span>
+          {/* Отображаем класс для общего расписания */}
           {showClass && className && (
-            <span className="ml-0.5 text-[9px] xs:text-[10px] text-gray-600">
+            <span className="ml-1 text-xs text-gray-600">
               [{className}]
             </span>
           )}
         </div>
         
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 xs:gap-1 md:gap-2">
+          {/* Показываем количество заданий, если они есть */}
           {schedule.assignments && schedule.assignments.length > 0 && (
-            <div className="text-[8px] xs:text-[9px] text-gray-600 font-medium px-0.5 py-0.5 bg-gray-100 rounded-md">
-              <span title="Количество заданий">{schedule.assignments.length}</span>
+            <div className="text-[10px] xs:text-xs text-gray-600 font-medium px-1 py-0.5 bg-gray-100 rounded-md">
+              <span title="Количество заданий">{schedule.assignments.length} зад.</span>
             </div>
           )}
           
-          <div className="flex items-center gap-0.5">
+          {/* Кнопки действий */}
+          <div className="flex items-center gap-0.5 xs:gap-1 md:gap-2">
+            {/* Кнопка для создания задания (Отображается для учителей, независимо от статуса урока) */}
             <div 
               className="cursor-pointer" 
               onClick={(e) => {
-                e.stopPropagation();
+                e.stopPropagation(); // Предотвращаем всплытие события
                 if (onClick && typeof onClick === 'function') {
                   onClick(e, "assignment");
                 }
               }}
             >
-              <FiList className="text-blue-500 w-3 h-3 xs:w-4 xs:h-4" title={schedule.status === 'conducted' ? "Создать задание" : "Запланировать задание"} />
+              <FiList className="text-blue-500 w-4 h-4 md:w-5 md:h-5" title={schedule.status === 'conducted' ? "Создать задание" : "Запланировать задание"} />
             </div>
             
+            {/* Кнопка для создания домашнего задания */}
             <div 
               className="cursor-pointer" 
               onClick={(e) => {
-                e.stopPropagation();
+                e.stopPropagation(); // Предотвращаем всплытие события
                 if (onClick && typeof onClick === 'function') {
                   onClick(e, "homework");
                 }
               }}
             >
               {isCompleted ? (
-                <FiEdit3 className="text-orange-500 w-3 h-3 xs:w-4 xs:h-4" title="Редактировать домашнее задание" />
+                <FiEdit3 className="text-orange-500 w-4 h-4 md:w-5 md:h-5" title="Редактировать домашнее задание" />
               ) : (
-                <FiPlus className="text-orange-500 w-3 h-3 xs:w-4 xs:h-4" title="Добавить домашнее задание" />
+                <FiPlus className="text-orange-500 w-4 h-4 md:w-5 md:h-5" title="Добавить домашнее задание" />
               )}
             </div>
             
+            {/* Кнопка для отметки посещаемости (Только для проведенных уроков и учителей) */}
             {schedule.status === 'conducted' && currentUser?.role === UserRoleEnum.TEACHER && (
               <div 
                 className="cursor-pointer" 
                 onClick={(e) => {
-                  e.stopPropagation();
+                  e.stopPropagation(); // Предотвращаем всплытие события
                   if (onClick && typeof onClick === 'function') {
                     onClick(e, "attendance");
                   }
                 }}
               >
-                <FiUsers className="text-purple-500 w-3 h-3 xs:w-4 xs:h-4" title="Отметить посещаемость" />
+                <FiUsers className="text-purple-500 w-4 h-4 md:w-5 md:h-5" title="Отметить посещаемость" />
               </div>
             )}
           </div>
         </div>
       </div>
       
+      {/* Отображаем оценки, если они есть */}
       {grades.length > 0 && (
-        <div className="mt-0.5 xs:mt-1">
-          <div className="flex flex-wrap gap-0.5">
+        <div className="mt-1 xs:mt-2">
+          <div className="flex flex-wrap gap-0.5 xs:gap-1">
             {grades.map((grade) => (
               <div 
                 key={grade.id}
-                className="inline-flex items-center px-1 py-0 rounded-full text-[9px] xs:text-[10px] font-medium bg-primary text-primary-foreground cursor-pointer hover:bg-primary-dark transition-colors"
+                className="inline-flex items-center px-1.5 xs:px-2 py-0.5 rounded-full text-[10px] xs:text-xs font-medium bg-primary text-primary-foreground cursor-pointer hover:bg-primary-dark transition-colors"
                 title={grade.comment || "Нажмите для просмотра деталей"}
                 onClick={(e) => {
-                  e.stopPropagation();
+                  e.stopPropagation(); // Предотвращаем всплытие события
                   if (onClick && typeof onClick === 'function') {
                     onClick(e, "grade", grade as unknown as Assignment);
                   }
@@ -531,18 +538,18 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   return (
     <>
-      <Card className="min-w-[135px] w-[calc(100vw-1.75rem)] xs:min-w-[200px] sm:w-full sm:max-w-[300px] h-[min(55vh,380px)] overflow-y-auto shadow-md">
-        <CardHeader className="text-center py-0.5 xs:py-1 sm:py-2 bg-white sticky top-0 z-10">
-          <CardTitle className="text-base xs:text-lg">{dayName}</CardTitle>
-          <div className="text-[10px] xs:text-xs text-gray-500">{formattedDate}</div>
+      <Card className="min-w-[180px] w-[calc(100vw-2.5rem)] xs:min-w-[260px] sm:w-full sm:max-w-[380px] h-[min(80vh,550px)] overflow-y-auto shadow-md">
+        <CardHeader className="text-center py-2 xs:py-3 sm:py-4 bg-white sticky top-0 z-10">
+          <CardTitle className="text-lg sm:text-xl">{dayName}</CardTitle>
+          <div className="text-xs xs:text-sm text-gray-500">{formattedDate}</div>
           {schedules.length > 0 && (
-            <div className="text-[9px] xs:text-[10px] text-gray-500">
+            <div className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">
               {schedules.length} {schedules.length === 1 ? 'урок' : 
                 schedules.length < 5 ? 'урока' : 'уроков'}
             </div>
           )}
         </CardHeader>
-        <CardContent className="px-2 xs:px-3 pt-0 pb-3">
+        <CardContent className="px-4 pt-0 pb-4">
           {sortedSchedules.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <FiClock className="w-12 h-12 mb-4" />
@@ -620,13 +627,13 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                         {slotsToShow.map(({ slot, schedules, isEmpty }) => (
                           <div key={slot.slotNumber} className="time-slot rounded-lg border border-gray-100">
                             {/* Заголовок слота */}
-                            <div className="p-0.5 xs:p-1 bg-gray-50 rounded-t-lg border-b border-gray-100 flex items-center justify-between">
-                              <div className="font-medium text-[10px] xs:text-xs sm:text-sm text-gray-800">{slot.slotNumber} урок</div>
-                              <div className="text-[10px] xs:text-xs text-gray-600">{slot.startTime} - {slot.endTime}</div>
+                            <div className="p-1 xs:p-2 bg-gray-50 rounded-t-lg border-b border-gray-100 flex items-center justify-between">
+                              <div className="font-medium text-xs xs:text-sm sm:text-base text-gray-800">{slot.slotNumber} урок</div>
+                              <div className="text-xs sm:text-sm text-gray-600">{slot.startTime} - {slot.endTime}</div>
                             </div>
                             
                             {/* Содержимое слота */}
-                            <div className="p-0.5 xs:p-1">
+                            <div className="p-1 xs:p-2">
                               {isEmpty ? (
                                 <div className="h-8 xs:h-10 sm:h-12 flex items-center justify-center text-xs sm:text-sm text-gray-400">
                                   <span className="hidden sm:inline">Нет уроков в это время</span>

@@ -390,12 +390,12 @@ export default function SchedulePage() {
 
   return (
     <MainLayout>
-      <div className="mx-auto px-0 xs:px-1 py-0.5 h-full flex flex-col overflow-hidden">
-        <div className="flex justify-between items-center mb-0.5 xs:mb-1">
-          <h2 className="text-lg xs:text-xl font-heading font-bold text-gray-800">Расписание</h2>
+      <div className="container mx-auto px-2 xs:px-3 py-2 h-[calc(100vh-3.5rem)] flex flex-col">
+        <div className="flex justify-between items-center mb-2 xs:mb-3">
+          <h2 className="text-xl xs:text-2xl font-heading font-bold text-gray-800">Расписание</h2>
           
           {canEditSchedule && (
-            <Button size="sm" className="h-7 text-xs px-2" onClick={() => setIsAddDialogOpen(true)}>
+            <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
               Добавить урок
             </Button>
           )}
