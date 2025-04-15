@@ -538,18 +538,18 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   return (
     <>
-      <Card className="min-w-[180px] w-[calc(100vw-2.5rem)] xs:min-w-[260px] sm:w-full sm:max-w-[380px] h-[min(80vh,550px)] overflow-y-auto shadow-md">
-        <CardHeader className="text-center py-2 xs:py-3 sm:py-4 bg-white sticky top-0 z-10">
+      <Card className="min-w-[170px] w-[calc(100vw-2rem)] xs:min-w-[250px] sm:w-full sm:max-w-[380px] h-[min(68vh,480px)] overflow-y-auto shadow-md">
+        <CardHeader className="text-center py-1.5 xs:py-2 sm:py-3 bg-white sticky top-0 z-10">
           <CardTitle className="text-lg sm:text-xl">{dayName}</CardTitle>
           <div className="text-xs xs:text-sm text-gray-500">{formattedDate}</div>
           {schedules.length > 0 && (
-            <div className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">
+            <div className="text-xs sm:text-sm text-gray-500 mt-0.5">
               {schedules.length} {schedules.length === 1 ? 'урок' : 
                 schedules.length < 5 ? 'урока' : 'уроков'}
             </div>
           )}
         </CardHeader>
-        <CardContent className="px-4 pt-0 pb-4">
+        <CardContent className="px-2 xs:px-3 sm:px-4 pt-0 pb-2 xs:pb-3 sm:pb-4">
           {sortedSchedules.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <FiClock className="w-12 h-12 mb-4" />

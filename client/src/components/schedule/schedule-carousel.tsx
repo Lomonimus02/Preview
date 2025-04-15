@@ -131,38 +131,38 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   const weekRangeText = `${format(currentWeekStart, "d MMM", { locale: ru })} - ${format(currentWeekEnd, "d MMM yyyy", { locale: ru })}`;
 
   return (
-    <div className="h-[calc(100vh-9rem)] flex flex-col mb-2">
-      <div className="flex flex-wrap justify-between items-center mb-2 gap-2 px-1.5">
+    <div className="h-[calc(100vh-7rem)] flex flex-col mb-1">
+      <div className="flex flex-wrap justify-between items-center mb-1 xs:mb-2 gap-1 px-1">
         <Button 
           variant="outline" 
           onClick={goToPreviousWeek}
-          className="gap-1 text-xs sm:text-sm"
+          className="gap-1 text-xs sm:text-sm h-8 xs:h-9"
           size="sm"
         >
           <FiChevronLeft className="shrink-0" /> 
-          <span className="hidden sm:inline">Предыдущая неделя</span>
+          <span className="hidden sm:inline">Пред. неделя</span>
           <span className="sm:hidden">Пред.</span>
         </Button>
         
-        <div className="flex items-center text-sm sm:text-lg font-medium order-first sm:order-none w-full sm:w-auto justify-center mb-1 sm:mb-0">
-          <FiCalendar className="mr-1.5 shrink-0" />
+        <div className="flex items-center text-sm xs:text-base sm:text-lg font-medium order-first sm:order-none w-full sm:w-auto justify-center mb-1 sm:mb-0">
+          <FiCalendar className="mr-1 shrink-0" />
           <span>{weekRangeText}</span>
         </div>
         
         <Button 
           variant="outline" 
           onClick={goToNextWeek}
-          className="gap-1 text-xs sm:text-sm"
+          className="gap-1 text-xs sm:text-sm h-8 xs:h-9"
           size="sm"
         >
-          <span className="hidden sm:inline">Следующая неделя</span>
+          <span className="hidden sm:inline">След. неделя</span>
           <span className="sm:hidden">След.</span>
           <FiChevronRight className="shrink-0" />
         </Button>
       </div>
       
       <div className="overflow-hidden touch-pan-y overscroll-x-none flex-grow" ref={emblaRef}>
-        <div className="flex h-full gap-1 xs:gap-2 md:gap-4 pb-1">
+        <div className="flex h-full gap-0.5 xs:gap-1 sm:gap-2 md:gap-3 pb-1">
           {weekDates.map((date) => (
             <div className="flex-shrink-0 h-full" key={format(date, "yyyy-MM-dd")}>
               <ScheduleDayCard
