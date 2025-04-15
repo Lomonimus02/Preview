@@ -32,7 +32,7 @@ export function SwipeableChatItem({
     onSwipedRight: () => setSwipedLeft(false),
     trackMouse: false,
     delta: 10,
-    preventDefaultTouchmoveEvent: true,
+    touchEventOptions: { passive: false },
   });
 
   // Закрыть меню действий
@@ -41,13 +41,19 @@ export function SwipeableChatItem({
     setSwipedLeft(false);
   };
 
+  // Определяем доступные действия на основе типа чата и роли пользователя
+  const canEdit = chatType === ChatTypeEnum.GROUP && onEdit;
+  const canLeave = chatType === ChatTypeEnum.GROUP && !isCreator && onLeave;
+  const canDelete = (chatType === ChatTypeEnum.PRIVATE) || 
+                  (chatType === ChatTypeEnum.GROUP && isCreator && onDelete);
+
   return (
     <ChatContextMenu
       chatType={chatType}
       isCreator={isCreator}
-      onDelete={onDelete}
-      onEdit={onEdit}
-      onLeave={onLeave}
+      onDelete={canDelete ? onDelete : undefined}
+      onEdit={canEdit ? onEdit : undefined}
+      onLeave={canLeave ? onLeave : undefined}
     >
       <div className={cn("relative overflow-hidden", className)}>
         <div
@@ -56,7 +62,8 @@ export function SwipeableChatItem({
             "transition-transform duration-200 ease-out flex items-center",
             {
               "transform -translate-x-32": swipedLeft && chatType === ChatTypeEnum.GROUP && isCreator,
-              "transform -translate-x-24": swipedLeft && (chatType === ChatTypeEnum.PRIVATE || !isCreator)
+              "transform -translate-x-24": swipedLeft && ((chatType === ChatTypeEnum.PRIVATE) || 
+                                          (chatType === ChatTypeEnum.GROUP && !isCreator))
             }
           )}
         >
@@ -72,8 +79,8 @@ export function SwipeableChatItem({
           )}
         >
           <div className="flex h-full">
-            {/* Для приватных чатов или групповых (не создатель) - только выйти */}
-            {(chatType === ChatTypeEnum.PRIVATE || !isCreator) && onLeave && (
+            {/* Выход из группового чата (все участники, кроме создателя) */}
+            {chatType === ChatTypeEnum.GROUP && !isCreator && onLeave && (
               <Button 
                 variant="destructive" 
                 size="sm" 
@@ -88,36 +95,34 @@ export function SwipeableChatItem({
               </Button>
             )}
 
-            {/* Только для групповых чатов (создатель) - редактировать и удалить */}
-            {chatType === ChatTypeEnum.GROUP && isCreator && (
-              <>
-                {onEdit && (
-                  <Button 
-                    variant="secondary" 
-                    size="sm" 
-                    className="h-full px-2 rounded-none"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit();
-                    }}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                )}
-                {onDelete && (
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="h-full px-2 rounded-none"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDelete();
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                )}
-              </>
+            {/* Редактирование названия группового чата */}
+            {chatType === ChatTypeEnum.GROUP && onEdit && (
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="h-full px-2 rounded-none"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+            )}
+
+            {/* Удаление чата */}
+            {canDelete && (
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                className="h-full px-2 rounded-none"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete && onDelete();
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             )}
 
             {/* Кнопка закрытия меню действий */}

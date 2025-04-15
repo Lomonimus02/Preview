@@ -710,18 +710,29 @@ export default function MessagesPage() {
                         key={chat.id}
                         chatType={chat.type}
                         isCreator={isCreator}
-                        onDelete={chat.type === ChatTypeEnum.GROUP && isCreator ? () => {
-                          setChatToDelete(chat);
-                          setDeleteAlertOpen(true);
-                        } : undefined}
-                        onEdit={chat.type === ChatTypeEnum.GROUP && isCreator ? () => {
-                          setChatToEdit(chat);
-                          setEditChatDialogOpen(true);
-                        } : undefined}
-                        onLeave={(chat.type === ChatTypeEnum.PRIVATE || !isCreator) ? () => {
-                          setChatToLeave(chat);
-                          setLeaveAlertOpen(true);
-                        } : undefined}
+                        onDelete={
+                          // Удаление для приватных чатов (всегда доступно)
+                          // или для групповых чатов (только создатель)
+                          (chat.type === ChatTypeEnum.PRIVATE || 
+                           (chat.type === ChatTypeEnum.GROUP && isCreator)) ? () => {
+                            setChatToDelete(chat);
+                            setDeleteAlertOpen(true);
+                          } : undefined
+                        }
+                        onEdit={
+                          // Редактирование только для групповых чатов (для всех участников)
+                          chat.type === ChatTypeEnum.GROUP ? () => {
+                            setChatToEdit(chat);
+                            setEditChatDialogOpen(true);
+                          } : undefined
+                        }
+                        onLeave={
+                          // Выход только из групповых чатов (для всех, кроме создателя)
+                          (chat.type === ChatTypeEnum.GROUP && !isCreator) ? () => {
+                            setChatToLeave(chat);
+                            setLeaveAlertOpen(true);
+                          } : undefined
+                        }
                       >
                         <div 
                           className={`flex items-center p-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 w-full ${
