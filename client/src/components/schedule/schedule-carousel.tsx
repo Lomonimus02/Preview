@@ -131,27 +131,27 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   const weekRangeText = `${format(currentWeekStart, "d MMM", { locale: ru })} - ${format(currentWeekEnd, "d MMM yyyy", { locale: ru })}`;
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col mb-0">
-      <div className="flex justify-between items-center mb-1 px-1 gap-1">
+    <div className="h-[calc(100vh-6.5rem)] flex flex-col">
+      <div className="flex justify-between items-center mb-0.5 gap-0.5">
         <Button 
           variant="outline" 
           onClick={goToPreviousWeek}
-          className="p-1 h-8 w-10 xs:h-auto xs:w-auto xs:p-2 gap-0.5 text-xs xs:text-sm"
+          className="p-0.5 h-7 w-7 xs:h-auto xs:w-auto xs:p-1.5 gap-0 text-[10px] xs:text-xs"
           size="sm"
         >
           <FiChevronLeft className="shrink-0" /> 
           <span className="hidden xs:inline">Пред.</span>
         </Button>
         
-        <div className="flex items-center text-xs xs:text-sm sm:text-base font-medium">
-          <FiCalendar className="mr-1 shrink-0" />
+        <div className="flex items-center text-[10px] xs:text-xs font-medium">
+          <FiCalendar className="mr-0.5 shrink-0 w-3 h-3 xs:w-4 xs:h-4" />
           <span>{weekRangeText}</span>
         </div>
         
         <Button 
           variant="outline" 
           onClick={goToNextWeek}
-          className="p-1 h-8 w-10 xs:h-auto xs:w-auto xs:p-2 gap-0.5 text-xs xs:text-sm"
+          className="p-0.5 h-7 w-7 xs:h-auto xs:w-auto xs:p-1.5 gap-0 text-[10px] xs:text-xs"
           size="sm"
         >
           <span className="hidden xs:inline">След.</span>
@@ -160,7 +160,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
       </div>
       
       <div className="overflow-hidden touch-pan-y overscroll-x-none flex-grow" ref={emblaRef}>
-        <div className="flex h-full gap-0.5 xs:gap-1 md:gap-3 pb-0">
+        <div className="flex h-full gap-0.5 pb-0">
           {weekDates.map((date) => (
             <div className="flex-shrink-0 h-full" key={format(date, "yyyy-MM-dd")}>
               <ScheduleDayCard
