@@ -215,6 +215,9 @@ export default function MessagesPage() {
   const [userPage, setUserPage] = useState(1);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(new Set());
   
+  // Рефы для контейнеров
+  const parentRef = useRef<HTMLDivElement>(null);
+  
   // Получение списка чатов пользователя
   const { data: chats = [], isLoading: chatsLoading } = useQuery<Chat[]>({
     queryKey: ["/api/chats"],
@@ -1413,9 +1416,6 @@ export default function MessagesPage() {
                         <div>
                           {/* Виртуализированный список пользователей */}
                           {(() => {
-                            // Создаем ссылку на контейнер списка
-                            const parentRef = useRef<HTMLDivElement>(null);
-                            
                             // Мемоизируем отфильтрованных пользователей
                             const filteredUsers = useMemo(() => {
                               return chatUsers
@@ -1516,7 +1516,7 @@ export default function MessagesPage() {
                             UserItem.displayName = 'UserItem';
                             
                             return (
-                              <div ref={parentRef} className="h-full overflow-auto">
+                              <div className="h-full overflow-auto" ref={parentRef}>
                                 {/* Контейнер для виртуализированного списка */}
                                 <div
                                   className="relative w-full"
