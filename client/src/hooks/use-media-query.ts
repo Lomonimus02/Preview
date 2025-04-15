@@ -1,47 +1,36 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 
 /**
- * Хук для отслеживания медиа-запросов
- * @param query Медиа-запрос для отслеживания (например, "(max-width: 768px)")
- * @returns Булево значение, указывающее, соответствует ли текущее состояние экрана медиа-запросу
+ * Hook для отслеживания медиа-запросов
+ * @param query - CSS медиа-запрос, например "(max-width: 768px)"
+ * @returns boolean результат проверки медиа-запроса
  */
-export function useMediaQuery(query: string): boolean {
+export const useMediaQuery = (query: string): boolean => {
+  // Состояние, отслеживающее соответствие медиа-запросу
   const [matches, setMatches] = useState<boolean>(false);
-
+  
   useEffect(() => {
-    // Проверяем, находимся ли мы в окружении браузера
-    if (typeof window === "undefined" || !window.matchMedia) {
-      return;
-    }
-    
+    // Создаем медиа-запрос
     const mediaQuery = window.matchMedia(query);
     
     // Устанавливаем начальное состояние
     setMatches(mediaQuery.matches);
     
-    // Функция обработчик изменений медиа-запроса
-    const handleChange = (event: MediaQueryListEvent) => {
+    // Функция для обновления состояния при изменении условий медиа-запроса
+    const handleChange = (event: MediaQueryListEvent): void => {
       setMatches(event.matches);
     };
     
-    // Подписываемся на изменения (используем правильный API в зависимости от браузера)
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener("change", handleChange);
-    } else {
-      // Обратная совместимость для старых браузеров
-      mediaQuery.addListener(handleChange);
-    }
+    // Добавляем слушатель событий
+    mediaQuery.addEventListener('change', handleChange);
     
-    // Отписываемся при размонтировании компонента
+    // Удаляем слушатель событий при размонтировании компонента
     return () => {
-      if (mediaQuery.removeEventListener) {
-        mediaQuery.removeEventListener("change", handleChange);
-      } else {
-        // Обратная совместимость для старых браузеров
-        mediaQuery.removeListener(handleChange);
-      }
+      mediaQuery.removeEventListener('change', handleChange);
     };
-  }, [query]);
+  }, [query]); // Пересоздаем эффект только при изменении запроса
   
   return matches;
-}
+};
+
+export default useMediaQuery;

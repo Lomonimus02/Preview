@@ -82,7 +82,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { useMediaQuery } from "../hooks/use-media-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -245,8 +245,19 @@ export default function MessagesPage() {
       const res = await apiRequest("/api/chats", "POST", data);
       return res.json();
     },
-    onSuccess: (newChat) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
+    onSuccess: async (newChat) => {
+      // Принудительно обновляем список чатов после создания нового
+      await queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
+      
+      // Обновляем состояние чатов непосредственно в памяти
+      queryClient.setQueryData<Chat[]>(["/api/chats"], (oldChats = []) => {
+        // Проверяем, не существует ли уже чат с таким ID
+        if (!oldChats.some(chat => chat.id === newChat.id)) {
+          return [...oldChats, newChat];
+        }
+        return oldChats;
+      });
+      
       setSelectedChatId(newChat.id);
       setIsNewChatDialogOpen(false);
       newChatForm.reset();
