@@ -153,10 +153,13 @@ export default function MessagesPage() {
   
   // Состояния для UI
   const [searchQuery, setSearchQuery] = useState("");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [isNewChatDialogOpen, setIsNewChatDialogOpen] = useState(false);
   const [isParticipantsDialogOpen, setIsParticipantsDialogOpen] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const [showAllUsers, setShowAllUsers] = useState(false);
+  const [isAddingUserByName, setIsAddingUserByName] = useState(false);
   
   // Получение списка чатов пользователя
   const { data: chats = [], isLoading: chatsLoading } = useQuery<Chat[]>({
