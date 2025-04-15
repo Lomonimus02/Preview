@@ -1415,8 +1415,9 @@ export default function MessagesPage() {
                       ) : (
                         <div>
                           {/* Виртуализированный список пользователей */}
+                          
+                          {/* Мемоизируем отфильтрованных пользователей */}
                           {(() => {
-                            // Мемоизируем отфильтрованных пользователей
                             const filteredUsers = useMemo(() => {
                               return chatUsers
                                 .filter(u => u.id !== user?.id)
@@ -1448,7 +1449,6 @@ export default function MessagesPage() {
                               );
                             }
                             
-                            // Создаем виртуализатор
                             const rowVirtualizer = useVirtualizer({
                               count: filteredUsers.length,
                               getScrollElement: () => parentRef.current,
@@ -1456,65 +1456,10 @@ export default function MessagesPage() {
                               overscan: 5, // Количество дополнительных элементов для рендеринга
                             });
                             
-                            // Компонент элемента списка с мемоизацией
-                            const UserItem = memo(({ index }: { index: number }) => {
-                              const u = filteredUsers[index];
-                              const id = u.id.toString();
-                              const isSelected = newChatForm.getValues().participantIds.includes(u.id);
-                              
-                              const handleCheckChange = useCallback((checked: boolean) => {
-                                const currentParticipants = newChatForm.getValues().participantIds;
-                                
-                                // Используем функцию обновления для повышения производительности
-                                if (checked) {
-                                  const newParticipants = [...currentParticipants, u.id];
-                                  newChatForm.setValue("participantIds", newParticipants);
-                                } else {
-                                  const newParticipants = currentParticipants.filter(pid => pid !== u.id);
-                                  newChatForm.setValue("participantIds", newParticipants);
-                                }
-                                
-                                // Устанавливаем тип чата как групповой
-                                newChatForm.setValue("type", ChatTypeEnum.GROUP);
-                              }, [u.id]);
-                              
-                              return (
-                                <div 
-                                  className={`flex items-center space-x-2 hover:bg-gray-100 p-1 rounded-md transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
-                                >
-                                  <Checkbox 
-                                    id={`user-${id}`}
-                                    checked={isSelected}
-                                    onCheckedChange={handleCheckChange}
-                                  />
-                                  <label 
-                                    htmlFor={`user-${id}`}
-                                    className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer"
-                                  >
-                                    <div className="flex items-center">
-                                      <Avatar className="h-6 w-6 mr-2">
-                                        <AvatarFallback className="text-xs">
-                                          {u.firstName.charAt(0)}{u.lastName.charAt(0)}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <div>
-                                        <span className="font-medium">{u.firstName} {u.lastName}</span>
-                                        <span className="text-xs text-gray-500 ml-1">
-                                          ({u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
-                                          u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
-                                          u.role === UserRoleEnum.PARENT ? 'Родитель' : 
-                                          u.role})
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </label>
-                                </div>
-                              );
-                            });
+                            // По правилам React, объявляем компонент вне условных конструкций
+                            // Этот компонент не используется в новой реализации и удален
                             
-                            // Задаем displayName для мемоизированного компонента
-                            UserItem.displayName = 'UserItem';
-                            
+                            // Рендерим виртуальный список
                             return (
                               <div className="h-full overflow-auto" ref={parentRef}>
                                 {/* Контейнер для виртуализированного списка */}
@@ -1524,7 +1469,7 @@ export default function MessagesPage() {
                                     height: `${rowVirtualizer.getTotalSize()}px`,
                                   }}
                                 >
-                                  {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+                                  {rowVirtualizer.getVirtualItems().map((virtualRow: any) => (
                                     <div
                                       key={filteredUsers[virtualRow.index].id}
                                       className="absolute top-0 left-0 w-full"
@@ -1533,7 +1478,58 @@ export default function MessagesPage() {
                                         transform: `translateY(${virtualRow.start}px)`,
                                       }}
                                     >
-                                      <UserItem index={virtualRow.index} />
+                                      <div className="p-1">
+                                        {(() => {
+                                          const u = filteredUsers[virtualRow.index];
+                                          const id = u.id.toString();
+                                          const isSelected = newChatForm.getValues().participantIds.includes(u.id);
+                                          
+                                          return (
+                                            <div 
+                                              className={`flex items-center space-x-2 hover:bg-gray-100 p-1 rounded-md transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
+                                            >
+                                              <Checkbox 
+                                                id={`user-${id}`}
+                                                checked={isSelected}
+                                                onCheckedChange={(checked) => {
+                                                  const currentParticipants = newChatForm.getValues().participantIds;
+                                                  
+                                                  if (checked) {
+                                                    const newParticipants = [...currentParticipants, u.id];
+                                                    newChatForm.setValue("participantIds", newParticipants);
+                                                  } else {
+                                                    const newParticipants = currentParticipants.filter(pid => pid !== u.id);
+                                                    newChatForm.setValue("participantIds", newParticipants);
+                                                  }
+                                                  
+                                                  newChatForm.setValue("type", ChatTypeEnum.GROUP);
+                                                }}
+                                              />
+                                              <label 
+                                                htmlFor={`user-${id}`}
+                                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer"
+                                              >
+                                                <div className="flex items-center">
+                                                  <Avatar className="h-6 w-6 mr-2">
+                                                    <AvatarFallback className="text-xs">
+                                                      {u.firstName.charAt(0)}{u.lastName.charAt(0)}
+                                                    </AvatarFallback>
+                                                  </Avatar>
+                                                  <div>
+                                                    <span className="font-medium">{u.firstName} {u.lastName}</span>
+                                                    <span className="text-xs text-gray-500 ml-1">
+                                                      ({u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
+                                                      u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
+                                                      u.role === UserRoleEnum.PARENT ? 'Родитель' : 
+                                                      u.role})
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              </label>
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
