@@ -1404,18 +1404,21 @@ export default function MessagesPage() {
                       />
                     </div>
                     
-                    <div className="border rounded-md p-2 max-h-60 overflow-y-auto">
+                    <div className="border rounded-md p-2 h-60">
                       {usersLoading ? (
                         <div className="flex justify-center items-center py-2">
                           <Clock className="h-4 w-4 text-primary animate-spin" />
                         </div>
                       ) : (
                         <div>
-                          {/* Список пользователей с фильтрацией */}
-                          <div className="space-y-2">
-                            {(() => {
-                              // Мемоизируем отфильтрованных пользователей
-                              const filteredUsers = chatUsers
+                          {/* Виртуализированный список пользователей */}
+                          {(() => {
+                            // Создаем ссылку на контейнер списка
+                            const parentRef = useRef<HTMLDivElement>(null);
+                            
+                            // Мемоизируем отфильтрованных пользователей
+                            const filteredUsers = useMemo(() => {
+                              return chatUsers
                                 .filter(u => u.id !== user?.id)
                                 .filter(u => {
                                   if (!userSearchQuery) {
@@ -1432,78 +1435,112 @@ export default function MessagesPage() {
                                     `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
                                   );
                                 });
+                            }, [chatUsers, userSearchQuery, showAllUsers, user?.id, newChatForm]);
+                            
+                            // Если список пуст, показываем сообщение
+                            if (filteredUsers.length === 0) {
+                              return (
+                                <div className="py-3 px-4 text-center text-gray-500">
+                                  {userSearchQuery 
+                                    ? "Пользователи не найдены" 
+                                    : "Нет доступных пользователей"}
+                                </div>
+                              );
+                            }
+                            
+                            // Создаем виртуализатор
+                            const rowVirtualizer = useVirtualizer({
+                              count: filteredUsers.length,
+                              getScrollElement: () => parentRef.current,
+                              estimateSize: () => 48, // Приблизительная высота элемента
+                              overscan: 5, // Количество дополнительных элементов для рендеринга
+                            });
+                            
+                            // Компонент элемента списка с мемоизацией
+                            const UserItem = memo(({ index }: { index: number }) => {
+                              const u = filteredUsers[index];
+                              const id = u.id.toString();
+                              const isSelected = newChatForm.getValues().participantIds.includes(u.id);
                               
-                              // Ограничиваем количество пользователей для отображения
-                              const usersToShow = userSearchQuery 
-                                ? filteredUsers 
-                                : filteredUsers.slice(0, 15);
+                              const handleCheckChange = useCallback((checked: boolean) => {
+                                const currentParticipants = newChatForm.getValues().participantIds;
                                 
-                              // Если список пуст, показываем сообщение
-                              if (usersToShow.length === 0) {
-                                return (
-                                  <div className="py-3 px-4 text-center text-gray-500">
-                                    {userSearchQuery 
-                                      ? "Пользователи не найдены" 
-                                      : "Нет доступных пользователей"}
-                                  </div>
-                                );
-                              }
+                                // Используем функцию обновления для повышения производительности
+                                if (checked) {
+                                  const newParticipants = [...currentParticipants, u.id];
+                                  newChatForm.setValue("participantIds", newParticipants);
+                                } else {
+                                  const newParticipants = currentParticipants.filter(pid => pid !== u.id);
+                                  newChatForm.setValue("participantIds", newParticipants);
+                                }
+                                
+                                // Устанавливаем тип чата как групповой
+                                newChatForm.setValue("type", ChatTypeEnum.GROUP);
+                              }, [u.id]);
                               
-                              // Отображаем список пользователей
-                              return usersToShow.map(u => {
-                                const id = u.id.toString();
-                                const isSelected = newChatForm.getValues().participantIds.includes(u.id);
-                                
-                                return (
-                                  <div 
-                                    key={id} 
-                                    className={`flex items-center space-x-2 hover:bg-gray-100 p-1 rounded-md transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
+                              return (
+                                <div 
+                                  className={`flex items-center space-x-2 hover:bg-gray-100 p-1 rounded-md transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
+                                >
+                                  <Checkbox 
+                                    id={`user-${id}`}
+                                    checked={isSelected}
+                                    onCheckedChange={handleCheckChange}
+                                  />
+                                  <label 
+                                    htmlFor={`user-${id}`}
+                                    className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer"
                                   >
-                                    <Checkbox 
-                                      id={`user-${id}`}
-                                      checked={isSelected}
-                                      onCheckedChange={(checked) => {
-                                        const currentParticipants = newChatForm.getValues().participantIds;
-                                        
-                                        // Используем функцию обновления для повышения производительности
-                                        if (checked) {
-                                          const newParticipants = [...currentParticipants, u.id];
-                                          newChatForm.setValue("participantIds", newParticipants);
-                                        } else {
-                                          const newParticipants = currentParticipants.filter(pid => pid !== u.id);
-                                          newChatForm.setValue("participantIds", newParticipants);
-                                        }
-                                        
-                                        // Устанавливаем тип чата как групповой
-                                        newChatForm.setValue("type", ChatTypeEnum.GROUP);
-                                      }}
-                                    />
-                                    <label 
-                                      htmlFor={`user-${id}`}
-                                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer"
-                                    >
-                                      <div className="flex items-center">
-                                        <Avatar className="h-6 w-6 mr-2">
-                                          <AvatarFallback className="text-xs">
-                                            {u.firstName.charAt(0)}{u.lastName.charAt(0)}
-                                          </AvatarFallback>
-                                        </Avatar>
-                                        <div>
-                                          <span className="font-medium">{u.firstName} {u.lastName}</span>
-                                          <span className="text-xs text-gray-500 ml-1">
-                                            ({u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
-                                            u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
-                                            u.role === UserRoleEnum.PARENT ? 'Родитель' : 
-                                            u.role})
-                                          </span>
-                                        </div>
+                                    <div className="flex items-center">
+                                      <Avatar className="h-6 w-6 mr-2">
+                                        <AvatarFallback className="text-xs">
+                                          {u.firstName.charAt(0)}{u.lastName.charAt(0)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div>
+                                        <span className="font-medium">{u.firstName} {u.lastName}</span>
+                                        <span className="text-xs text-gray-500 ml-1">
+                                          ({u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
+                                          u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
+                                          u.role === UserRoleEnum.PARENT ? 'Родитель' : 
+                                          u.role})
+                                        </span>
                                       </div>
-                                    </label>
-                                  </div>
-                                );
-                              });
-                            })()}
-                          </div>
+                                    </div>
+                                  </label>
+                                </div>
+                              );
+                            });
+                            
+                            // Задаем displayName для мемоизированного компонента
+                            UserItem.displayName = 'UserItem';
+                            
+                            return (
+                              <div ref={parentRef} className="h-full overflow-auto">
+                                {/* Контейнер для виртуализированного списка */}
+                                <div
+                                  className="relative w-full"
+                                  style={{
+                                    height: `${rowVirtualizer.getTotalSize()}px`,
+                                  }}
+                                >
+                                  {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+                                    <div
+                                      key={filteredUsers[virtualRow.index].id}
+                                      className="absolute top-0 left-0 w-full"
+                                      style={{
+                                        height: `${virtualRow.size}px`,
+                                        transform: `translateY(${virtualRow.start}px)`,
+                                      }}
+                                    >
+                                      <UserItem index={virtualRow.index} />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                          
                           
                           {/* Кнопки управления списком */}
                           <div className="space-y-1 mt-2">
