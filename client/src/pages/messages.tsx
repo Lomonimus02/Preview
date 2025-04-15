@@ -21,7 +21,8 @@ import {
   Play,
   Download,
   ExternalLink,
-  ArrowLeft
+  ArrowLeft,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1363,6 +1364,74 @@ export default function MessagesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Диалог редактирования чата */}
+      <EditChatDialog
+        isOpen={editChatDialogOpen}
+        onClose={() => setEditChatDialogOpen(false)}
+        onSubmit={(values) => updateChatMutation.mutate({ 
+          chatId: chatToEdit?.id || 0, 
+          name: values.name 
+        })}
+        defaultName={chatToEdit?.name || ''}
+        isSubmitting={updateChatMutation.isPending}
+      />
+      
+      {/* Диалог подтверждения удаления чата */}
+      <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Удаление чата</AlertDialogTitle>
+            <AlertDialogDescription>
+              Вы уверены, что хотите удалить этот чат? Это действие невозможно отменить.
+              Все сообщения также будут удалены.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => chatToDelete && deleteChatMutation.mutate(chatToDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteChatMutation.isPending}
+            >
+              {deleteChatMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Удаление...
+                </>
+              ) : "Удалить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      {/* Диалог подтверждения выхода из чата */}
+      <AlertDialog open={leaveAlertOpen} onOpenChange={setLeaveAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Выход из чата</AlertDialogTitle>
+            <AlertDialogDescription>
+              Вы уверены, что хотите выйти из этого чата? 
+              Вы больше не будете получать сообщения и уведомления.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Отмена</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => chatToLeave && leaveChatMutation.mutate(chatToLeave.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={leaveChatMutation.isPending}
+            >
+              {leaveChatMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Выход...
+                </>
+              ) : "Выйти"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </MainLayout>
   );
 }
