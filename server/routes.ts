@@ -4389,6 +4389,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Обновление информации о чате (название и аватар)
+  app.patch("/api/chats/:chatId", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = parseInt(req.params.chatId);
+      if (isNaN(chatId)) {
+        return res.status(400).json({ message: "Invalid chat ID" });
+      }
+      
+      // Проверяем, существует ли чат
+      const chat = await dataStorage.getChat(chatId);
+      if (!chat) {
+        return res.status(404).json({ message: "Chat not found" });
+      }
+      
+      // Проверяем, является ли пользователь участником и администратором чата
+      const participants = await dataStorage.getChatParticipants(chatId);
+      const userParticipant = participants.find(p => p.userId === req.user.id);
+      
+      if (!userParticipant) {
+        return res.status(403).json({ message: "You are not a participant of this chat" });
+      }
+      
+      // Для групповых чатов только администратор может обновлять информацию
+      if (chat.type === ChatTypeEnum.GROUP && !userParticipant.isAdmin) {
+        return res.status(403).json({ message: "Only chat administrators can update group chat information" });
+      }
+      
+      // Проверяем, что чат создан этим пользователем (дополнительная проверка)
+      if (chat.type === ChatTypeEnum.GROUP && chat.creatorId !== req.user.id) {
+        // Для групповых чатов разрешаем редактирование только создателю
+        // А обычным администраторам разрешаем только приглашать/удалять участников
+        return res.status(403).json({ message: "Only chat creator can update group chat information" });
+      }
+      
+      // Валидируем и ограничиваем обновляемые поля
+      const allowedFields = ['name', 'avatarUrl'];
+      const updateData: Partial<InsertChat> = {};
+      
+      allowedFields.forEach(field => {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field];
+        }
+      });
+      
+      // Обновляем информацию о чате
+      const updatedChat = await dataStorage.updateChat(chatId, updateData);
+      
+      // Получаем обновленную информацию об участниках
+      const participantDetails = await Promise.all(
+        participants.map(async (p) => {
+          const user = await dataStorage.getUser(p.userId);
+          return {
+            id: p.userId,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            isAdmin: p.isAdmin,
+            lastReadMessageId: p.lastReadMessageId
+          };
+        })
+      );
+      
+      res.json({
+        ...updatedChat,
+        participants: participantDetails
+      });
+    } catch (error) {
+      console.error("Error updating chat:", error);
+      res.status(500).json({ message: "Failed to update chat" });
+    }
+  });
+  
+  // Удаление чата
+  app.delete("/api/chats/:chatId", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = parseInt(req.params.chatId);
+      if (isNaN(chatId)) {
+        return res.status(400).json({ message: "Invalid chat ID" });
+      }
+      
+      // Проверяем, существует ли чат
+      const chat = await dataStorage.getChat(chatId);
+      if (!chat) {
+        return res.status(404).json({ message: "Chat not found" });
+      }
+      
+      // Проверяем, является ли пользователь создателем чата (только создатель может удалить чат)
+      if (chat.creatorId !== req.user.id) {
+        return res.status(403).json({ message: "Only chat creator can delete the chat" });
+      }
+      
+      // Удаляем чат и связанные данные
+      await dataStorage.deleteChat(chatId);
+      
+      res.json({ success: true, message: "Chat deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting chat:", error);
+      res.status(500).json({ message: "Failed to delete chat" });
+    }
+  });
+  
+  // Выход из группового чата (для любого участника)
+  app.delete("/api/chats/:chatId/leave", isAuthenticated, async (req, res) => {
+    try {
+      const chatId = parseInt(req.params.chatId);
+      if (isNaN(chatId)) {
+        return res.status(400).json({ message: "Invalid chat ID" });
+      }
+      
+      // Проверяем, существует ли чат
+      const chat = await dataStorage.getChat(chatId);
+      if (!chat) {
+        return res.status(404).json({ message: "Chat not found" });
+      }
+      
+      // Проверяем, является ли чат групповым (из личного чата выходить нельзя)
+      if (chat.type !== ChatTypeEnum.GROUP) {
+        return res.status(400).json({ message: "Cannot leave a private chat" });
+      }
+      
+      // Проверяем, является ли пользователь участником чата
+      const participants = await dataStorage.getChatParticipants(chatId);
+      const isParticipant = participants.some(p => p.userId === req.user.id);
+      
+      if (!isParticipant) {
+        return res.status(403).json({ message: "You are not a participant of this chat" });
+      }
+      
+      // Проверяем, является ли пользователь создателем чата
+      if (chat.creatorId === req.user.id) {
+        // Если создатель выходит, нужно передать права другому администратору
+        // или сделать администратором другого участника
+        const otherAdmins = participants.filter(p => p.isAdmin && p.userId !== req.user.id);
+        
+        // Если есть другие администраторы, можно просто выйти
+        if (otherAdmins.length === 0) {
+          // Если других администраторов нет, делаем администратором первого участника
+          if (participants.length > 1) {
+            // Находим первого участника, который не создатель
+            const firstParticipant = participants.find(p => p.userId !== req.user.id);
+            if (firstParticipant) {
+              // Удаляем и создаем заново с правами администратора
+              await dataStorage.removeChatParticipant(chatId, firstParticipant.userId);
+              await dataStorage.addChatParticipant({
+                chatId,
+                userId: firstParticipant.userId,
+                isAdmin: true
+              });
+              
+              // Обновляем создателя чата
+              await dataStorage.updateChat(chatId, { creatorId: firstParticipant.userId });
+            }
+          }
+        }
+      }
+      
+      // Удаляем пользователя из чата
+      await dataStorage.removeChatParticipant(chatId, req.user.id);
+      
+      res.json({ success: true, message: "Left the chat successfully" });
+    } catch (error) {
+      console.error("Error leaving chat:", error);
+      res.status(500).json({ message: "Failed to leave chat" });
+    }
+  });
+  
   // Получение сообщений в чате
   app.get("/api/chats/:chatId/messages", isAuthenticated, async (req, res) => {
     try {
