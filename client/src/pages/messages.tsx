@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRoleEnum } from "@shared/schema";
+import { UserRoleEnum, ChatTypeEnum } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +20,8 @@ import {
   X,
   Play,
   Download,
-  ExternalLink
+  ExternalLink,
+  ArrowLeft
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,18 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar";
+import { SwipeableChatItem } from "@/components/chat/swipeable-chat-item";
+import { EditChatDialog } from "@/components/chat/edit-chat-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -485,6 +498,101 @@ export default function MessagesPage() {
     return chat.unreadCount || 0;
   };
   
+  // Проверка, является ли пользователь создателем чата
+  const isCreatorOfChat = (chat: Chat) => {
+    return chat.creatorId === user?.id;
+  };
+  
+  // Состояние для управления диалогом редактирования чата
+  const [editChatDialogOpen, setEditChatDialogOpen] = useState(false);
+  const [chatToEdit, setChatToEdit] = useState<Chat | null>(null);
+  
+  // Состояние для управления диалогом подтверждения удаления
+  const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<Chat | null>(null);
+  
+  // Состояние для управления диалогом подтверждения выхода из чата
+  const [leaveAlertOpen, setLeaveAlertOpen] = useState(false);
+  const [chatToLeave, setChatToLeave] = useState<Chat | null>(null);
+  
+  // Мутация для обновления названия чата
+  const updateChatMutation = useMutation({
+    mutationFn: async (data: { chatId: number, name: string }) => {
+      const res = await apiRequest(`/api/chats/${data.chatId}`, "PATCH", { name: data.name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
+      setEditChatDialogOpen(false);
+      setChatToEdit(null);
+      toast({
+        title: "Чат обновлен",
+        description: "Название чата успешно изменено",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось обновить чат",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Мутация для удаления чата
+  const deleteChatMutation = useMutation({
+    mutationFn: async (chatId: number) => {
+      const res = await apiRequest(`/api/chats/${chatId}`, "DELETE");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
+      setDeleteAlertOpen(false);
+      setChatToDelete(null);
+      if (selectedChatId === chatToDelete?.id) {
+        setSelectedChatId(null);
+      }
+      toast({
+        title: "Чат удален",
+        description: "Чат был успешно удален",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить чат",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  // Мутация для выхода из чата
+  const leaveChatMutation = useMutation({
+    mutationFn: async (chatId: number) => {
+      const res = await apiRequest(`/api/chats/${chatId}/leave`, "POST");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chats"] });
+      setLeaveAlertOpen(false);
+      setChatToLeave(null);
+      if (selectedChatId === chatToLeave?.id) {
+        setSelectedChatId(null);
+      }
+      toast({
+        title: "Выход из чата",
+        description: "Вы успешно покинули чат",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось выйти из чата",
+        variant: "destructive",
+      });
+    },
+  });
+  
   // Форматирование времени сообщения
   const formatMessageTime = (dateStr: string | Date) => {
     try {
@@ -594,54 +702,72 @@ export default function MessagesPage() {
                     const unreadCount = getUnreadCount(chat);
                     const isSelected = chat.id === selectedChatId;
                     const chatName = getChatName(chat);
+                    const isCreator = isCreatorOfChat(chat);
                     
                     return (
-                      <div 
+                      <SwipeableChatItem
                         key={chat.id}
-                        className={`flex items-center p-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 ${
-                          isSelected ? 'bg-primary/10' : ''
-                        }`}
-                        onClick={() => setSelectedChatId(chat.id)}
+                        chatType={chat.type}
+                        isCreator={isCreator}
+                        onDelete={chat.type === 'group' && isCreator ? () => {
+                          setChatToDelete(chat);
+                          setDeleteAlertOpen(true);
+                        } : undefined}
+                        onEdit={chat.type === 'group' && isCreator ? () => {
+                          setChatToEdit(chat);
+                          setEditChatDialogOpen(true);
+                        } : undefined}
+                        onLeave={(chat.type === 'private' || !isCreator) ? () => {
+                          setChatToLeave(chat);
+                          setLeaveAlertOpen(true);
+                        } : undefined}
                       >
-                        <Avatar className="h-10 w-10 mr-3">
-                          {chat.avatarUrl ? (
-                            <AvatarImage src={chat.avatarUrl} alt={chatName} />
-                          ) : (
-                            <AvatarFallback className={isSelected ? 'bg-primary text-white' : 'bg-gray-200'}>
-                              {chat.type === 'group' ? (
-                                <Users className="h-4 w-4" />
-                              ) : chat.participants ? (
-                                chat.participants
-                                  .find(p => p.id !== user?.id)?.firstName.charAt(0) +
-                                chat.participants
-                                  .find(p => p.id !== user?.id)?.lastName.charAt(0)
-                              ) : "??"}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <div className="flex-grow">
-                          <div className="flex justify-between">
-                            <p className="font-medium text-gray-800">
-                              {chatName}
-                            </p>
-                            {chat.lastMessageAt && (
+                        <div 
+                          className={`flex items-center p-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 w-full ${
+                            isSelected ? 'bg-primary/10' : ''
+                          }`}
+                          onClick={() => setSelectedChatId(chat.id)}
+                        >
+                          <Avatar className="h-10 w-10 mr-3">
+                            {chat.avatarUrl ? (
+                              <AvatarImage src={chat.avatarUrl} alt={chatName} />
+                            ) : (
+                              <AvatarFallback className={isSelected ? 'bg-primary text-white' : 'bg-gray-200'}>
+                                {chat.type === 'group' ? (
+                                  <Users className="h-4 w-4" />
+                                ) : chat.participants ? (
+                                  chat.participants
+                                    .find(p => p.id !== user?.id)?.firstName.charAt(0) +
+                                  chat.participants
+                                    .find(p => p.id !== user?.id)?.lastName.charAt(0)
+                                ) : "??"}
+                              </AvatarFallback>
+                            )}
+                          </Avatar>
+                          <div className="flex-grow">
+                            <div className="flex justify-between">
+                              <p className="font-medium text-gray-800">
+                                {chatName}
+                              </p>
+                              {chat.lastMessageAt && (
+                                <p className="text-xs text-gray-500">
+                                  {formatMessageTime(chat.lastMessageAt)}
+                                </p>
+                              )}
+                            </div>
+                            {chat.type === 'group' && (
                               <p className="text-xs text-gray-500">
-                                {formatMessageTime(chat.lastMessageAt)}
+                                {chat.participants ? `${chat.participants.length} участников` : ''}
                               </p>
                             )}
                           </div>
-                          {chat.type === 'group' && (
-                            <p className="text-xs text-gray-500">
-                              {chat.participants ? `${chat.participants.length} участников` : ''}
-                            </p>
+                          {unreadCount > 0 && (
+                            <span className="bg-primary text-white text-xs px-2 py-1 rounded-full ml-2">
+                              {unreadCount}
+                            </span>
                           )}
                         </div>
-                        {unreadCount > 0 && (
-                          <span className="bg-primary text-white text-xs px-2 py-1 rounded-full ml-2">
-                            {unreadCount}
-                          </span>
-                        )}
-                      </div>
+                      </SwipeableChatItem>
                     );
                   })
                 )}
