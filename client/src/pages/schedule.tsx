@@ -390,7 +390,7 @@ export default function SchedulePage() {
 
   return (
     <MainLayout>
-      <div className="container mx-auto px-0 py-0 h-[calc(100vh-45px)] max-h-[calc(100vh-45px)] flex flex-col overflow-hidden">
+      <div className="container mx-auto px-0 xs:px-1 py-0.5 h-[calc(100vh-50px)] flex flex-col overflow-hidden">
         <div className="flex justify-between items-center mb-0.5 xs:mb-1">
           <h2 className="text-lg xs:text-xl font-heading font-bold text-gray-800">Расписание</h2>
           
