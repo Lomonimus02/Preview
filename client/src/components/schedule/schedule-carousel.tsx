@@ -132,26 +132,32 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
 
   return (
     <div className="mb-8">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
         <Button 
           variant="outline" 
           onClick={goToPreviousWeek}
-          className="gap-1"
+          className="gap-1 text-xs sm:text-sm"
+          size="sm"
         >
-          <FiChevronLeft /> Предыдущая неделя
+          <FiChevronLeft className="shrink-0" /> 
+          <span className="hidden sm:inline">Предыдущая неделя</span>
+          <span className="sm:hidden">Пред.</span>
         </Button>
         
-        <div className="flex items-center text-lg font-medium">
-          <FiCalendar className="mr-2" />
+        <div className="flex items-center text-sm sm:text-lg font-medium order-first sm:order-none w-full sm:w-auto justify-center mb-2 sm:mb-0">
+          <FiCalendar className="mr-2 shrink-0" />
           <span>{weekRangeText}</span>
         </div>
         
         <Button 
           variant="outline" 
           onClick={goToNextWeek}
-          className="gap-1"
+          className="gap-1 text-xs sm:text-sm"
+          size="sm"
         >
-          Следующая неделя <FiChevronRight />
+          <span className="hidden sm:inline">Следующая неделя</span>
+          <span className="sm:hidden">След.</span>
+          <FiChevronRight className="shrink-0" />
         </Button>
       </div>
       

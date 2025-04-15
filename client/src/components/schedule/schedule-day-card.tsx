@@ -153,7 +153,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
       onClick={onClick}
       title={`Кабинет: ${room || "—"} • Учитель: ${teacherName}`} // Информация в тултипе
     >
-      <div className="flex justify-between">
+      <div className="flex justify-between items-center">
         <div className="text-emerald-700 font-medium text-sm md:text-base">
           <span className="inline-block min-w-[70px]">{schedule.startTime} - {schedule.endTime}</span>
           <span className="ml-2 text-emerald-900 truncate max-w-[150px] md:max-w-none inline-block align-middle">
@@ -168,95 +168,68 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
             </span>
           )}
         </div>
+        
         <div className="flex items-center gap-1 md:gap-2">
-          {/* Кнопка для создания задания (Отображается для учителей, независимо от статуса урока) */}
-          <div 
-            className="cursor-pointer" 
-            onClick={(e) => {
-              e.stopPropagation(); // Предотвращаем всплытие события
-              if (onClick && typeof onClick === 'function') {
-                onClick(e, "assignment");
-              }
-            }}
-          >
-            <FiList className="text-blue-500 w-4 h-4 md:w-5 md:h-5" title={schedule.status === 'conducted' ? "Создать задание" : "Запланировать задание"} />
-          </div>
+          {/* Показываем количество заданий, если они есть */}
+          {schedule.assignments && schedule.assignments.length > 0 && (
+            <div className="text-xs text-gray-600 font-medium px-1.5 py-0.5 bg-gray-100 rounded-md">
+              <span title="Количество заданий">{schedule.assignments.length} зад.</span>
+            </div>
+          )}
           
-          {/* Кнопка для создания домашнего задания */}
-          <div 
-            className="cursor-pointer" 
-            onClick={(e) => {
-              e.stopPropagation(); // Предотвращаем всплытие события
-              if (onClick && typeof onClick === 'function') {
-                onClick(e, "homework");
-              }
-            }}
-          >
-            {isCompleted ? (
-              <FiEdit3 className="text-orange-500 w-4 h-4 md:w-5 md:h-5" title="Редактировать домашнее задание" />
-            ) : (
-              <FiPlus className="text-orange-500 w-4 h-4 md:w-5 md:h-5" title="Добавить домашнее задание" />
-            )}
-          </div>
-          
-          {/* Кнопка для отметки посещаемости (Только для проведенных уроков и учителей) */}
-          {schedule.status === 'conducted' && currentUser?.role === UserRoleEnum.TEACHER && (
+          {/* Кнопки действий */}
+          <div className="flex items-center gap-1 md:gap-2">
+            {/* Кнопка для создания задания (Отображается для учителей, независимо от статуса урока) */}
             <div 
               className="cursor-pointer" 
               onClick={(e) => {
                 e.stopPropagation(); // Предотвращаем всплытие события
                 if (onClick && typeof onClick === 'function') {
-                  onClick(e, "attendance");
+                  onClick(e, "assignment");
                 }
               }}
             >
-              <FiUsers className="text-purple-500 w-4 h-4 md:w-5 md:h-5" title="Отметить посещаемость" />
+              <FiList className="text-blue-500 w-4 h-4 md:w-5 md:h-5" title={schedule.status === 'conducted' ? "Создать задание" : "Запланировать задание"} />
             </div>
-          )}
-        </div>
-      </div>
-      
-      {/* Отображаем задания, если они есть */}
-      {schedule.assignments && schedule.assignments.length > 0 && (
-        <div className="mt-1">
-          <div className="flex flex-wrap gap-1">
-            {schedule.assignments.map((assignment) => (
+            
+            {/* Кнопка для создания домашнего задания */}
+            <div 
+              className="cursor-pointer" 
+              onClick={(e) => {
+                e.stopPropagation(); // Предотвращаем всплытие события
+                if (onClick && typeof onClick === 'function') {
+                  onClick(e, "homework");
+                }
+              }}
+            >
+              {isCompleted ? (
+                <FiEdit3 className="text-orange-500 w-4 h-4 md:w-5 md:h-5" title="Редактировать домашнее задание" />
+              ) : (
+                <FiPlus className="text-orange-500 w-4 h-4 md:w-5 md:h-5" title="Добавить домашнее задание" />
+              )}
+            </div>
+            
+            {/* Кнопка для отметки посещаемости (Только для проведенных уроков и учителей) */}
+            {schedule.status === 'conducted' && currentUser?.role === UserRoleEnum.TEACHER && (
               <div 
-                key={assignment.id}
-                className={`inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium text-gray-800 
-                  ${getAssignmentTypeColor(assignment.assignmentType)} 
-                  ${assignment.plannedFor ? 'border border-dashed border-gray-400' : ''} 
-                  hover:bg-opacity-80 cursor-pointer`}
-                title={`${assignment.plannedFor ? 'ЗАПЛАНИРОВАНО: ' : ''}${getAssignmentTypeName(assignment.assignmentType)}: ${assignment.maxScore} баллов. 
-                  ${assignment.plannedFor ? 
-                    'Это задание запланировано на будущий урок. Оценки за него не будут учитываться в средней оценке до проведения урока.' : 
-                    'Нажмите для редактирования.'}`}
+                className="cursor-pointer" 
                 onClick={(e) => {
                   e.stopPropagation(); // Предотвращаем всплытие события
-                  // Вызов обработчика для редактирования задания
                   if (onClick && typeof onClick === 'function') {
-                    onClick(e, "edit-assignment", assignment);
+                    onClick(e, "attendance");
                   }
                 }}
               >
-                <span className="font-medium">
-                  {getAssignmentTypeName(assignment.assignmentType).substring(0, 3)}
-                </span>
-                <span className="mx-1 font-bold">{assignment.maxScore}б.</span>
-                {assignment.plannedFor && (
-                  <span className="ml-1 text-gray-600 flex items-center" title="Запланировано">
-                    📅
-                  </span>
-                )}
+                <FiUsers className="text-purple-500 w-4 h-4 md:w-5 md:h-5" title="Отметить посещаемость" />
               </div>
-            ))}
+            )}
           </div>
         </div>
-      )}
+      </div>
       
       {/* Отображаем оценки, если они есть */}
       {grades.length > 0 && (
-        <div className="mt-1">
+        <div className="mt-2">
           <div className="flex flex-wrap gap-1">
             {grades.map((grade) => (
               <div 
@@ -565,7 +538,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   return (
     <>
-      <Card className="min-w-[320px] max-w-[380px] h-[600px] overflow-y-auto shadow-md">
+      <Card className="min-w-[300px] w-full sm:max-w-[380px] h-[600px] overflow-y-auto shadow-md">
         <CardHeader className="text-center py-4 bg-white sticky top-0 z-10">
           <CardTitle className="text-xl">{dayName}</CardTitle>
           <div className="text-gray-500">{formattedDate}</div>
@@ -829,6 +802,41 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                   <p className="font-medium">{dayName}</p>
                 </div>
               </div>
+              
+              {/* Отображение информации о заданиях */}
+              {selectedSchedule.assignments && selectedSchedule.assignments.length > 0 && (
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                  <h3 className="text-lg font-medium text-blue-800 mb-2">Задания</h3>
+                  <div className="space-y-2">
+                    {selectedSchedule.assignments.map((assignment) => (
+                      <div 
+                        key={assignment.id} 
+                        className="p-3 bg-white rounded-md border border-blue-200"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="font-medium">
+                            {getAssignmentTypeName(assignment.assignmentType)}
+                          </div>
+                          <div className="text-sm bg-blue-100 px-2 py-0.5 rounded-full">
+                            {assignment.maxScore} баллов
+                          </div>
+                        </div>
+                        
+                        {assignment.description && (
+                          <p className="text-sm text-gray-600">{assignment.description}</p>
+                        )}
+                        
+                        {assignment.plannedFor && (
+                          <div className="text-xs text-gray-500 mt-2 flex items-center">
+                            <FiClock className="mr-1" />
+                            Запланировано
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               {/* Отображение информации о домашнем задании */}
               {getScheduleHomework(selectedSchedule) && (
