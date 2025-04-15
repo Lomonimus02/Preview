@@ -1159,42 +1159,160 @@ export default function MessagesPage() {
                       name="participantIds"
                       render={() => (
                         <FormItem>
-                          <Select
-                            onValueChange={(value) => {
-                              const userId = parseInt(value);
-                              newChatForm.setValue("participantIds", [userId]);
-                              
-                              // Для личного чата используем имя собеседника
-                              const participant = chatUsers.find(u => u.id === userId);
-                              if (participant) {
-                                newChatForm.setValue("name", `${participant.firstName} ${participant.lastName}`);
-                              }
-                              
-                              // Устанавливаем тип чата как личный
-                              newChatForm.setValue("type", ChatTypeEnum.PRIVATE);
-                            }}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Выберите собеседника" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {usersLoading ? (
-                                <div className="flex justify-center items-center py-2">
-                                  <Clock className="h-4 w-4 text-primary animate-spin" />
-                                </div>
-                              ) : (
-                                chatUsers
-                                  .filter(u => u.id !== user?.id)
-                                  .map(u => (
-                                    <SelectItem key={u.id} value={u.id.toString()}>
-                                      {u.firstName} {u.lastName} ({u.role})
-                                    </SelectItem>
-                                  ))
+                          {/* Поиск пользователей для личного чата */}
+                          <div className="relative">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                              <Input 
+                                placeholder="Поиск по имени или фамилии..." 
+                                className="pl-10 pr-8"
+                                value={userSearchQuery}
+                                onChange={(e) => {
+                                  setUserSearchQuery(e.target.value);
+                                  if (e.target.value) {
+                                    setIsAddingUserByName(true);
+                                  }
+                                }}
+                                onFocus={() => setIsAddingUserByName(true)}
+                              />
+                              {userSearchQuery && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                                  onClick={() => {
+                                    setUserSearchQuery("");
+                                    setIsAddingUserByName(false);
+                                  }}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
                               )}
-                            </SelectContent>
-                          </Select>
+                            </div>
+                            
+                            {isAddingUserByName && (
+                              <div className="absolute z-10 w-full mt-1 bg-white shadow-lg rounded-md border max-h-[240px] overflow-y-auto">
+                                {usersLoading ? (
+                                  <div className="flex justify-center items-center py-4">
+                                    <Clock className="h-4 w-4 text-primary animate-spin" />
+                                  </div>
+                                ) : (
+                                  <>
+                                    {chatUsers
+                                      .filter(u => u.id !== user?.id)
+                                      .filter(u => {
+                                        if (!userSearchQuery) return true;
+                                        const searchTerm = userSearchQuery.toLowerCase();
+                                        return (
+                                          u.firstName.toLowerCase().includes(searchTerm) ||
+                                          u.lastName.toLowerCase().includes(searchTerm) ||
+                                          `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
+                                        );
+                                      })
+                                      .slice(0, 15)
+                                      .map(u => (
+                                        <div 
+                                          key={u.id} 
+                                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer transition-colors flex items-center"
+                                          onClick={() => {
+                                            // Выбираем пользователя и закрываем поиск
+                                            newChatForm.setValue("participantIds", [u.id]);
+                                            newChatForm.setValue("name", `${u.firstName} ${u.lastName}`);
+                                            newChatForm.setValue("type", ChatTypeEnum.PRIVATE);
+                                            setUserSearchQuery(`${u.firstName} ${u.lastName}`);
+                                            setIsAddingUserByName(false);
+                                          }}
+                                        >
+                                          <Avatar className="h-6 w-6 mr-2">
+                                            <AvatarFallback className="text-xs">
+                                              {u.firstName.charAt(0)}{u.lastName.charAt(0)}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <div>
+                                            <div className="text-sm font-medium">{u.firstName} {u.lastName}</div>
+                                            <div className="text-xs text-gray-500">{u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
+                                               u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
+                                               u.role === UserRoleEnum.PARENT ? 'Родитель' : 
+                                               u.role}</div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                      
+                                    {userSearchQuery && chatUsers
+                                      .filter(u => u.id !== user?.id)
+                                      .filter(u => {
+                                        const searchTerm = userSearchQuery.toLowerCase();
+                                        return (
+                                          u.firstName.toLowerCase().includes(searchTerm) ||
+                                          u.lastName.toLowerCase().includes(searchTerm) ||
+                                          `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
+                                        );
+                                      }).length === 0 && (
+                                        <div className="py-3 px-4 text-center text-gray-500">
+                                          Пользователи не найдены
+                                        </div>
+                                      )}
+                                      
+                                    <div className="p-2 border-t">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full text-xs"
+                                        onClick={() => setIsAddingUserByName(false)}
+                                      >
+                                        Закрыть список
+                                      </Button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Показываем выбранного пользователя */}
+                          {newChatForm.getValues().participantIds.length > 0 && !isAddingUserByName && (
+                            <div className="mt-2">
+                              <div className="flex items-center p-2 border rounded-md">
+                                {(() => {
+                                  const participantId = newChatForm.getValues().participantIds[0];
+                                  const participant = chatUsers.find(u => u.id === participantId);
+                                  if (!participant) return null;
+                                  
+                                  return (
+                                    <>
+                                      <Avatar className="h-8 w-8 mr-2">
+                                        <AvatarFallback>
+                                          {participant.firstName.charAt(0)}{participant.lastName.charAt(0)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1">
+                                        <div className="text-sm font-medium">{participant.firstName} {participant.lastName}</div>
+                                        <div className="text-xs text-gray-500">{participant.role === UserRoleEnum.TEACHER ? 'Учитель' : 
+                                          participant.role === UserRoleEnum.STUDENT ? 'Ученик' : 
+                                          participant.role === UserRoleEnum.PARENT ? 'Родитель' : 
+                                          participant.role}</div>
+                                      </div>
+                                      <Button 
+                                        type="button" 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => {
+                                          newChatForm.setValue("participantIds", []);
+                                          setUserSearchQuery("");
+                                          setIsAddingUserByName(true);
+                                        }}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          )}
+                          
                           <FormMessage />
                         </FormItem>
                       )}
@@ -1239,34 +1357,65 @@ export default function MessagesPage() {
                         <>
                           {/* Список пользователей с фильтрацией */}
                           <div className="space-y-2">
-                            {chatUsers
-                              .filter(u => u.id !== user?.id)
-                              .filter(u => {
-                                if (!userSearchQuery) return showAllUsers || newChatForm.getValues().participantIds.includes(u.id);
-                                const searchTerm = userSearchQuery.toLowerCase();
+                            {(() => {
+                              // Мемоизируем отфильтрованных пользователей
+                              const filteredUsers = chatUsers
+                                .filter(u => u.id !== user?.id)
+                                .filter(u => {
+                                  if (!userSearchQuery) {
+                                    // Если нет поискового запроса, показываем либо всех (если showAllUsers=true), 
+                                    // либо только выбранных пользователей
+                                    return showAllUsers || newChatForm.getValues().participantIds.includes(u.id);
+                                  }
+                                  
+                                  // Поиск по имени, фамилии или полному имени
+                                  const searchTerm = userSearchQuery.toLowerCase();
+                                  return (
+                                    u.firstName.toLowerCase().includes(searchTerm) ||
+                                    u.lastName.toLowerCase().includes(searchTerm) ||
+                                    `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
+                                  );
+                                });
+                              
+                              // Ограничиваем количество пользователей для отображения
+                              const usersToShow = userSearchQuery 
+                                ? filteredUsers 
+                                : filteredUsers.slice(0, 15);
+                                
+                              // Если список пуст, показываем сообщение
+                              if (usersToShow.length === 0) {
                                 return (
-                                  u.firstName.toLowerCase().includes(searchTerm) ||
-                                  u.lastName.toLowerCase().includes(searchTerm) ||
-                                  `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
+                                  <div className="py-3 px-4 text-center text-gray-500">
+                                    {userSearchQuery 
+                                      ? "Пользователи не найдены" 
+                                      : "Нет доступных пользователей"}
+                                  </div>
                                 );
-                              })
-                              .slice(0, userSearchQuery ? undefined : 15) // Ограничиваем без поиска
-                              .map(u => {
+                              }
+                              
+                              // Отображаем список пользователей
+                              return usersToShow.map(u => {
                                 const id = u.id.toString();
+                                const isSelected = newChatForm.getValues().participantIds.includes(u.id);
+                                
                                 return (
-                                  <div key={id} className="flex items-center space-x-2 hover:bg-gray-100 p-1 rounded-md">
+                                  <div 
+                                    key={id} 
+                                    className={`flex items-center space-x-2 hover:bg-gray-100 p-1 rounded-md transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
+                                  >
                                     <Checkbox 
                                       id={`user-${id}`}
-                                      checked={newChatForm.getValues().participantIds.includes(u.id)}
+                                      checked={isSelected}
                                       onCheckedChange={(checked) => {
                                         const currentParticipants = newChatForm.getValues().participantIds;
+                                        
+                                        // Используем функцию обновления для повышения производительности
                                         if (checked) {
-                                          newChatForm.setValue("participantIds", [...currentParticipants, u.id]);
+                                          const newParticipants = [...currentParticipants, u.id];
+                                          newChatForm.setValue("participantIds", newParticipants);
                                         } else {
-                                          newChatForm.setValue(
-                                            "participantIds", 
-                                            currentParticipants.filter(pid => pid !== u.id)
-                                          );
+                                          const newParticipants = currentParticipants.filter(pid => pid !== u.id);
+                                          newChatForm.setValue("participantIds", newParticipants);
                                         }
                                         
                                         // Устанавливаем тип чата как групповой
@@ -1277,31 +1426,57 @@ export default function MessagesPage() {
                                       htmlFor={`user-${id}`}
                                       className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer"
                                     >
-                                      {u.firstName} {u.lastName}
-                                      <span className="text-xs text-gray-500 ml-1">
-                                        ({u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
-                                         u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
-                                         u.role === UserRoleEnum.PARENT ? 'Родитель' : 
-                                         u.role})
-                                      </span>
+                                      <div className="flex items-center">
+                                        <Avatar className="h-6 w-6 mr-2">
+                                          <AvatarFallback className="text-xs">
+                                            {u.firstName.charAt(0)}{u.lastName.charAt(0)}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                          <span className="font-medium">{u.firstName} {u.lastName}</span>
+                                          <span className="text-xs text-gray-500 ml-1">
+                                            ({u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
+                                            u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
+                                            u.role === UserRoleEnum.PARENT ? 'Родитель' : 
+                                            u.role})
+                                          </span>
+                                        </div>
+                                      </div>
                                     </label>
                                   </div>
-                                )
-                              })
-                            }
+                                );
+                              });
+                            })()}
                           </div>
                           
-                          {/* Показать больше пользователей */}
-                          {!userSearchQuery && chatUsers.filter(u => u.id !== user?.id).length > 15 && !showAllUsers && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              className="w-full mt-2 text-sm h-8"
-                              onClick={() => setShowAllUsers(true)}
-                            >
-                              Показать больше пользователей
-                            </Button>
-                          )}
+                          {/* Кнопки управления списком */}
+                          <div className="space-y-1 mt-2">
+                            {/* Показать больше пользователей */}
+                            {!userSearchQuery && chatUsers.filter(u => u.id !== user?.id).length > 15 && !showAllUsers && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="w-full text-xs h-7"
+                                onClick={() => setShowAllUsers(true)}
+                              >
+                                Показать больше пользователей
+                              </Button>
+                            )}
+                            
+                            {/* Скрыть список при поиске */}
+                            {userSearchQuery && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="w-full text-xs h-7"
+                                onClick={() => setIsAddingUserByName(false)}
+                              >
+                                Скрыть список
+                              </Button>
+                            )}
+                          </div>
                         </>
                       )}
                     </div>
