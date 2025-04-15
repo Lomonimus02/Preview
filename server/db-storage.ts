@@ -590,6 +590,36 @@ export class DatabaseStorage implements IStorage {
       .orderBy(sql`messages.sent_at DESC`);
   }
   
+  async updateChat(id: number, chatData: Partial<InsertChat>): Promise<Chat | undefined> {
+    await db.update(chats)
+      .set(chatData)
+      .where(eq(chats.id, id));
+    
+    const result = await db.select().from(chats).where(eq(chats.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async deleteChat(id: number): Promise<Chat | undefined> {
+    // Получаем информацию о чате перед удалением
+    const result = await db.select().from(chats).where(eq(chats.id, id)).limit(1);
+    const chat = result[0];
+    if (!chat) return undefined;
+    
+    // Удаляем связанные сообщения
+    await db.delete(messages)
+      .where(eq(messages.chatId, id));
+    
+    // Удаляем участников чата
+    await db.delete(chatParticipants)
+      .where(eq(chatParticipants.chatId, id));
+    
+    // Удаляем сам чат
+    await db.delete(chats)
+      .where(eq(chats.id, id));
+    
+    return chat;
+  }
+  
   async createChatMessage(message: InsertMessage): Promise<Message> {
     // Установим значения по умолчанию для полей, если они не указаны
     const messageData = {
