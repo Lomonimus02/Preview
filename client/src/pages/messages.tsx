@@ -1218,53 +1218,94 @@ export default function MessagesPage() {
                   
                   <div>
                     <h4 className="text-sm font-medium mb-2">Выберите участников</h4>
-                    <div className="border rounded-md p-2 max-h-60 overflow-y-auto space-y-2">
+                    
+                    {/* Поиск пользователей */}
+                    <div className="relative mb-3">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input 
+                        placeholder="Поиск по имени или фамилии..." 
+                        className="pl-10"
+                        value={userSearchQuery}
+                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="border rounded-md p-2 max-h-60 overflow-y-auto">
                       {usersLoading ? (
                         <div className="flex justify-center items-center py-2">
                           <Clock className="h-4 w-4 text-primary animate-spin" />
                         </div>
                       ) : (
-                        chatUsers
-                          .filter(u => u.id !== user?.id)
-                          .map(u => {
-                            const id = u.id.toString();
-                            return (
-                              <div key={id} className="flex items-center space-x-2">
-                                <Checkbox 
-                                  id={`user-${id}`}
-                                  checked={newChatForm.getValues().participantIds.includes(u.id)}
-                                  onCheckedChange={(checked) => {
-                                    const currentParticipants = newChatForm.getValues().participantIds;
-                                    if (checked) {
-                                      newChatForm.setValue("participantIds", [...currentParticipants, u.id]);
-                                    } else {
-                                      newChatForm.setValue(
-                                        "participantIds", 
-                                        currentParticipants.filter(pid => pid !== u.id)
-                                      );
-                                    }
-                                    
-                                    // Устанавливаем тип чата как групповой
-                                    newChatForm.setValue("type", ChatTypeEnum.GROUP);
-                                  }}
-                                />
-                                <label 
-                                  htmlFor={`user-${id}`}
-                                  className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                  {u.firstName} {u.lastName}
-                                  <span className="text-xs text-gray-500 ml-1">
-                                    ({u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
-                                     u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
-                                     u.role === UserRoleEnum.PARENT ? 'Родитель' : 
-                                     u.role})
-                                  </span>
-                                </label>
-                              </div>
-                            )
-                          })
+                        <>
+                          {/* Список пользователей с фильтрацией */}
+                          <div className="space-y-2">
+                            {chatUsers
+                              .filter(u => u.id !== user?.id)
+                              .filter(u => {
+                                if (!userSearchQuery) return showAllUsers || newChatForm.getValues().participantIds.includes(u.id);
+                                const searchTerm = userSearchQuery.toLowerCase();
+                                return (
+                                  u.firstName.toLowerCase().includes(searchTerm) ||
+                                  u.lastName.toLowerCase().includes(searchTerm) ||
+                                  `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
+                                );
+                              })
+                              .slice(0, userSearchQuery ? undefined : 15) // Ограничиваем без поиска
+                              .map(u => {
+                                const id = u.id.toString();
+                                return (
+                                  <div key={id} className="flex items-center space-x-2 hover:bg-gray-100 p-1 rounded-md">
+                                    <Checkbox 
+                                      id={`user-${id}`}
+                                      checked={newChatForm.getValues().participantIds.includes(u.id)}
+                                      onCheckedChange={(checked) => {
+                                        const currentParticipants = newChatForm.getValues().participantIds;
+                                        if (checked) {
+                                          newChatForm.setValue("participantIds", [...currentParticipants, u.id]);
+                                        } else {
+                                          newChatForm.setValue(
+                                            "participantIds", 
+                                            currentParticipants.filter(pid => pid !== u.id)
+                                          );
+                                        }
+                                        
+                                        // Устанавливаем тип чата как групповой
+                                        newChatForm.setValue("type", ChatTypeEnum.GROUP);
+                                      }}
+                                    />
+                                    <label 
+                                      htmlFor={`user-${id}`}
+                                      className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer"
+                                    >
+                                      {u.firstName} {u.lastName}
+                                      <span className="text-xs text-gray-500 ml-1">
+                                        ({u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
+                                         u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
+                                         u.role === UserRoleEnum.PARENT ? 'Родитель' : 
+                                         u.role})
+                                      </span>
+                                    </label>
+                                  </div>
+                                )
+                              })
+                            }
+                          </div>
+                          
+                          {/* Показать больше пользователей */}
+                          {!userSearchQuery && chatUsers.filter(u => u.id !== user?.id).length > 15 && !showAllUsers && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="w-full mt-2 text-sm h-8"
+                              onClick={() => setShowAllUsers(true)}
+                            >
+                              Показать больше пользователей
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
+                    
                     {newChatForm.formState.errors.participantIds && (
                       <p className="text-sm font-medium text-destructive mt-1">
                         {newChatForm.formState.errors.participantIds.message}
