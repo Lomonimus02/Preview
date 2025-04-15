@@ -531,8 +531,8 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   return (
     <>
-      <Card className="min-w-[140px] w-[calc(100vw-1.5rem)] xs:min-w-[200px] sm:w-full sm:max-w-[320px] h-[min(60vh,400px)] overflow-y-auto shadow-md">
-        <CardHeader className="text-center py-1 xs:py-2 sm:py-3 bg-white sticky top-0 z-10">
+      <Card className="min-w-[135px] w-[calc(100vw-1.75rem)] xs:min-w-[200px] sm:w-full sm:max-w-[300px] h-[min(55vh,380px)] overflow-y-auto shadow-md">
+        <CardHeader className="text-center py-0.5 xs:py-1 sm:py-2 bg-white sticky top-0 z-10">
           <CardTitle className="text-base xs:text-lg">{dayName}</CardTitle>
           <div className="text-[10px] xs:text-xs text-gray-500">{formattedDate}</div>
           {schedules.length > 0 && (
@@ -620,13 +620,13 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                         {slotsToShow.map(({ slot, schedules, isEmpty }) => (
                           <div key={slot.slotNumber} className="time-slot rounded-lg border border-gray-100">
                             {/* Заголовок слота */}
-                            <div className="p-1 xs:p-2 bg-gray-50 rounded-t-lg border-b border-gray-100 flex items-center justify-between">
-                              <div className="font-medium text-xs xs:text-sm sm:text-base text-gray-800">{slot.slotNumber} урок</div>
-                              <div className="text-xs sm:text-sm text-gray-600">{slot.startTime} - {slot.endTime}</div>
+                            <div className="p-0.5 xs:p-1 bg-gray-50 rounded-t-lg border-b border-gray-100 flex items-center justify-between">
+                              <div className="font-medium text-[10px] xs:text-xs sm:text-sm text-gray-800">{slot.slotNumber} урок</div>
+                              <div className="text-[10px] xs:text-xs text-gray-600">{slot.startTime} - {slot.endTime}</div>
                             </div>
                             
                             {/* Содержимое слота */}
-                            <div className="p-1 xs:p-2">
+                            <div className="p-0.5 xs:p-1">
                               {isEmpty ? (
                                 <div className="h-8 xs:h-10 sm:h-12 flex items-center justify-center text-xs sm:text-sm text-gray-400">
                                   <span className="hidden sm:inline">Нет уроков в это время</span>
