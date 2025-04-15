@@ -531,7 +531,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   return (
     <>
-      <Card className="min-w-[130px] w-[calc(100vw-2rem)] xs:w-[calc(100vw-2.25rem)] sm:w-full sm:max-w-[280px] h-[calc(100vh-130px)] max-h-[calc(100vh-130px)] overflow-y-auto shadow-md">
+      <Card className="min-w-[135px] w-[calc(100vw-1.75rem)] xs:min-w-[200px] sm:w-full sm:max-w-[300px] h-[min(55vh,380px)] overflow-y-auto shadow-md">
         <CardHeader className="text-center py-0.5 xs:py-1 sm:py-2 bg-white sticky top-0 z-10">
           <CardTitle className="text-base xs:text-lg">{dayName}</CardTitle>
           <div className="text-[10px] xs:text-xs text-gray-500">{formattedDate}</div>
@@ -678,7 +678,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог для создания домашнего задания */}
       <Dialog open={isHomeworkDialogOpen} onOpenChange={setIsHomeworkDialogOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto w-[90vw] md:w-auto">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Добавить домашнее задание</DialogTitle>
             <DialogDescription>
@@ -703,7 +703,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог для создания/редактирования задания */}
       <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto w-[90vw] md:w-auto">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{selectedAssignment ? "Редактировать задание" : "Создать задание"}</DialogTitle>
             <DialogDescription>
@@ -731,7 +731,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог с детальной информацией об уроке */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-xl md:max-w-2xl max-h-[85vh] overflow-y-auto w-[90vw] md:w-auto">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Информация об уроке</DialogTitle>
             <DialogDescription>
