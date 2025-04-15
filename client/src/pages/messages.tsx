@@ -877,7 +877,7 @@ export default function MessagesPage() {
                                     <X className="h-3.5 w-3.5" />
                                   </button>
                                 )}
-                                {selectedChat.type === 'group' && !isSentByUser && (
+                                {selectedChat.type === ChatTypeEnum.GROUP && !isSentByUser && (
                                   <p className={`text-xs font-medium mb-1 ${
                                     isSentByUser ? 'text-primary-50' : 'text-gray-500'
                                   }`}>
@@ -1132,13 +1132,13 @@ export default function MessagesPage() {
           
           <Tabs defaultValue="private">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="private">Личный чат</TabsTrigger>
-              <TabsTrigger value="group">Групповой чат</TabsTrigger>
+              <TabsTrigger value={ChatTypeEnum.PRIVATE}>Личный чат</TabsTrigger>
+              <TabsTrigger value={ChatTypeEnum.GROUP}>Групповой чат</TabsTrigger>
             </TabsList>
             
             <Form {...newChatForm}>
               <form onSubmit={newChatForm.handleSubmit(onSubmitNewChat)}>
-                <TabsContent value="private" className="space-y-4 mt-4">
+                <TabsContent value={ChatTypeEnum.PRIVATE} className="space-y-4 mt-4">
                   <div className="space-y-4">
                     <FormField
                       control={newChatForm.control}
@@ -1188,7 +1188,7 @@ export default function MessagesPage() {
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="group" className="space-y-4 mt-4">
+                <TabsContent value={ChatTypeEnum.GROUP} className="space-y-4 mt-4">
                   <FormField
                     control={newChatForm.control}
                     name="name"
@@ -1231,7 +1231,7 @@ export default function MessagesPage() {
                                     }
                                     
                                     // Устанавливаем тип чата как групповой
-                                    newChatForm.setValue("type", "group");
+                                    newChatForm.setValue("type", ChatTypeEnum.GROUP);
                                   }}
                                 />
                                 <label 
