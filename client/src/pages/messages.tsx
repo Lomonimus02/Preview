@@ -1197,7 +1197,7 @@ export default function MessagesPage() {
                                     <Clock className="h-4 w-4 text-primary animate-spin" />
                                   </div>
                                 ) : (
-                                  <>
+                                  <div>
                                     {chatUsers
                                       .filter(u => u.id !== user?.id)
                                       .filter(u => {
@@ -1264,7 +1264,7 @@ export default function MessagesPage() {
                                         Закрыть список
                                       </Button>
                                     </div>
-                                  </>
+                                  </div>
                                 )}
                               </div>
                             )}
@@ -1354,7 +1354,7 @@ export default function MessagesPage() {
                           <Clock className="h-4 w-4 text-primary animate-spin" />
                         </div>
                       ) : (
-                        <>
+                        <div>
                           {/* Список пользователей с фильтрацией */}
                           <div className="space-y-2">
                             {(() => {
@@ -1477,7 +1477,7 @@ export default function MessagesPage() {
                               </Button>
                             )}
                           </div>
-                        </>
+                        </div>
                       )}
                     </div>
                     
