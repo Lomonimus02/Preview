@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo, useMemo, useCallback } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { UserRoleEnum, ChatTypeEnum } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { 
   Search, 
   Send, 
@@ -145,11 +146,62 @@ const newChatFormSchema = z.object({
 
 type NewChatFormValues = z.infer<typeof newChatFormSchema>;
 
+// Компонент для оптимизированного отображения пользователей в чеклисте
+const UserSelectItem = memo(({ 
+  user, 
+  isSelected, 
+  onChange 
+}: { 
+  user: ChatUser; 
+  isSelected: boolean; 
+  onChange: (userId: number, isChecked: boolean) => void;
+}) => {
+  const handleChange = useCallback((checked: boolean) => {
+    onChange(user.id, checked);
+  }, [user.id, onChange]);
+
+  return (
+    <div 
+      className={`flex items-center space-x-2 hover:bg-gray-100 p-1 rounded-md transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
+    >
+      <Checkbox 
+        id={`user-${user.id}`}
+        checked={isSelected}
+        onCheckedChange={handleChange}
+      />
+      <label 
+        htmlFor={`user-${user.id}`}
+        className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer"
+      >
+        <div className="flex items-center">
+          <Avatar className="h-6 w-6 mr-2">
+            <AvatarFallback className="text-xs">
+              {user.firstName.charAt(0)}{user.lastName.charAt(0)}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <span className="font-medium">{user.firstName} {user.lastName}</span>
+            <span className="text-xs text-gray-500 ml-1">
+              ({user.role === UserRoleEnum.TEACHER ? 'Учитель' : 
+              user.role === UserRoleEnum.STUDENT ? 'Ученик' : 
+              user.role === UserRoleEnum.PARENT ? 'Родитель' : 
+              user.role})
+            </span>
+          </div>
+        </div>
+      </label>
+    </div>
+  );
+});
+
+UserSelectItem.displayName = 'UserSelectItem';
+
 export default function MessagesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const usersListRef = useRef<HTMLDivElement>(null);
   
   // Состояния для UI
   const [searchQuery, setSearchQuery] = useState("");
@@ -160,6 +212,8 @@ export default function MessagesPage() {
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
   const [showAllUsers, setShowAllUsers] = useState(false);
   const [isAddingUserByName, setIsAddingUserByName] = useState(false);
+  const [userPage, setUserPage] = useState(1);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<number>>(new Set());
   
   // Получение списка чатов пользователя
   const { data: chats = [], isLoading: chatsLoading } = useQuery<Chat[]>({
