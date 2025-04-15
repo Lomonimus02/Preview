@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef, memo, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
-import { UserRoleEnum, ChatTypeEnum } from "@shared/schema";
+import { UserRoleEnum } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { 
   Search, 
   Send, 
@@ -23,7 +22,8 @@ import {
   Download,
   ExternalLink,
   ArrowLeft,
-  Loader2
+  Loader2,
+  Check
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/avatar";
 import { SwipeableChatItem } from "@/components/chat/swipeable-chat-item";
 import { EditChatDialog } from "@/components/chat/edit-chat-dialog";
+import { ChatContextMenu } from "@/components/chat/chat-context-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,133 +69,32 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-
-// Типы для интерфейса сообщений и чатов
-interface ChatUser {
-  id: number;
-  firstName: string;
-  lastName: string;
-  username: string;
-  role: string;
-  isAdmin?: boolean;
-  lastReadMessageId?: number | null;
-}
-
-interface Chat {
-  id: number;
-  name: string;
-  type: ChatTypeEnum;
-  creatorId: number;
-  schoolId: number;
-  avatarUrl: string | null;
-  createdAt: string;
-  lastMessageAt: string | null;
-  participants?: ChatUser[];
-  unreadCount?: number; // Количество непрочитанных сообщений
-}
-
-interface ChatMessage {
-  id: number;
-  chatId: number;
-  senderId: number;
-  content: string | null;
-  hasAttachment: boolean;
-  attachmentType: string | null;
-  attachmentUrl: string | null;
-  isRead: boolean;
-  sentAt: string;
-  sender?: {
-    id: number;
-    firstName: string;
-    lastName: string;
-  };
-}
-
-// Схема для создания нового сообщения
-const messageFormSchema = z.object({
-  content: z.string().optional(),
-  attachmentFile: z.instanceof(File).optional(),
-});
-
-type MessageFormValues = z.infer<typeof messageFormSchema>;
-
-// Схема для создания нового чата
-const newChatFormSchema = z.object({
-  name: z.string().min(1, "Введите название чата"),
-  type: z.enum(["private", "group"], {
-    required_error: "Выберите тип чата",
-  }),
-  participantIds: z.array(z.number()).min(1, "Добавьте хотя бы одного участника"),
-});
-
-type NewChatFormValues = z.infer<typeof newChatFormSchema>;
-
-// Компонент для оптимизированного отображения пользователей в чеклисте
-const UserSelectItem = memo(({ 
-  user, 
-  isSelected, 
-  onChange 
-}: { 
-  user: ChatUser; 
-  isSelected: boolean; 
-  onChange: (userId: number, isChecked: boolean) => void;
-}) => {
-  const handleChange = useCallback((checked: boolean) => {
-    onChange(user.id, checked);
-  }, [user.id, onChange]);
-
-  return (
-    <div 
-      className={`flex items-center space-x-2 hover:bg-gray-100 p-1 rounded-md transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
-    >
-      <Checkbox 
-        id={`user-${user.id}`}
-        checked={isSelected}
-        onCheckedChange={handleChange}
-      />
-      <label 
-        htmlFor={`user-${user.id}`}
-        className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer"
-      >
-        <div className="flex items-center">
-          <Avatar className="h-6 w-6 mr-2">
-            <AvatarFallback className="text-xs">
-              {user.firstName.charAt(0)}{user.lastName.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <span className="font-medium">{user.firstName} {user.lastName}</span>
-            <span className="text-xs text-gray-500 ml-1">
-              ({user.role === UserRoleEnum.TEACHER ? 'Учитель' : 
-              user.role === UserRoleEnum.STUDENT ? 'Ученик' : 
-              user.role === UserRoleEnum.PARENT ? 'Родитель' : 
-              user.role})
-            </span>
-          </div>
-        </div>
-      </label>
-    </div>
-  );
-});
-
-UserSelectItem.displayName = 'UserSelectItem';
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
+import FilteredUsersList from "@/components/chat/filtered-users-list";
+import { 
+  Chat, 
+  ChatMessage, 
+  ChatTypeEnum, 
+  ChatUser, 
+  MessageFormValues, 
+  NewChatFormValues, 
+  messageFormSchema, 
+  newChatFormSchema 
+} from "../types/chat";
 
 export default function MessagesPage() {
   const { user } = useAuth();
@@ -305,20 +205,13 @@ export default function MessagesPage() {
           attachmentType = uploadResult.file.type;
           
           console.log('Файл успешно загружен:', uploadResult);
-        } catch (error) {
+        } catch (error: any) {
           console.error('Ошибка при загрузке файла:', error);
           throw new Error('Не удалось загрузить файл: ' + (error.message || 'неизвестная ошибка'));
         }
       }
       
       // Отправляем сообщение
-      console.log(`Отправка сообщения в чат ${data.chatId}:`, {
-        content: data.content,
-        hasAttachment,
-        attachmentType,
-        attachmentUrl
-      });
-      
       const res = await apiRequest(`/api/chats/${data.chatId}/messages`, "POST", {
         content: data.content,
         hasAttachment,
@@ -548,8 +441,6 @@ export default function MessagesPage() {
     });
   }, [chats, searchQuery]);
   
-  // Определение выбранного чата перемещено выше
-  
   // Получаем сообщения для выбранного чата, отсортированные по времени
   const sortedMessages = [...chatMessages].sort(
     (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime()
@@ -686,366 +577,309 @@ export default function MessagesPage() {
              messageDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     } catch (error) {
       console.error('Ошибка при форматировании даты:', error);
-      return 'Сейчас';
+      return 'Некорректная дата';
     }
   };
   
-  // Получение имени пользователя по ID
-  const getUserName = (userId: number) => {
-    const found = chatUsers.find(u => u.id === userId);
-    return found ? `${found.firstName} ${found.lastName}` : `Пользователь ${userId}`;
-  };
-  
-  // Получение инициалов пользователя
-  const getUserInitials = (userId: number) => {
-    const found = chatUsers.find(u => u.id === userId);
-    return found ? found.firstName.charAt(0) + found.lastName.charAt(0) : "??";
-  };
-  
-  // Получение названия для чата
+  // Определение имени чата
   const getChatName = (chat: Chat) => {
-    // Для личных чатов показываем имя собеседника
-    if (chat.type === 'private' && chat.participants) {
+    // Если чат групповой, показываем его имя
+    if (chat.type === ChatTypeEnum.GROUP) {
+      return chat.name;
+    }
+    
+    // Если чат приватный, показываем имя собеседника
+    if (chat.participants && chat.participants.length > 0) {
+      // Находим пользователя, который не является текущим
       const otherParticipant = chat.participants.find(p => p.id !== user?.id);
       if (otherParticipant) {
         return `${otherParticipant.firstName} ${otherParticipant.lastName}`;
       }
     }
     
-    // Для групповых чатов показываем название чата
-    return chat.name;
+    // Если не удалось определить имя, возвращаем дефолтное
+    return chat.name || "Чат без названия";
   };
   
+  // Определение аватара чата
+  const getChatAvatar = (chat: Chat) => {
+    // Если у чата есть аватар, используем его
+    if (chat.avatarUrl) {
+      return chat.avatarUrl;
+    }
+    
+    // Если чат приватный, показываем аватар собеседника
+    if (chat.type === ChatTypeEnum.PRIVATE && chat.participants && chat.participants.length > 0) {
+      const otherParticipant = chat.participants.find(p => p.id !== user?.id);
+      if (otherParticipant) {
+        return null; // Тут обычно должна быть логика для получения аватара пользователя
+      }
+    }
+    
+    // Если не удалось определить аватар, возвращаем null
+    return null;
+  };
+  
+  // Медиа-запрос для адаптивности
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  
+  // Отображение интерфейса
   return (
-    <MainLayout>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-heading font-bold text-gray-800">Сообщения</h2>
-        <Button onClick={() => setIsNewChatDialogOpen(true)}>
-          <PlusCircle className="h-4 w-4 mr-2" />
-          Новый чат
-        </Button>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Список чатов */}
-        <div className="md:col-span-1">
-          <Card className="h-[calc(100vh-220px)]">
-            <CardHeader className="p-4 pb-2">
-              <div className="relative mb-2">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <Input 
-                  placeholder="Поиск чатов..." 
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <ScrollArea className="h-[calc(100vh-300px)]">
-                {chatsLoading ? (
-                  <div className="flex justify-center items-center h-20">
-                    <Clock className="h-5 w-5 text-primary animate-spin" />
-                  </div>
-                ) : filteredChats.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-40 text-gray-500">
-                    <MessagesSquare className="h-8 w-8 mb-2" />
-                    {searchQuery ? "Чаты не найдены" : "У вас пока нет чатов"}
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setIsNewChatDialogOpen(true)}
-                      className="mt-2"
-                    >
-                      Создать чат
-                    </Button>
-                  </div>
-                ) : (
-                  filteredChats.map(chat => {
-                    const unreadCount = getUnreadCount(chat);
-                    const isSelected = chat.id === selectedChatId;
-                    const chatName = getChatName(chat);
-                    const isCreator = isCreatorOfChat(chat);
-                    
-                    return (
-                      <SwipeableChatItem
-                        key={chat.id}
-                        chatType={chat.type}
-                        isCreator={isCreator}
-                        onDelete={
-                          // Удаление для приватных чатов (всегда доступно)
-                          // или для групповых чатов (только создатель)
-                          (chat.type === ChatTypeEnum.PRIVATE || 
-                           (chat.type === ChatTypeEnum.GROUP && isCreator)) ? () => {
-                            setChatToDelete(chat);
-                            setDeleteAlertOpen(true);
-                          } : undefined
-                        }
-                        onEdit={
-                          // Редактирование только для групповых чатов (для всех участников)
-                          chat.type === ChatTypeEnum.GROUP ? () => {
+    <MainLayout title="Сообщения">
+      <div className="grid grid-cols-1 md:grid-cols-12 h-full gap-4">
+        {/* Список чатов - скрывается на мобильных когда выбран чат */}
+        {(!isMobile || !selectedChatId) && (
+          <div className="col-span-1 md:col-span-3 lg:col-span-3 h-full">
+            <Card className="h-full flex flex-col">
+              <CardHeader>
+                <div className="flex items-center justify-between mb-2">
+                  <CardTitle className="text-xl">Чаты</CardTitle>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      // Сбрасываем форму и открываем диалог
+                      newChatForm.reset({ name: "", type: "private", participantIds: [] });
+                      setIsNewChatDialogOpen(true);
+                    }}
+                  >
+                    <PlusCircle className="h-4 w-4 mr-1" />
+                    Новый чат
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input 
+                    placeholder="Поиск чатов..." 
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-hidden p-0">
+                <ScrollArea className="h-full w-full">
+                  {chatsLoading ? (
+                    // Скелетон для загрузки
+                    <div className="p-4 space-y-4">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <Skeleton className="h-12 w-12 rounded-full" />
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : filteredChats.length === 0 ? (
+                    // Сообщение, если нет чатов
+                    <div className="p-4 text-center text-gray-500">
+                      {searchQuery ? (
+                        <p>Чаты не найдены. Попробуйте изменить запрос.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p>У вас пока нет чатов.</p>
+                          <Button
+                            variant="link"
+                            onClick={() => {
+                              newChatForm.reset({ name: "", type: "private", participantIds: [] });
+                              setIsNewChatDialogOpen(true);
+                            }}
+                          >
+                            Создать новый чат
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Список чатов
+                    <div>
+                      {filteredChats.map((chat) => (
+                        <SwipeableChatItem
+                          key={chat.id}
+                          chat={chat}
+                          isSelected={selectedChatId === chat.id}
+                          unreadCount={getUnreadCount(chat)}
+                          getChatName={getChatName}
+                          onClick={() => setSelectedChatId(chat.id)}
+                          onEdit={() => {
                             setChatToEdit(chat);
                             setEditChatDialogOpen(true);
-                          } : undefined
-                        }
-                        onLeave={
-                          // Выход только из групповых чатов (для всех, кроме создателя)
-                          (chat.type === ChatTypeEnum.GROUP && !isCreator) ? () => {
+                          }}
+                          onDelete={() => {
+                            setChatToDelete(chat);
+                            setDeleteAlertOpen(true);
+                          }}
+                          onLeave={() => {
                             setChatToLeave(chat);
                             setLeaveAlertOpen(true);
-                          } : undefined
-                        }
-                      >
-                        <div 
-                          className={`flex items-center p-3 cursor-pointer hover:bg-gray-50 border-b border-gray-100 w-full ${
-                            isSelected ? 'bg-primary/10' : ''
-                          }`}
-                          onClick={() => setSelectedChatId(chat.id)}
-                        >
-                          <Avatar className="h-10 w-10 mr-3">
-                            {chat.avatarUrl ? (
-                              <AvatarImage src={chat.avatarUrl} alt={chatName} />
-                            ) : (
-                              <AvatarFallback className={isSelected ? 'bg-primary text-white' : 'bg-gray-200'}>
-                                {chat.type === ChatTypeEnum.GROUP ? (
-                                  <Users className="h-4 w-4" />
-                                ) : chat.participants ? (
-                                  chat.participants
-                                    .find(p => p.id !== user?.id)?.firstName.charAt(0) +
-                                  chat.participants
-                                    .find(p => p.id !== user?.id)?.lastName.charAt(0)
-                                ) : "??"}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                          <div className="flex-grow">
-                            <div className="flex justify-between">
-                              <p className="font-medium text-gray-800">
-                                {chatName}
-                              </p>
-                              {chat.lastMessageAt && (
-                                <p className="text-xs text-gray-500">
-                                  {formatMessageTime(chat.lastMessageAt)}
-                                </p>
-                              )}
-                            </div>
-                            {chat.type === ChatTypeEnum.GROUP && (
-                              <p className="text-xs text-gray-500">
-                                {chat.participants ? `${chat.participants.length} участников` : ''}
-                              </p>
-                            )}
-                          </div>
-                          {unreadCount > 0 && (
-                            <span className="bg-primary text-white text-xs px-2 py-1 rounded-full ml-2">
-                              {unreadCount}
-                            </span>
-                          )}
-                        </div>
-                      </SwipeableChatItem>
-                    );
-                  })
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Окно переписки */}
-        <div className="md:col-span-2">
-          <Card className="h-[calc(100vh-220px)] flex flex-col">
-            {selectedChat ? (
-              <>
-                <CardHeader className="p-4 pb-2 border-b">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Avatar className="h-10 w-10 mr-3">
-                        {selectedChat.avatarUrl ? (
-                          <AvatarImage src={selectedChat.avatarUrl} alt={getChatName(selectedChat)} />
-                        ) : (
-                          <AvatarFallback className="bg-primary text-white">
-                            {selectedChat.type === ChatTypeEnum.GROUP ? (
-                              <Users className="h-4 w-4" />
-                            ) : selectedChat.participants ? (
-                              selectedChat.participants
-                                .find(p => p.id !== user?.id)?.firstName.charAt(0) +
-                              selectedChat.participants
-                                .find(p => p.id !== user?.id)?.lastName.charAt(0)
-                            ) : "??"}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <div>
-                        <CardTitle 
-                          className="text-lg cursor-pointer hover:text-primary"
-                          onClick={() => {
-                            if (selectedChat.type === ChatTypeEnum.GROUP) {
-                              setIsParticipantsDialogOpen(true);
-                            }
                           }}
-                        >
-                          {getChatName(selectedChat)}
-                          {selectedChat.type === ChatTypeEnum.GROUP && (
-                            <span className="ml-1 text-xs">
-                              <ExternalLink className="inline h-3 w-3" />
-                            </span>
+                          isCreator={isCreatorOfChat(chat)}
+                          chatType={chat.type}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+        
+        {/* Основная область чата */}
+        {(!isMobile || selectedChatId) && (
+          <div className="col-span-1 md:col-span-9 lg:col-span-9 h-full relative">
+            {selectedChat ? (
+              <Card className="h-full flex flex-col">
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-center">
+                    {isMobile && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => setSelectedChatId(null)}
+                        className="mr-2"
+                      >
+                        <ArrowLeft className="h-5 w-5" />
+                      </Button>
+                    )}
+                    
+                    <div className="flex items-center flex-1">
+                      <Avatar className="h-8 w-8 mr-2">
+                        <AvatarImage src={getChatAvatar(selectedChat) || undefined} />
+                        <AvatarFallback>
+                          {selectedChat.type === ChatTypeEnum.GROUP ? (
+                            <Users className="h-4 w-4" />
+                          ) : (
+                            <UserIcon className="h-4 w-4" />
                           )}
-                        </CardTitle>
-                        {selectedChat.type === ChatTypeEnum.GROUP && selectedChat.participants && (
-                          <p className="text-xs text-gray-500">
-                            {selectedChat.participants.length} участников
-                          </p>
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div>
+                        <h3 className="font-semibold text-sm">{getChatName(selectedChat)}</h3>
+                        {selectedChat.type === ChatTypeEnum.GROUP && (
+                          <div className="text-xs text-gray-500">
+                            {chatParticipants.length} участников
+                          </div>
                         )}
                       </div>
                     </div>
+                    
+                    <ChatContextMenu
+                      chat={selectedChat}
+                      isCreator={isCreatorOfChat(selectedChat)}
+                      onViewParticipants={() => setIsParticipantsDialogOpen(true)}
+                      onEdit={() => {
+                        setChatToEdit(selectedChat);
+                        setEditChatDialogOpen(true);
+                      }}
+                      onDelete={() => {
+                        setChatToDelete(selectedChat);
+                        setDeleteAlertOpen(true);
+                      }}
+                      onLeave={() => {
+                        setChatToLeave(selectedChat);
+                        setLeaveAlertOpen(true);
+                      }}
+                    />
                   </div>
                 </CardHeader>
                 
-                <CardContent className="flex-grow p-0 overflow-hidden">
-                  <ScrollArea className="h-[calc(100vh-350px)] px-4" ref={scrollRef}>
+                <CardContent className="flex-1 overflow-hidden p-0 border-t">
+                  <ScrollArea className="h-full p-4" ref={scrollRef}>
                     {messagesLoading ? (
-                      <div className="flex justify-center items-center h-20">
-                        <Clock className="h-5 w-5 text-primary animate-spin" />
+                      <div className="flex justify-center items-center h-full">
+                        <Clock className="h-6 w-6 text-primary animate-spin" />
                       </div>
                     ) : sortedMessages.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full text-gray-500 py-10">
-                        <MessagesSquare className="h-12 w-12 mb-4" />
-                        <p>Нет сообщений. Начните общение!</p>
+                      <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                        <MessagesSquare className="h-12 w-12 text-gray-300 mb-2" />
+                        <h3 className="text-lg font-medium">Нет сообщений</h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Начните общение, отправив первое сообщение
+                        </p>
                       </div>
                     ) : (
-                      <div className="space-y-4 py-4">
-                        {sortedMessages.map(message => {
-                          const isSentByUser = message.senderId === user?.id;
-                          const senderName = message.sender ? 
-                            `${message.sender.firstName} ${message.sender.lastName}` : 
-                            getUserName(message.senderId);
+                      <div className="space-y-4">
+                        {sortedMessages.map((message) => {
+                          const isCurrentUser = message.senderId === user?.id;
                           
                           return (
-                            <div 
-                              key={message.id} 
-                              className={`flex ${isSentByUser ? 'justify-end' : 'justify-start'}`}
+                            <div
+                              key={message.id}
+                              className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
                             >
-                              <div 
-                                className={`max-w-[80%] p-3 rounded-lg relative group ${
-                                  isSentByUser 
-                                    ? 'bg-primary text-white rounded-tr-none' 
-                                    : 'bg-gray-100 text-gray-800 rounded-tl-none'
+                              <div
+                                className={`max-w-[80%] rounded-lg p-3 ${
+                                  isCurrentUser 
+                                    ? 'bg-primary text-primary-foreground' 
+                                    : 'bg-muted'
                                 }`}
                               >
-                                {(isSentByUser || user?.role === 'principal' || user?.role === 'school_admin' || user?.role === 'super_admin') && (
-                                  <button
-                                    className={`absolute top-1 right-1 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity ${
-                                      isSentByUser ? 'hover:bg-primary-dark text-white' : 'hover:bg-gray-200 text-gray-500'
-                                    }`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (window.confirm('Вы уверены, что хотите удалить это сообщение?')) {
-                                        deleteMessageMutation.mutate({
-                                          chatId: selectedChatId!,
-                                          messageId: message.id
-                                        });
-                                      }
-                                    }}
-                                    title="Удалить сообщение"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
-                                {selectedChat.type === ChatTypeEnum.GROUP && !isSentByUser && (
-                                  <p className={`text-xs font-medium mb-1 ${
-                                    isSentByUser ? 'text-primary-50' : 'text-gray-500'
-                                  }`}>
-                                    {senderName}
-                                  </p>
+                                {!isCurrentUser && message.sender && (
+                                  <div className="text-xs font-medium mb-1">
+                                    {message.sender.firstName} {message.sender.lastName}
+                                  </div>
                                 )}
                                 
                                 {message.content && (
-                                  <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                                  <div className="mb-2">{message.content}</div>
                                 )}
                                 
                                 {message.hasAttachment && message.attachmentUrl && (
-                                  <div className="mt-2">
+                                  <div className="mb-2">
                                     {message.attachmentType === 'image' ? (
-                                      <a 
-                                        href={message.attachmentUrl} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="block"
-                                      >
-                                        <img 
-                                          src={message.attachmentUrl.startsWith('http') ? message.attachmentUrl : message.attachmentUrl} 
-                                          alt="Изображение" 
-                                          className="max-w-full h-auto max-h-[300px] rounded-md hover:opacity-90 transition-opacity border border-gray-200 shadow-sm"
-                                          onError={(e) => {
-                                            console.error('Ошибка загрузки изображения:', message.attachmentUrl);
-                                            e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTMgMTRIMTFWNEgxM1YxNFoiIGZpbGw9ImN1cnJlbnRDb2xvciI+PC9wYXRoPjxwYXRoIGQ9Ik0xMyAyMEgxMVYxOEgxM1YyMFoiIGZpbGw9ImN1cnJlbnRDb2xvciI+PC9wYXRoPjwvc3ZnPg==';
-                                            e.currentTarget.alt = 'Не удалось загрузить изображение';
-                                            e.currentTarget.classList.add('p-4', 'bg-red-50');
-                                          }}
+                                      <div className="relative">
+                                        <img
+                                          src={message.attachmentUrl}
+                                          alt="Изображение"
+                                          className="rounded max-w-full h-auto"
                                         />
-                                      </a>
+                                        <a 
+                                          href={message.attachmentUrl} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="absolute top-2 right-2 bg-black/50 rounded-full p-1 transition-opacity opacity-50 hover:opacity-100"
+                                        >
+                                          <ExternalLink className="h-4 w-4 text-white" />
+                                        </a>
+                                      </div>
                                     ) : message.attachmentType === 'video' ? (
-                                      <div className="rounded-md overflow-hidden border border-gray-200 shadow-sm">
-                                        <div className="relative">
-                                          <video 
-                                            src={message.attachmentUrl}
-                                            controls
-                                            className="max-w-full w-full rounded-t-md bg-black"
-                                            controlsList="nodownload"
-                                            preload="metadata"
-                                            poster={message.attachmentUrl + '?poster=true'}
-                                          />
-                                          <div className="absolute inset-0 bg-black/30 pointer-events-none flex items-center justify-center">
-                                            <Play className="h-12 w-12 text-white opacity-80" />
-                                          </div>
-                                        </div>
-                                        <div className="flex p-2 gap-2 bg-gray-50">
-                                          <a 
-                                            href={message.attachmentUrl} 
-                                            download
-                                            className="flex items-center p-1.5 bg-gray-100 justify-center text-xs rounded flex-1 hover:bg-gray-200 transition-colors"
-                                          >
-                                            <Download className="h-3 w-3 mr-1" />
-                                            <span>Скачать</span>
-                                          </a>
-                                          <a 
-                                            href={message.attachmentUrl} 
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center p-1.5 bg-gray-100 justify-center text-xs rounded flex-1 hover:bg-gray-200 transition-colors"
-                                          >
-                                            <ExternalLink className="h-3 w-3 mr-1" />
-                                            <span>Открыть</span>
-                                          </a>
-                                        </div>
+                                      <div className="relative">
+                                        <video
+                                          controls
+                                          className="rounded max-w-full h-auto"
+                                        >
+                                          <source src={message.attachmentUrl} />
+                                          Ваш браузер не поддерживает видео.
+                                        </video>
                                       </div>
                                     ) : (
-                                      <a 
-                                        href={message.attachmentUrl} 
-                                        download
-                                        className="flex items-center p-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors border border-gray-200 shadow-sm"
-                                      >
-                                        <FileIcon className="h-5 w-5 mr-2 text-gray-600" />
-                                        <span className="text-sm truncate flex-grow">
-                                          {message.attachmentUrl.split('/').pop() || 'Документ'}
-                                        </span>
-                                        <span className="text-xs bg-gray-200 px-2 py-1 rounded-full ml-2">Скачать</span>
-                                      </a>
+                                      <div className="flex items-center gap-2 bg-background/20 p-2 rounded">
+                                        <FileIcon className="h-4 w-4" />
+                                        <a 
+                                          href={message.attachmentUrl} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="text-sm underline"
+                                        >
+                                          Скачать файл
+                                        </a>
+                                      </div>
                                     )}
                                   </div>
                                 )}
                                 
-                                <div 
-                                  className={`flex items-center text-xs mt-1 ${
-                                    isSentByUser ? 'text-primary-50' : 'text-gray-500'
-                                  }`}
-                                >
-                                  <span>{formatMessageTime(message.sentAt)}</span>
-                                  {isSentByUser && (
-                                    <CheckCircle 
-                                      className={`h-3 w-3 ml-1 ${
-                                        message.isRead ? 'text-white' : 'text-primary-50'
-                                      }`} 
-                                    />
+                                <div className="text-xs opacity-70 flex items-center justify-end gap-1">
+                                  {formatMessageTime(message.sentAt)}
+                                  {isCurrentUser && (
+                                    message.isRead ? (
+                                      <CheckCircle className="h-3 w-3 text-current" />
+                                    ) : (
+                                      <Check className="h-3 w-3 text-current" />
+                                    )
                                   )}
                                 </div>
                               </div>
@@ -1057,346 +891,137 @@ export default function MessagesPage() {
                   </ScrollArea>
                 </CardContent>
                 
-                <CardFooter className="p-4 border-t">
-                  {selectedAttachment && (
-                    <div className="mb-3 border border-dashed border-gray-300 rounded-lg p-3 bg-gray-50">
-                      <div className="flex items-start">
-                        {selectedAttachment.type.startsWith('image/') ? (
-                          <div className="w-14 h-14 relative overflow-hidden rounded bg-white border flex-shrink-0 mr-3">
-                            <img 
-                              src={URL.createObjectURL(selectedAttachment)} 
-                              alt="Предпросмотр" 
-                              className="object-cover w-full h-full"
-                            />
-                          </div>
-                        ) : selectedAttachment.type.startsWith('video/') ? (
-                          <div className="w-14 h-14 flex items-center justify-center bg-gray-200 rounded flex-shrink-0 mr-3 relative">
-                            <video className="h-6 w-6 text-gray-600" />
-                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-[8px] px-1 rounded">
-                              MP4
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-14 h-14 flex items-center justify-center bg-gray-100 rounded flex-shrink-0 mr-3 relative border">
-                            <FileIcon className="h-6 w-6 text-gray-500" />
-                            <div className="absolute bottom-1 right-1 bg-gray-200 text-gray-700 text-[8px] px-1 rounded">
-                              {selectedAttachment.name.split('.').pop()?.toUpperCase() || 'FILE'}
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex flex-col flex-grow min-w-0">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-700 truncate max-w-[200px]">
-                              {selectedAttachment.name}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={cancelAttachment}
-                              className="h-6 w-6 p-0 ml-1"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                          
-                          <div className="flex items-center mt-1">
-                            <span className="text-xs text-gray-500">
-                              {(selectedAttachment.size / 1024 < 1024) 
-                                ? `${(selectedAttachment.size / 1024).toFixed(1)} КБ` 
-                                : `${(selectedAttachment.size / 1024 / 1024).toFixed(2)} МБ`}
-                            </span>
-                            <span className="mx-1.5 w-1 h-1 bg-gray-400 rounded-full inline-block"></span>
-                            <span className="text-xs text-gray-500">
-                              {selectedAttachment.type.split('/')[0]}
-                            </span>
-                          </div>
-                          
-                          <div className="w-full bg-gray-200 rounded-full h-1.5 mt-2">
-                            <div className="bg-primary h-1.5 rounded-full" style={{ width: '100%' }}></div>
-                          </div>
-                          <span className="text-xs text-gray-500 mt-0.5">Готов к отправке</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
+                <CardFooter className="p-2 border-t bg-card">
                   <Form {...messageForm}>
                     <form 
                       onSubmit={messageForm.handleSubmit(onSubmitMessage)} 
-                      className="flex gap-2 w-full"
+                      className="flex w-full items-end gap-2"
                     >
+                      {selectedAttachment && (
+                        <div className="absolute bottom-full mb-2 left-0 right-0 bg-background border rounded-md p-2 mx-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              {selectedAttachment.type.startsWith('image/') ? (
+                                <Image className="h-4 w-4 mr-2" />
+                              ) : selectedAttachment.type.startsWith('video/') ? (
+                                <Video className="h-4 w-4 mr-2" />
+                              ) : (
+                                <FileIcon className="h-4 w-4 mr-2" />
+                              )}
+                              <span className="text-sm truncate max-w-[200px]">
+                                {selectedAttachment.name}
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={cancelAttachment}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={openFileDialog}
+                      >
+                        <PaperclipIcon className="h-5 w-5" />
+                      </Button>
+                      
                       <input
                         type="file"
                         ref={fileInputRef}
-                        onChange={handleFileChange}
                         className="hidden"
+                        onChange={handleFileChange}
                       />
-                      <div className="relative group">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={openFileDialog}
-                          className="h-10 w-10 relative"
-                        >
-                          <PaperclipIcon className="h-4 w-4" />
-                        </Button>
-                        <div className="absolute bottom-full mb-2 left-0 bg-white shadow-md rounded-md p-2 hidden group-hover:block min-w-[250px] text-xs z-10">
-                          <p className="font-medium mb-1">Поддерживаемые типы файлов:</p>
-                          <ul className="space-y-1">
-                            <li className="flex items-center"><Image className="h-3 w-3 mr-1" />Изображения (jpg, png, gif, jpeg)</li>
-                            <li className="flex items-center"><video className="h-3 w-3 mr-1" />Видео (mp4, avi, mov, mkv)</li>
-                            <li className="flex items-center"><FileIcon className="h-3 w-3 mr-1" />Документы (pdf, doc, docx, xls, xlsx, txt)</li>
-                          </ul>
-                        </div>
-                      </div>
+                      
                       <FormField
                         control={messageForm.control}
                         name="content"
                         render={({ field }) => (
-                          <FormItem className="flex-grow">
+                          <FormItem className="flex-1">
                             <FormControl>
-                              <Textarea 
-                                placeholder="Введите сообщение..." 
-                                className="resize-none min-h-[60px]" 
-                                {...field} 
+                              <Input
+                                placeholder="Напишите сообщение..."
+                                {...field}
                               />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                      
                       <Button 
                         type="submit" 
-                        className="self-end" 
-                        disabled={sendMessageMutation.isPending}
+                        disabled={sendMessageMutation.isPending || (!messageForm.getValues().content && !selectedAttachment)}
                       >
-                        <Send className="h-4 w-4" />
-                        <span className="sr-only">Отправить</span>
+                        {sendMessageMutation.isPending ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <Send className="h-5 w-5" />
+                        )}
                       </Button>
                     </form>
                   </Form>
                 </CardFooter>
-              </>
+              </Card>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                <MessagesSquare className="h-12 w-12 mb-4" />
-                <p>Выберите чат слева или создайте новый</p>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsNewChatDialogOpen(true)}
+              <div className="flex flex-col items-center justify-center h-full bg-card p-8 rounded-lg border">
+                <MessagesSquare className="h-16 w-16 text-gray-300 mb-4" />
+                <h3 className="text-xl font-medium">Выберите чат</h3>
+                <p className="text-center text-gray-500 mt-2 max-w-md">
+                  Выберите существующий чат из списка или создайте новый,
+                  чтобы начать общение
+                </p>
+                <Button
                   className="mt-4"
+                  onClick={() => {
+                    newChatForm.reset({ name: "", type: "private", participantIds: [] });
+                    setIsNewChatDialogOpen(true);
+                  }}
                 >
                   <PlusCircle className="h-4 w-4 mr-2" />
-                  Создать чат
+                  Создать новый чат
                 </Button>
               </div>
             )}
-          </Card>
-        </div>
+          </div>
+        )}
       </div>
       
       {/* Диалог создания нового чата */}
       <Dialog open={isNewChatDialogOpen} onOpenChange={setIsNewChatDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Создать новый чат</DialogTitle>
+            <DialogDescription>
+              Выберите тип чата и пользователей для общения
+            </DialogDescription>
           </DialogHeader>
           
-          <Tabs defaultValue="private">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value={ChatTypeEnum.PRIVATE}>Личный чат</TabsTrigger>
-              <TabsTrigger value={ChatTypeEnum.GROUP}>Групповой чат</TabsTrigger>
-            </TabsList>
-            
-            <Form {...newChatForm}>
-              <form onSubmit={newChatForm.handleSubmit(onSubmitNewChat)}>
-                <TabsContent value={ChatTypeEnum.PRIVATE} className="space-y-4 mt-4">
-                  <div className="space-y-4">
-                    <FormField
-                      control={newChatForm.control}
-                      name="participantIds"
-                      render={() => (
-                        <FormItem>
-                          {/* Поиск пользователей для личного чата */}
-                          <div className="relative">
-                            <div className="relative">
-                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                              <Input 
-                                placeholder="Поиск по имени или фамилии..." 
-                                className="pl-10 pr-8"
-                                value={userSearchQuery}
-                                onChange={(e) => {
-                                  setUserSearchQuery(e.target.value);
-                                  if (e.target.value) {
-                                    setIsAddingUserByName(true);
-                                  }
-                                }}
-                                onFocus={() => setIsAddingUserByName(true)}
-                              />
-                              {userSearchQuery && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
-                                  onClick={() => {
-                                    setUserSearchQuery("");
-                                    setIsAddingUserByName(false);
-                                  }}
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                            </div>
-                            
-                            {isAddingUserByName && (
-                              <div className="absolute z-10 w-full mt-1 bg-white shadow-lg rounded-md border max-h-[240px] overflow-y-auto">
-                                {usersLoading ? (
-                                  <div className="flex justify-center items-center py-4">
-                                    <Clock className="h-4 w-4 text-primary animate-spin" />
-                                  </div>
-                                ) : (
-                                  <div>
-                                    {chatUsers
-                                      .filter(u => u.id !== user?.id)
-                                      .filter(u => {
-                                        if (!userSearchQuery) return true;
-                                        const searchTerm = userSearchQuery.toLowerCase();
-                                        return (
-                                          u.firstName.toLowerCase().includes(searchTerm) ||
-                                          u.lastName.toLowerCase().includes(searchTerm) ||
-                                          `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
-                                        );
-                                      })
-                                      .slice(0, 15)
-                                      .map(u => (
-                                        <div 
-                                          key={u.id} 
-                                          className="px-3 py-2 hover:bg-gray-100 cursor-pointer transition-colors flex items-center"
-                                          onClick={() => {
-                                            // Выбираем пользователя и закрываем поиск
-                                            newChatForm.setValue("participantIds", [u.id]);
-                                            newChatForm.setValue("name", `${u.firstName} ${u.lastName}`);
-                                            newChatForm.setValue("type", ChatTypeEnum.PRIVATE);
-                                            setUserSearchQuery(`${u.firstName} ${u.lastName}`);
-                                            setIsAddingUserByName(false);
-                                          }}
-                                        >
-                                          <Avatar className="h-6 w-6 mr-2">
-                                            <AvatarFallback className="text-xs">
-                                              {u.firstName.charAt(0)}{u.lastName.charAt(0)}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                          <div>
-                                            <div className="text-sm font-medium">{u.firstName} {u.lastName}</div>
-                                            <div className="text-xs text-gray-500">{u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
-                                               u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
-                                               u.role === UserRoleEnum.PARENT ? 'Родитель' : 
-                                               u.role}</div>
-                                          </div>
-                                        </div>
-                                      ))}
-                                      
-                                    {userSearchQuery && chatUsers
-                                      .filter(u => u.id !== user?.id)
-                                      .filter(u => {
-                                        const searchTerm = userSearchQuery.toLowerCase();
-                                        return (
-                                          u.firstName.toLowerCase().includes(searchTerm) ||
-                                          u.lastName.toLowerCase().includes(searchTerm) ||
-                                          `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
-                                        );
-                                      }).length === 0 && (
-                                        <div className="py-3 px-4 text-center text-gray-500">
-                                          Пользователи не найдены
-                                        </div>
-                                      )}
-                                      
-                                    <div className="p-2 border-t">
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="w-full text-xs"
-                                        onClick={() => setIsAddingUserByName(false)}
-                                      >
-                                        Закрыть список
-                                      </Button>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          
-                          {/* Показываем выбранного пользователя */}
-                          {newChatForm.getValues().participantIds.length > 0 && !isAddingUserByName && (
-                            <div className="mt-2">
-                              <div className="flex items-center p-2 border rounded-md">
-                                {(() => {
-                                  const participantId = newChatForm.getValues().participantIds[0];
-                                  const participant = chatUsers.find(u => u.id === participantId);
-                                  if (!participant) return null;
-                                  
-                                  return (
-                                    <>
-                                      <Avatar className="h-8 w-8 mr-2">
-                                        <AvatarFallback>
-                                          {participant.firstName.charAt(0)}{participant.lastName.charAt(0)}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <div className="flex-1">
-                                        <div className="text-sm font-medium">{participant.firstName} {participant.lastName}</div>
-                                        <div className="text-xs text-gray-500">{participant.role === UserRoleEnum.TEACHER ? 'Учитель' : 
-                                          participant.role === UserRoleEnum.STUDENT ? 'Ученик' : 
-                                          participant.role === UserRoleEnum.PARENT ? 'Родитель' : 
-                                          participant.role}</div>
-                                      </div>
-                                      <Button 
-                                        type="button" 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="h-8 w-8 p-0"
-                                        onClick={() => {
-                                          newChatForm.setValue("participantIds", []);
-                                          setUserSearchQuery("");
-                                          setIsAddingUserByName(true);
-                                        }}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    </>
-                                  );
-                                })()}
-                              </div>
-                            </div>
-                          )}
-                          
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </TabsContent>
+          <Form {...newChatForm}>
+            <form onSubmit={newChatForm.handleSubmit(onSubmitNewChat)} className="space-y-4">
+              <Tabs defaultValue="private" onValueChange={(value) => newChatForm.setValue('type', value as ChatTypeEnum)}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="private">Личный чат</TabsTrigger>
+                  <TabsTrigger value="group">Групповой чат</TabsTrigger>
+                </TabsList>
                 
-                <TabsContent value={ChatTypeEnum.GROUP} className="space-y-4 mt-4">
-                  <FormField
-                    control={newChatForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input placeholder="Название группового чата" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Выберите участников</h4>
+                <TabsContent value="private">
+                  <div className="space-y-4 mt-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Показать всех пользователей</span>
+                      <Switch
+                        checked={showAllUsers}
+                        onCheckedChange={value => setShowAllUsers(value)}
+                      />
+                    </div>
                     
-                    {/* Поиск пользователей */}
                     <div className="relative mb-3">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                       <Input 
@@ -1415,304 +1040,234 @@ export default function MessagesPage() {
                       ) : (
                         <div>
                           {/* Виртуализированный список пользователей */}
-                          {(() => {
-                            // Определяем отфильтрованных пользователей
-                            const filteredUsers = chatUsers
-                              .filter(u => u.id !== user?.id)
-                              .filter(u => {
-                                if (!userSearchQuery) {
-                                  // Если нет поискового запроса, показываем либо всех (если showAllUsers=true), 
-                                  // либо только выбранных пользователей
-                                  return showAllUsers || newChatForm.getValues().participantIds.includes(u.id);
-                                }
-                                
-                                // Поиск по имени, фамилии или полному имени
-                                const searchTerm = userSearchQuery.toLowerCase();
-                                return (
-                                  u.firstName.toLowerCase().includes(searchTerm) ||
-                                  u.lastName.toLowerCase().includes(searchTerm) ||
-                                  `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchTerm)
+                          <FilteredUsersList
+                            chatUsers={chatUsers}
+                            currentUserId={user?.id}
+                            searchQuery={userSearchQuery}
+                            showAllUsers={showAllUsers}
+                            selectedUserIds={newChatForm.getValues().participantIds || []}
+                            onUserSelect={(userId) => {
+                              const currentParticipants = newChatForm.getValues().participantIds;
+                              const isSelected = currentParticipants.includes(userId);
+                              
+                              if (isSelected) {
+                                // Если пользователь уже выбран, удаляем его из списка
+                                newChatForm.setValue(
+                                  'participantIds',
+                                  currentParticipants.filter(id => id !== userId)
                                 );
-                              });
-                            
-                            // Если список пуст, показываем сообщение
-                            if (filteredUsers.length === 0) {
-                              return (
-                                <div className="py-3 px-4 text-center text-gray-500">
-                                  {userSearchQuery 
-                                    ? "Пользователи не найдены" 
-                                    : "Нет доступных пользователей"}
-                                </div>
-                              );
-                            }
-                            
-                            const rowVirtualizer = useVirtualizer({
-                              count: filteredUsers.length,
-                              getScrollElement: () => parentRef.current,
-                              estimateSize: () => 48, // Приблизительная высота элемента
-                              overscan: 5, // Количество дополнительных элементов для рендеринга
-                            });
-                            
-                            // Рендерим виртуальный список
-                            return (
-                              <div className="h-full overflow-auto" ref={parentRef}>
-                                {/* Контейнер для виртуализированного списка */}
-                                <div
-                                  className="relative w-full"
-                                  style={{
-                                    height: `${rowVirtualizer.getTotalSize()}px`,
-                                  }}
-                                >
-                                  {rowVirtualizer.getVirtualItems().map((virtualRow: any) => (
-                                    <div
-                                      key={filteredUsers[virtualRow.index].id}
-                                      className="absolute top-0 left-0 w-full"
-                                      style={{
-                                        height: `${virtualRow.size}px`,
-                                        transform: `translateY(${virtualRow.start}px)`,
-                                      }}
-                                    >
-                                      <div className="p-1">
-                                        {(() => {
-                                          const u = filteredUsers[virtualRow.index];
-                                          const id = u.id.toString();
-                                          const isSelected = newChatForm.getValues().participantIds.includes(u.id);
-                                          
-                                          return (
-                                            <div 
-                                              className={`flex items-center space-x-2 hover:bg-gray-100 p-1 rounded-md transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
-                                            >
-                                              <Checkbox 
-                                                id={`user-${id}`}
-                                                checked={isSelected}
-                                                onCheckedChange={(checked) => {
-                                                  const currentParticipants = newChatForm.getValues().participantIds;
-                                                  
-                                                  if (checked) {
-                                                    const newParticipants = [...currentParticipants, u.id];
-                                                    newChatForm.setValue("participantIds", newParticipants);
-                                                  } else {
-                                                    const newParticipants = currentParticipants.filter(pid => pid !== u.id);
-                                                    newChatForm.setValue("participantIds", newParticipants);
-                                                  }
-                                                  
-                                                  newChatForm.setValue("type", ChatTypeEnum.GROUP);
-                                                }}
-                                              />
-                                              <label 
-                                                htmlFor={`user-${id}`}
-                                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-grow cursor-pointer"
-                                              >
-                                                <div className="flex items-center">
-                                                  <Avatar className="h-6 w-6 mr-2">
-                                                    <AvatarFallback className="text-xs">
-                                                      {u.firstName.charAt(0)}{u.lastName.charAt(0)}
-                                                    </AvatarFallback>
-                                                  </Avatar>
-                                                  <div>
-                                                    <span className="font-medium">{u.firstName} {u.lastName}</span>
-                                                    <span className="text-xs text-gray-500 ml-1">
-                                                      ({u.role === UserRoleEnum.TEACHER ? 'Учитель' : 
-                                                      u.role === UserRoleEnum.STUDENT ? 'Ученик' : 
-                                                      u.role === UserRoleEnum.PARENT ? 'Родитель' : 
-                                                      u.role})
-                                                    </span>
-                                                  </div>
-                                                </div>
-                                              </label>
-                                            </div>
-                                          );
-                                        })()}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                          
-                          
-                          {/* Кнопки управления списком */}
-                          <div className="space-y-1 mt-2">
-                            {/* Показать больше пользователей */}
-                            {!userSearchQuery && chatUsers.filter(u => u.id !== user?.id).length > 15 && !showAllUsers && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="w-full text-xs h-7"
-                                onClick={() => setShowAllUsers(true)}
-                              >
-                                Показать больше пользователей
-                              </Button>
-                            )}
-                            
-                            {/* Скрыть список при поиске */}
-                            {userSearchQuery && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="w-full text-xs h-7"
-                                onClick={() => setIsAddingUserByName(false)}
-                              >
-                                Скрыть список
-                              </Button>
-                            )}
-                          </div>
+                              } else {
+                                // Для приватного чата можно выбрать только одного пользователя
+                                newChatForm.setValue('participantIds', [userId]);
+                              }
+                              
+                              // Сбрасываем ошибки валидации, т.к. могли быть исправлены
+                              newChatForm.trigger('participantIds');
+                            }}
+                            height={240}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="group">
+                  <div className="space-y-4 mt-4">
+                    <FormField
+                      control={newChatForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input placeholder="Название группового чата" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Показать всех пользователей</span>
+                      <Switch
+                        checked={showAllUsers}
+                        onCheckedChange={value => setShowAllUsers(value)}
+                      />
+                    </div>
+                    
+                    <div className="relative mb-3">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input 
+                        placeholder="Поиск по имени или фамилии..." 
+                        className="pl-10"
+                        value={userSearchQuery}
+                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div className="border rounded-md p-2 h-60">
+                      {usersLoading ? (
+                        <div className="flex justify-center items-center py-2">
+                          <Clock className="h-4 w-4 text-primary animate-spin" />
+                        </div>
+                      ) : (
+                        <div>
+                          {/* Виртуализированный список пользователей */}
+                          <FilteredUsersList
+                            chatUsers={chatUsers}
+                            currentUserId={user?.id}
+                            searchQuery={userSearchQuery}
+                            showAllUsers={showAllUsers}
+                            selectedUserIds={newChatForm.getValues().participantIds || []}
+                            onUserSelect={(userId) => {
+                              const currentParticipants = newChatForm.getValues().participantIds;
+                              const isSelected = currentParticipants.includes(userId);
+                              
+                              if (isSelected) {
+                                // Если пользователь уже выбран, удаляем его из списка
+                                newChatForm.setValue(
+                                  'participantIds',
+                                  currentParticipants.filter(id => id !== userId)
+                                );
+                              } else {
+                                // Для группового чата можно выбрать нескольких пользователей
+                                newChatForm.setValue(
+                                  'participantIds',
+                                  [...currentParticipants, userId]
+                                );
+                              }
+                              
+                              // Сбрасываем ошибки валидации, т.к. могли быть исправлены
+                              newChatForm.trigger('participantIds');
+                            }}
+                            height={240}
+                          />
                         </div>
                       )}
                     </div>
                     
-                    {newChatForm.formState.errors.participantIds && (
-                      <p className="text-sm font-medium text-destructive mt-1">
-                        {newChatForm.formState.errors.participantIds.message}
-                      </p>
-                    )}
-                    
-                    {/* Показываем выбранных участников */}
-                    {newChatForm.getValues().participantIds.length > 0 && (
-                      <div className="mt-2">
-                        <h4 className="text-sm font-medium mb-1">Выбрано участников: {newChatForm.getValues().participantIds.length}</h4>
-                        <div className="flex flex-wrap gap-1">
-                          {newChatForm.getValues().participantIds.map(pid => {
-                            const participant = chatUsers.find(u => u.id === pid);
-                            if (!participant) return null;
-                            
-                            return (
-                              <Badge key={pid} variant="secondary" className="flex items-center gap-1">
-                                {participant.firstName} {participant.lastName}
-                                <X 
-                                  className="h-3 w-3 cursor-pointer" 
-                                  onClick={() => {
-                                    const currentParticipants = newChatForm.getValues().participantIds;
-                                    newChatForm.setValue(
-                                      "participantIds", 
-                                      currentParticipants.filter(id => id !== pid)
-                                    );
-                                  }}
-                                />
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                    <FormField
+                      control={newChatForm.control}
+                      name="participantIds"
+                      render={() => (
+                        <FormItem>
+                          <div className="flex flex-wrap gap-1">
+                            {newChatForm.getValues().participantIds.map((participantId) => {
+                              const participant = chatUsers.find(u => u.id === participantId);
+                              if (!participant) return null;
+                              
+                              return (
+                                <Badge key={participant.id} variant="secondary" className="gap-1">
+                                  {participant.firstName} {participant.lastName}
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-4 w-4 p-0"
+                                    onClick={() => {
+                                      const currentParticipants = newChatForm.getValues().participantIds;
+                                      newChatForm.setValue(
+                                        'participantIds',
+                                        currentParticipants.filter(id => id !== participant.id)
+                                      );
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </Badge>
+                              );
+                            })}
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </TabsContent>
-                
-                <DialogFooter className="mt-6">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsNewChatDialogOpen(false)}
-                  >
-                    Отмена
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    disabled={createChatMutation.isPending}
-                  >
-                    {createChatMutation.isPending && (
-                      <Clock className="h-4 w-4 mr-2 animate-spin" />
-                    )}
-                    Создать чат
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
-      {/* Диалог со списком участников группового чата */}
-      <Dialog open={isParticipantsDialogOpen} onOpenChange={setIsParticipantsDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Участники чата</DialogTitle>
-          </DialogHeader>
-          
-          <div className="py-4">
-            {participantsLoading ? (
-              <div className="flex justify-center items-center py-8">
-                <Clock className="h-5 w-5 text-primary animate-spin" />
-              </div>
-            ) : chatParticipants.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>Участники не найдены</p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[60vh] overflow-auto pr-2">
-                {chatParticipants.map(participant => (
-                  <div 
-                    key={participant.id}
-                    className="flex items-center p-2 hover:bg-gray-50 rounded-md"
-                  >
-                    <Avatar className="h-10 w-10 mr-3">
-                      <AvatarFallback className="bg-primary text-white">
-                        {participant.firstName.charAt(0)}{participant.lastName.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium">
-                        {participant.firstName} {participant.lastName}
-                      </p>
-                      <p className="text-sm text-gray-500 truncate">
-                        {participant.username} • {participant.role}
-                      </p>
-                    </div>
-                    {/* Отображаем метку создателя чата */}
-                    {selectedChat && selectedChat.creatorId === participant.id && (
-                      <Badge variant="outline" className="ml-2 bg-primary/10">
-                        Создатель
-                      </Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter>
-            <Button onClick={() => setIsParticipantsDialogOpen(false)}>Закрыть</Button>
-          </DialogFooter>
+              </Tabs>
+              
+              <FormMessage>
+                {newChatForm.formState.errors.participantIds && (
+                  <p className="text-sm text-destructive">
+                    Выберите хотя бы одного участника
+                  </p>
+                )}
+              </FormMessage>
+              
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsNewChatDialogOpen(false)}
+                >
+                  Отмена
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={
+                    createChatMutation.isPending || 
+                    !newChatForm.formState.isValid
+                  }
+                >
+                  {createChatMutation.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Создание...
+                    </>
+                  ) : (
+                    "Создать чат"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
       
       {/* Диалог редактирования чата */}
-      <EditChatDialog
-        isOpen={editChatDialogOpen}
-        onClose={() => setEditChatDialogOpen(false)}
-        onSubmit={(values) => updateChatMutation.mutate({ 
-          chatId: chatToEdit?.id || 0, 
-          name: values.name 
-        })}
-        defaultName={chatToEdit?.name || ''}
-        isSubmitting={updateChatMutation.isPending}
-      />
+      {chatToEdit && (
+        <EditChatDialog
+          chat={chatToEdit}
+          open={editChatDialogOpen}
+          onOpenChange={setEditChatDialogOpen}
+          onSave={(name) => {
+            updateChatMutation.mutate({
+              chatId: chatToEdit.id,
+              name
+            });
+          }}
+          isPending={updateChatMutation.isPending}
+        />
+      )}
       
       {/* Диалог подтверждения удаления чата */}
       <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Удаление чата</AlertDialogTitle>
+            <AlertDialogTitle>Удалить чат?</AlertDialogTitle>
             <AlertDialogDescription>
               Вы уверены, что хотите удалить этот чат? Это действие невозможно отменить.
-              Все сообщения также будут удалены.
+              Все сообщения чата будут удалены для всех участников.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => chatToDelete && deleteChatMutation.mutate(chatToDelete.id)}
+            <AlertDialogAction
+              onClick={() => {
+                if (chatToDelete) {
+                  deleteChatMutation.mutate(chatToDelete.id);
+                }
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleteChatMutation.isPending}
             >
               {deleteChatMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Удаление...
                 </>
-              ) : "Удалить"}
+              ) : (
+                "Удалить"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1722,29 +1277,90 @@ export default function MessagesPage() {
       <AlertDialog open={leaveAlertOpen} onOpenChange={setLeaveAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Выход из чата</AlertDialogTitle>
+            <AlertDialogTitle>Выйти из чата?</AlertDialogTitle>
             <AlertDialogDescription>
               Вы уверены, что хотите выйти из этого чата? 
-              Вы больше не будете получать сообщения и уведомления.
+              Вы больше не будете получать сообщения от участников.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => chatToLeave && leaveChatMutation.mutate(chatToLeave.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={leaveChatMutation.isPending}
+            <AlertDialogAction
+              onClick={() => {
+                if (chatToLeave) {
+                  leaveChatMutation.mutate(chatToLeave.id);
+                }
+              }}
             >
               {leaveChatMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Выход...
                 </>
-              ) : "Выйти"}
+              ) : (
+                "Выйти"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Диалог просмотра участников чата */}
+      <Dialog open={isParticipantsDialogOpen} onOpenChange={setIsParticipantsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Участники чата</DialogTitle>
+            <DialogDescription>
+              Список участников группового чата
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="max-h-80 overflow-y-auto">
+            {participantsLoading ? (
+              <div className="flex justify-center items-center p-4">
+                <Clock className="h-6 w-6 text-primary animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {chatParticipants.map((participant) => (
+                  <div key={participant.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={null} />
+                      <AvatarFallback className="bg-primary/10 text-primary">
+                        <UserIcon className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <div className="text-sm font-medium">
+                        {participant.firstName} {participant.lastName}
+                      </div>
+                      <div className="text-xs text-gray-500 flex items-center gap-1">
+                        {participant.role}
+                        {participant.isAdmin && (
+                          <Badge variant="outline" className="text-xs py-0 h-5">
+                            Администратор
+                          </Badge>
+                        )}
+                        {participant.id === selectedChat?.creatorId && (
+                          <Badge variant="outline" className="text-xs py-0 h-5">
+                            Создатель
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button onClick={() => setIsParticipantsDialogOpen(false)}>
+              Закрыть
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

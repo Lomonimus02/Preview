@@ -1,7 +1,7 @@
 import { memo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, User } from "lucide-react";
-import { ChatUser } from "../../types/chat";
+import { ChatUser } from "@/types/chat";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 interface VirtualizedUsersListProps {
@@ -72,7 +72,7 @@ const VirtualizedUsersList = memo(({
                 >
                   <div className="flex items-center gap-2">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={null} alt={user.firstName} />
+                      <AvatarImage src="" alt={user.firstName} />
                       <AvatarFallback className="bg-primary/10 text-primary">
                         <User className="h-4 w-4" />
                       </AvatarFallback>

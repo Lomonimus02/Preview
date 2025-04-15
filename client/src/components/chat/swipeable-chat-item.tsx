@@ -11,7 +11,7 @@ type SwipeableChatItemProps = {
   onDelete?: () => void;
   onEdit?: () => void;
   onLeave?: () => void;
-  chatType: string;
+  chatType: ChatTypeEnum;
   isCreator: boolean;
   className?: string;
 };

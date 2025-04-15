@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-export type ChatTypeEnum = "private" | "group";
+import { ChatTypeEnum } from '@shared/schema';
+
+export { ChatTypeEnum };
 
 export interface ChatUser {
   id: number;
