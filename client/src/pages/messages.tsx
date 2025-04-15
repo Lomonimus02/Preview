@@ -710,15 +710,15 @@ export default function MessagesPage() {
                         key={chat.id}
                         chatType={chat.type}
                         isCreator={isCreator}
-                        onDelete={chat.type === 'group' && isCreator ? () => {
+                        onDelete={chat.type === ChatTypeEnum.GROUP && isCreator ? () => {
                           setChatToDelete(chat);
                           setDeleteAlertOpen(true);
                         } : undefined}
-                        onEdit={chat.type === 'group' && isCreator ? () => {
+                        onEdit={chat.type === ChatTypeEnum.GROUP && isCreator ? () => {
                           setChatToEdit(chat);
                           setEditChatDialogOpen(true);
                         } : undefined}
-                        onLeave={(chat.type === 'private' || !isCreator) ? () => {
+                        onLeave={(chat.type === ChatTypeEnum.PRIVATE || !isCreator) ? () => {
                           setChatToLeave(chat);
                           setLeaveAlertOpen(true);
                         } : undefined}
@@ -734,7 +734,7 @@ export default function MessagesPage() {
                               <AvatarImage src={chat.avatarUrl} alt={chatName} />
                             ) : (
                               <AvatarFallback className={isSelected ? 'bg-primary text-white' : 'bg-gray-200'}>
-                                {chat.type === 'group' ? (
+                                {chat.type === ChatTypeEnum.GROUP ? (
                                   <Users className="h-4 w-4" />
                                 ) : chat.participants ? (
                                   chat.participants
@@ -756,7 +756,7 @@ export default function MessagesPage() {
                                 </p>
                               )}
                             </div>
-                            {chat.type === 'group' && (
+                            {chat.type === ChatTypeEnum.GROUP && (
                               <p className="text-xs text-gray-500">
                                 {chat.participants ? `${chat.participants.length} участников` : ''}
                               </p>
@@ -790,7 +790,7 @@ export default function MessagesPage() {
                           <AvatarImage src={selectedChat.avatarUrl} alt={getChatName(selectedChat)} />
                         ) : (
                           <AvatarFallback className="bg-primary text-white">
-                            {selectedChat.type === 'group' ? (
+                            {selectedChat.type === ChatTypeEnum.GROUP ? (
                               <Users className="h-4 w-4" />
                             ) : selectedChat.participants ? (
                               selectedChat.participants
@@ -805,19 +805,19 @@ export default function MessagesPage() {
                         <CardTitle 
                           className="text-lg cursor-pointer hover:text-primary"
                           onClick={() => {
-                            if (selectedChat.type === 'group') {
+                            if (selectedChat.type === ChatTypeEnum.GROUP) {
                               setIsParticipantsDialogOpen(true);
                             }
                           }}
                         >
                           {getChatName(selectedChat)}
-                          {selectedChat.type === 'group' && (
+                          {selectedChat.type === ChatTypeEnum.GROUP && (
                             <span className="ml-1 text-xs">
                               <ExternalLink className="inline h-3 w-3" />
                             </span>
                           )}
                         </CardTitle>
-                        {selectedChat.type === 'group' && selectedChat.participants && (
+                        {selectedChat.type === ChatTypeEnum.GROUP && selectedChat.participants && (
                           <p className="text-xs text-gray-500">
                             {selectedChat.participants.length} участников
                           </p>
