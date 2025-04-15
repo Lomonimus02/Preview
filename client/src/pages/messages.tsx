@@ -897,10 +897,10 @@ export default function MessagesPage() {
                   <Form {...messageForm}>
                     <form 
                       onSubmit={messageForm.handleSubmit(onSubmitMessage)} 
-                      className="flex w-full items-end gap-2"
+                      className="flex w-full items-end gap-2 relative"
                     >
                       {selectedAttachment && (
-                        <div className="absolute bottom-full mb-2 left-0 right-0 bg-background border rounded-md p-2 mx-2">
+                        <div className="absolute bottom-full mb-2 left-0 right-0 bg-background border rounded-md p-2 mx-2 z-10">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center">
                               {selectedAttachment.type.startsWith('image/') ? (
@@ -919,6 +919,7 @@ export default function MessagesPage() {
                               variant="ghost"
                               size="icon"
                               onClick={cancelAttachment}
+                              className="h-6 w-6 p-0"
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -931,6 +932,7 @@ export default function MessagesPage() {
                         variant="ghost"
                         size="icon"
                         onClick={openFileDialog}
+                        className="flex-shrink-0"
                       >
                         <PaperclipIcon className="h-5 w-5" />
                       </Button>
@@ -940,17 +942,19 @@ export default function MessagesPage() {
                         ref={fileInputRef}
                         className="hidden"
                         onChange={handleFileChange}
+                        accept="image/*,video/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
                       />
                       
                       <FormField
                         control={messageForm.control}
                         name="content"
                         render={({ field }) => (
-                          <FormItem className="flex-1">
+                          <FormItem className="flex-1 min-w-0">
                             <FormControl>
                               <Input
                                 placeholder="Напишите сообщение..."
                                 {...field}
+                                className="w-full"
                               />
                             </FormControl>
                             <FormMessage />
@@ -961,12 +965,15 @@ export default function MessagesPage() {
                       <Button 
                         type="submit" 
                         disabled={sendMessageMutation.isPending || (!messageForm.getValues().content && !selectedAttachment)}
+                        className="flex-shrink-0 px-3 sm:px-4"
+                        size="sm"
                       >
                         {sendMessageMutation.isPending ? (
                           <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
                           <Send className="h-5 w-5" />
                         )}
+                        <span className="hidden sm:inline ml-2">Отправить</span>
                       </Button>
                     </form>
                   </Form>
