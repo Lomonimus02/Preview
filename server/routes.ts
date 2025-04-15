@@ -4474,9 +4474,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Chat not found" });
       }
       
-      // Проверяем, является ли пользователь создателем чата (только создатель может удалить чат)
-      if (chat.creatorId !== req.user.id) {
-        return res.status(403).json({ message: "Only chat creator can delete the chat" });
+      // Для приватных чатов - любой участник может удалить чат
+      // Для групповых чатов - только создатель может удалить
+      if (chat.type === ChatTypeEnum.GROUP && chat.creatorId !== req.user.id) {
+        return res.status(403).json({ message: "Only chat creator can delete the group chat" });
+      }
+      
+      // Проверяем, является ли пользователь участником чата
+      if (chat.type === ChatTypeEnum.PRIVATE) {
+        const participants = await dataStorage.getChatParticipants(chatId);
+        const isParticipant = participants.some(p => p.userId === req.user.id);
+        if (!isParticipant) {
+          return res.status(403).json({ message: "You are not a participant of this chat" });
+        }
       }
       
       // Удаляем чат и связанные данные
@@ -4490,7 +4500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Выход из группового чата (для любого участника)
-  app.delete("/api/chats/:chatId/leave", isAuthenticated, async (req, res) => {
+  app.post("/api/chats/:chatId/leave", isAuthenticated, async (req, res) => {
     try {
       const chatId = parseInt(req.params.chatId);
       if (isNaN(chatId)) {
