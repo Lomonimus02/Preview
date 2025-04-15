@@ -684,7 +684,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог для создания домашнего задания */}
       <Dialog open={isHomeworkDialogOpen} onOpenChange={setIsHomeworkDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Добавить домашнее задание</DialogTitle>
             <DialogDescription>
@@ -737,7 +737,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог с детальной информацией об уроке */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Информация об уроке</DialogTitle>
             <DialogDescription>
@@ -1012,7 +1012,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог с формой для заданий (накопительная система оценок) */}
       <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedAssignment ? "Редактирование задания" : "Создание задания"}
@@ -1036,7 +1036,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог с формой для отметки посещаемости */}
       <Dialog open={isAttendanceDialogOpen} onOpenChange={setIsAttendanceDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Отметка посещаемости</DialogTitle>
             <DialogDescription>
@@ -1063,7 +1063,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог для просмотра детальной информации об оценке */}
       <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Информация об оценке</DialogTitle>
             <DialogDescription>
