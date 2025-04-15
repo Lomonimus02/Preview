@@ -526,22 +526,24 @@ export default function MessagesPage() {
     }
   };
   
-  // Фильтрация чатов по поисковому запросу
-  const filteredChats = chats.filter(chat => {
-    if (!searchQuery) return true;
-    const lowerQuery = searchQuery.toLowerCase();
-    
-    // Поиск по имени чата
-    if (chat.name.toLowerCase().includes(lowerQuery)) return true;
-    
-    // Поиск по именам участников
-    if (chat.participants && chat.participants.some(p => 
-      `${p.firstName} ${p.lastName}`.toLowerCase().includes(lowerQuery) ||
-      p.username.toLowerCase().includes(lowerQuery)
-    )) return true;
-    
-    return false;
-  });
+  // Оптимизация: фильтрация чатов с помощью мемоизации
+  const filteredChats = useMemo(() => {
+    return chats.filter(chat => {
+      if (!searchQuery) return true;
+      const lowerQuery = searchQuery.toLowerCase();
+      
+      // Поиск по имени чата
+      if (chat.name.toLowerCase().includes(lowerQuery)) return true;
+      
+      // Поиск по именам участников
+      if (chat.participants && chat.participants.some(p => 
+        `${p.firstName} ${p.lastName}`.toLowerCase().includes(lowerQuery) ||
+        p.username.toLowerCase().includes(lowerQuery)
+      )) return true;
+      
+      return false;
+    });
+  }, [chats, searchQuery]);
   
   // Определение выбранного чата перемещено выше
   
