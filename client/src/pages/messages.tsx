@@ -99,7 +99,7 @@ interface ChatUser {
 interface Chat {
   id: number;
   name: string;
-  type: 'private' | 'group';
+  type: ChatTypeEnum;
   creatorId: number;
   schoolId: number;
   avatarUrl: string | null;
