@@ -1157,7 +1157,7 @@ export default function MessagesPage() {
                               }
                               
                               // Устанавливаем тип чата как личный
-                              newChatForm.setValue("type", "private");
+                              newChatForm.setValue("type", ChatTypeEnum.PRIVATE);
                             }}
                           >
                             <FormControl>
