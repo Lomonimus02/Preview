@@ -538,7 +538,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   return (
     <>
-      <Card className="min-w-[300px] w-full sm:max-w-[380px] h-[600px] overflow-y-auto shadow-md">
+      <Card className="min-w-[260px] w-[calc(100vw-2rem)] xs:min-w-[300px] sm:w-full sm:max-w-[380px] h-[min(90vh,600px)] overflow-y-auto shadow-md">
         <CardHeader className="text-center py-4 bg-white sticky top-0 z-10">
           <CardTitle className="text-xl">{dayName}</CardTitle>
           <div className="text-gray-500">{formattedDate}</div>
@@ -636,7 +636,8 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                             <div className="p-2">
                               {isEmpty ? (
                                 <div className="h-12 flex items-center justify-center text-sm text-gray-400">
-                                  Нет уроков в это время
+                                  <span className="hidden sm:inline">Нет уроков в это время</span>
+                                  <span className="sm:hidden">—</span>
                                 </div>
                               ) : (
                                 <div className="space-y-2">

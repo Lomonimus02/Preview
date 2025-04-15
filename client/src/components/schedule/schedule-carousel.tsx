@@ -161,8 +161,8 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         </Button>
       </div>
       
-      <div className="overflow-hidden" ref={emblaRef}>
-        <div className="flex gap-4">
+      <div className="overflow-hidden touch-pan-y overscroll-x-none" ref={emblaRef}>
+        <div className="flex gap-2 md:gap-4">
           {weekDates.map((date) => (
             <div className="flex-shrink-0" key={format(date, "yyyy-MM-dd")}>
               <ScheduleDayCard
