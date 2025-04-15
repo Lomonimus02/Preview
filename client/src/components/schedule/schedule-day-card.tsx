@@ -144,7 +144,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
   return (
     <div 
       className={`
-        mb-2 p-2 rounded-lg cursor-pointer transition-all duration-200
+        mb-1 xs:mb-2 p-1 xs:p-2 rounded-lg cursor-pointer transition-all duration-200
         ${isCompleted 
           ? 'bg-green-50 border border-green-100' 
           : 'bg-emerald-50 border border-emerald-100 hover:border-emerald-200'
@@ -154,9 +154,9 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
       title={`Кабинет: ${room || "—"} • Учитель: ${teacherName}`} // Информация в тултипе
     >
       <div className="flex justify-between items-center">
-        <div className="text-emerald-700 font-medium text-sm md:text-base">
-          <span className="inline-block min-w-[70px]">{schedule.startTime} - {schedule.endTime}</span>
-          <span className="ml-2 text-emerald-900 truncate max-w-[150px] md:max-w-none inline-block align-middle">
+        <div className="text-emerald-700 font-medium text-xs xs:text-sm md:text-base">
+          <span className="inline-block min-w-[60px] xs:min-w-[70px]">{schedule.startTime} - {schedule.endTime}</span>
+          <span className="ml-1 xs:ml-2 text-emerald-900 truncate max-w-[100px] xs:max-w-[120px] sm:max-w-[150px] md:max-w-none inline-block align-middle">
             {schedule.subgroupId
               ? getSubgroupName() // Используем функцию для получения названия подгруппы
               : subject?.name || "Предмет"}
@@ -169,16 +169,16 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
           )}
         </div>
         
-        <div className="flex items-center gap-1 md:gap-2">
+        <div className="flex items-center gap-0.5 xs:gap-1 md:gap-2">
           {/* Показываем количество заданий, если они есть */}
           {schedule.assignments && schedule.assignments.length > 0 && (
-            <div className="text-xs text-gray-600 font-medium px-1.5 py-0.5 bg-gray-100 rounded-md">
+            <div className="text-[10px] xs:text-xs text-gray-600 font-medium px-1 py-0.5 bg-gray-100 rounded-md">
               <span title="Количество заданий">{schedule.assignments.length} зад.</span>
             </div>
           )}
           
           {/* Кнопки действий */}
-          <div className="flex items-center gap-1 md:gap-2">
+          <div className="flex items-center gap-0.5 xs:gap-1 md:gap-2">
             {/* Кнопка для создания задания (Отображается для учителей, независимо от статуса урока) */}
             <div 
               className="cursor-pointer" 
@@ -229,12 +229,12 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
       
       {/* Отображаем оценки, если они есть */}
       {grades.length > 0 && (
-        <div className="mt-2">
-          <div className="flex flex-wrap gap-1">
+        <div className="mt-1 xs:mt-2">
+          <div className="flex flex-wrap gap-0.5 xs:gap-1">
             {grades.map((grade) => (
               <div 
                 key={grade.id}
-                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary text-primary-foreground cursor-pointer hover:bg-primary-dark transition-colors"
+                className="inline-flex items-center px-1.5 xs:px-2 py-0.5 rounded-full text-[10px] xs:text-xs font-medium bg-primary text-primary-foreground cursor-pointer hover:bg-primary-dark transition-colors"
                 title={grade.comment || "Нажмите для просмотра деталей"}
                 onClick={(e) => {
                   e.stopPropagation(); // Предотвращаем всплытие события
@@ -538,12 +538,12 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   return (
     <>
-      <Card className="min-w-[260px] w-[calc(100vw-2rem)] xs:min-w-[300px] sm:w-full sm:max-w-[380px] h-[min(90vh,600px)] overflow-y-auto shadow-md">
-        <CardHeader className="text-center py-4 bg-white sticky top-0 z-10">
-          <CardTitle className="text-xl">{dayName}</CardTitle>
-          <div className="text-gray-500">{formattedDate}</div>
+      <Card className="min-w-[220px] w-[calc(100vw-3rem)] xs:min-w-[280px] sm:w-full sm:max-w-[380px] h-[min(85vh,600px)] overflow-y-auto shadow-md">
+        <CardHeader className="text-center py-2 xs:py-3 sm:py-4 bg-white sticky top-0 z-10">
+          <CardTitle className="text-lg sm:text-xl">{dayName}</CardTitle>
+          <div className="text-xs xs:text-sm text-gray-500">{formattedDate}</div>
           {schedules.length > 0 && (
-            <div className="text-sm text-gray-500 mt-1">
+            <div className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">
               {schedules.length} {schedules.length === 1 ? 'урок' : 
                 schedules.length < 5 ? 'урока' : 'уроков'}
             </div>
@@ -627,15 +627,15 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                         {slotsToShow.map(({ slot, schedules, isEmpty }) => (
                           <div key={slot.slotNumber} className="time-slot rounded-lg border border-gray-100">
                             {/* Заголовок слота */}
-                            <div className="p-2 bg-gray-50 rounded-t-lg border-b border-gray-100 flex items-center justify-between">
-                              <div className="font-medium text-gray-800">{slot.slotNumber} урок</div>
-                              <div className="text-sm text-gray-600">{slot.startTime} - {slot.endTime}</div>
+                            <div className="p-1 xs:p-2 bg-gray-50 rounded-t-lg border-b border-gray-100 flex items-center justify-between">
+                              <div className="font-medium text-xs xs:text-sm sm:text-base text-gray-800">{slot.slotNumber} урок</div>
+                              <div className="text-xs sm:text-sm text-gray-600">{slot.startTime} - {slot.endTime}</div>
                             </div>
                             
                             {/* Содержимое слота */}
-                            <div className="p-2">
+                            <div className="p-1 xs:p-2">
                               {isEmpty ? (
-                                <div className="h-12 flex items-center justify-center text-sm text-gray-400">
+                                <div className="h-8 xs:h-10 sm:h-12 flex items-center justify-center text-xs sm:text-sm text-gray-400">
                                   <span className="hidden sm:inline">Нет уроков в это время</span>
                                   <span className="sm:hidden">—</span>
                                 </div>
