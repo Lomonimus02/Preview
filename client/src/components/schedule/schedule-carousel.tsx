@@ -131,8 +131,8 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   const weekRangeText = `${format(currentWeekStart, "d MMM", { locale: ru })} - ${format(currentWeekEnd, "d MMM yyyy", { locale: ru })}`;
 
   return (
-    <div className="mb-8">
-      <div className="flex flex-wrap justify-between items-center mb-4 gap-2">
+    <div className="h-[calc(100vh-9rem)] flex flex-col mb-2">
+      <div className="flex flex-wrap justify-between items-center mb-2 gap-2 px-1.5">
         <Button 
           variant="outline" 
           onClick={goToPreviousWeek}
@@ -144,8 +144,8 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
           <span className="sm:hidden">Пред.</span>
         </Button>
         
-        <div className="flex items-center text-sm sm:text-lg font-medium order-first sm:order-none w-full sm:w-auto justify-center mb-2 sm:mb-0">
-          <FiCalendar className="mr-2 shrink-0" />
+        <div className="flex items-center text-sm sm:text-lg font-medium order-first sm:order-none w-full sm:w-auto justify-center mb-1 sm:mb-0">
+          <FiCalendar className="mr-1.5 shrink-0" />
           <span>{weekRangeText}</span>
         </div>
         
@@ -161,10 +161,10 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         </Button>
       </div>
       
-      <div className="overflow-hidden touch-pan-y overscroll-x-none" ref={emblaRef}>
-        <div className="flex gap-1 xs:gap-2 md:gap-4">
+      <div className="overflow-hidden touch-pan-y overscroll-x-none flex-grow" ref={emblaRef}>
+        <div className="flex h-full gap-1 xs:gap-2 md:gap-4 pb-1">
           {weekDates.map((date) => (
-            <div className="flex-shrink-0" key={format(date, "yyyy-MM-dd")}>
+            <div className="flex-shrink-0 h-full" key={format(date, "yyyy-MM-dd")}>
               <ScheduleDayCard
                 date={date}
                 dayName={getDayName(date)}
