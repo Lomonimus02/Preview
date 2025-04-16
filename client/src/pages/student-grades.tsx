@@ -243,7 +243,7 @@ export default function StudentGrades() {
       for (const subject of subjects) {
         try {
           const subjectId = subject.id;
-          const cacheKey = subject.customId || `${subjectId}`;
+          const cacheKey = (subject as any).customId || `${subjectId}`;
           
           // Загружаем среднюю оценку для этого предмета
           const url = `/api/student-subject-average?studentId=${user.id}&subjectId=${subjectId}`;
@@ -497,7 +497,7 @@ export default function StudentGrades() {
           
           // Определяем цвет в зависимости от типа задания или оценки
           const getColorClass = () => {
-            if (hasAssignment) {
+            if (hasAssignment && assignment) {
               return assignmentTypeColors[assignment.assignmentType] || 'bg-primary-100 text-primary-800 hover:bg-primary-200';
             } else if (grade.gradeType && gradeTypeColors[grade.gradeType]) {
               return gradeTypeColors[grade.gradeType];
@@ -515,7 +515,7 @@ export default function StudentGrades() {
               key={grade.id}
               onClick={() => handleGradeClick(grade, assignment || null)}
               className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium cursor-pointer ${getColorClass()}`}
-              title={hasAssignment ? getAssignmentTypeName(assignment.assignmentType) : (grade.gradeType ? getGradeTypeName(grade.gradeType) : "")}
+              title={hasAssignment && assignment ? getAssignmentTypeName(assignment.assignmentType) : (grade.gradeType ? getGradeTypeName(grade.gradeType) : "")}
             >
               {grade.grade}
               {hasAssignment && (
