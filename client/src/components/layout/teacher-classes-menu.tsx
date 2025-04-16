@@ -298,10 +298,7 @@ export function TeacherClassesMenu() {
                       "flex items-center text-sm py-1.5 px-3 rounded-md w-full cursor-pointer",
                       isItemActive(item.classId, item.subjectId, item.subgroupId) 
                         ? "bg-accent/50 text-accent-foreground" 
-                        : "hover:bg-muted text-foreground/80",
-                      item.isSubgroup 
-                        ? "ml-4 text-sm border-l-2 pl-4 border-muted-foreground/20" 
-                        : "" // Стильное оформление для подгрупп
+                        : "hover:bg-muted text-foreground/80"
                     )}
                   >
                     <span className="truncate">
