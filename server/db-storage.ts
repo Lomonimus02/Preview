@@ -4,6 +4,7 @@ import { eq, and, or, inArray, sql, lte, ne, gt } from 'drizzle-orm';
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import * as schema from '@shared/schema';
+import { decryptUser, encryptUser, decryptMessage, encryptMessage, decryptMessages, decryptUsers } from "./utils/encrypted-models";
 import {
   User, InsertUser,
   School, InsertSchool,
@@ -86,12 +87,12 @@ export class DatabaseStorage implements IStorage {
   // ===== User operations =====
   async getUser(id: number): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return result[0];
+    return decryptUser(result[0]);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
-    return result[0];
+    return decryptUser(result[0]);
   }
   
   async getUsersCount(): Promise<number> {
@@ -100,16 +101,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const [newUser] = await db.insert(users).values(user).returning();
-    return newUser;
+    // Шифруем чувствительные поля
+    const encryptedUserData = encryptUser(user);
+    const [newUser] = await db.insert(users).values(encryptedUserData).returning();
+    return decryptUser(newUser);
   }
 
   async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
+    // Шифруем чувствительные поля
+    const encryptedUserData = encryptUser(user as InsertUser);
     const [updatedUser] = await db.update(users)
-      .set(user)
+      .set(encryptedUserData)
       .where(eq(users.id, id))
       .returning();
-    return updatedUser;
+    return decryptUser(updatedUser);
   }
 
   async deleteUser(id: number): Promise<User | undefined> {
@@ -125,11 +130,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUsers(): Promise<User[]> {
-    return await db.select().from(users);
+    const usersList = await db.select().from(users);
+    return decryptUsers(usersList);
   }
 
   async getUsersByRole(role: UserRoleEnum): Promise<User[]> {
-    return await db.select().from(users).where(eq(users.role, role));
+    const usersList = await db.select().from(users).where(eq(users.role, role));
+    return decryptUsers(usersList);
   }
 
   async getUsersBySchool(schoolId: number): Promise<User[]> {
