@@ -17,7 +17,15 @@ export function encryptField(value: string | null): string | null {
  */
 export function decryptField(value: string | null): string | null {
   if (!value) return null;
-  return decrypt(value);
+  
+  try {
+    return decrypt(value);
+  } catch (error: any) {
+    // Если расшифровка не удалась, возвращаем исходное значение
+    // Это позволяет работать с данными, которые были созданы до внедрения шифрования
+    console.log(`Decryption failed, returning original value: ${error.message || 'Unknown error'}`);
+    return value;
+  }
 }
 
 /**

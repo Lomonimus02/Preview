@@ -96,13 +96,37 @@ export class DatabaseStorage implements IStorage {
 
   // ===== User operations =====
   async getUser(id: number): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
-    return decryptUser(result[0]);
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      if (!result.length) return undefined;
+      
+      try {
+        return decryptUser(result[0]) || undefined;
+      } catch (error) {
+        console.warn(`Error decrypting user data: ${error.message}. Returning original data.`);
+        return result[0];
+      }
+    } catch (error) {
+      console.error(`Error getting user by ID ${id}:`, error);
+      return undefined;
+    }
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
-    return decryptUser(result[0]);
+    try {
+      const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
+      if (!result.length) return undefined;
+      
+      try {
+        return decryptUser(result[0]) || undefined;
+      } catch (error) {
+        console.warn(`Error decrypting user data: ${error.message}. Returning original data.`);
+        return result[0];
+      }
+    } catch (error) {
+      console.error(`Error getting user by username ${username}:`, error);
+      return undefined;
+    }
   }
   
   async getUsersCount(): Promise<number> {
