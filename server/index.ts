@@ -29,6 +29,8 @@ declare global {
 dotenv.config();
 
 const app = express();
+// Убираем заголовок X-Powered-By для безопасности
+app.disable('x-powered-by');
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

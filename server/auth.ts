@@ -41,6 +41,9 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
+  // Определяем, работаем ли мы в production и доступен ли HTTPS
+  const isHttpsAvailable = Boolean(process.env.HTTPS_AVAILABLE) || process.env.NODE_ENV === 'production';
+  
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "school-management-secret",
     resave: false,
@@ -48,6 +51,9 @@ export function setupAuth(app: Express) {
     store: dataStorage.sessionStore,
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      secure: isHttpsAvailable, // Используем secure cookie только при доступном HTTPS
+      httpOnly: true, // Защита от XSS атак, должна быть всегда включена
+      sameSite: 'strict' // Защита от CSRF атак
     }
   };
 
