@@ -5,12 +5,19 @@ import { testConnection } from "./db";
 import dotenv from "dotenv";
 import { Server } from "http";
 import * as https from "https";
+import * as tls from "tls";
 import path from "path";
 import { initializeEncryption } from "./utils/encryption";
 import { checkSSLCertificates, loadSSLCertificates } from "./ssl-config";
 
-// Расширяем интерфейс Request из express для поддержки поля secure
+// Расширяем интерфейс Socket для поддержки TLS
 declare global {
+  namespace NodeJS {
+    interface Socket {
+      encrypted?: boolean;
+    }
+  }
+  
   namespace Express {
     interface Request {
       secure?: boolean;
@@ -40,18 +47,17 @@ let isHttpsAvailable = false;
 // Функция для определения, является ли запрос защищенным (HTTPS)
 function isSecureRequest(req: Request): boolean {
   return Boolean(
-    req.secure || // Стандартный признак для Express, если сервер напрямую обслуживает HTTPS
-    req.protocol === 'https' || // Иногда req.protocol устанавливается корректно
+    req.protocol === 'https' || // Проверка протокола
     req.headers['x-forwarded-proto'] === 'https' || // Для запросов через прокси
     req.headers['x-forwarded-ssl'] === 'on' || // Альтернативный заголовок
-    req.socket.encrypted // Проверка шифрования сокета
+    (req.socket && Object.prototype.hasOwnProperty.call(req.socket, 'encrypted') && (req.socket as any).encrypted === true) // Безопасный способ проверки шифрования сокета
   );
 }
 
 // Middleware для перенаправления с HTTP на HTTPS
 app.use((req, res, next) => {
   // Проверяем, включен ли HTTPS и не является ли соединение уже защищенным
-  if (isHttpsAvailable && !req.secure) {
+  if (isHttpsAvailable && !isSecureRequest(req)) {
     // Если запрос пришел не через HTTPS, но HTTPS доступен, перенаправляем на HTTPS
     const host = req.headers.host?.replace(/:.*/, '') || 'localhost';
     const httpsPort = 5443; // Порт HTTPS сервера

@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { Notification } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { ConnectionStatus } from "@/components/ui/connection-status";
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -75,6 +76,9 @@ export function Header({ toggleSidebar }: HeaderProps) {
         </div>
         
         <div className="flex items-center space-x-4">
+          {/* Индикатор состояния соединения */}
+          <ConnectionStatus className="hidden md:flex" />
+          
           {/* Иконка для сообщений с индикатором количества */}
           <Link href="/messages" className="relative">
             <MessageSquare className="h-5 w-5 text-gray-600" />
