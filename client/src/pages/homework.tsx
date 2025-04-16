@@ -253,10 +253,12 @@ export default function HomeworkPage() {
   // Update homework mutation
   const updateHomeworkMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: z.infer<typeof homeworkFormSchema> }) => {
+      console.log("Отправляемые данные для обновления:", { id, data });
       const res = await apiRequest(`/api/homework/${id}`, "PATCH", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Домашнее задание успешно обновлено:", data);
       queryClient.invalidateQueries({ queryKey: ["/api/homework"] });
       setIsEditDialogOpen(false);
       setHomeworkToEdit(null);
@@ -267,6 +269,7 @@ export default function HomeworkPage() {
       });
     },
     onError: (error) => {
+      console.error("Ошибка при обновлении домашнего задания:", error);
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось обновить домашнее задание",
@@ -745,6 +748,7 @@ export default function HomeworkPage() {
           
           <Form {...editHomeworkForm}>
             <form onSubmit={editHomeworkForm.handleSubmit((values) => {
+                console.log("Отправка формы редактирования с данными:", values);
                 if (homeworkToEdit) {
                   updateHomeworkMutation.mutate({ id: homeworkToEdit.id, data: values });
                 }
