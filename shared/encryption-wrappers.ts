@@ -13,10 +13,12 @@ export function encryptField(value: string | null): string | null {
 /**
  * Проверяет, может ли строка быть зашифрованной
  * @param text Строка для проверки
- * @returns true если строка может быть зашифрованной (состоит только из hex-символов)
+ * @returns true если строка может быть зашифрованной (состоит только из hex-символов и имеет подходящую длину)
  */
 function isPossiblyEncrypted(text: string): boolean {
-  return /^[0-9a-f]+$/i.test(text);
+  // Проверяем, что строка состоит только из hex-символов и имеет достаточную длину (минимум 32 символа, 
+  // так как зашифрованные данные обычно длиннее)
+  return /^[0-9a-f]+$/i.test(text) && text.length >= 32;
 }
 
 /**
@@ -33,11 +35,21 @@ export function decryptField(value: string | null): string | null {
   }
   
   try {
-    return decrypt(value);
+    const decrypted = decrypt(value);
+    
+    // Дополнительная проверка: если расшифрованное значение совпадает с оригиналом,
+    // то вероятно, это не зашифрованные данные
+    if (decrypted === value) {
+      console.log('Warning: Decrypted value is identical to original, probably not encrypted data');
+    }
+    
+    return decrypted;
   } catch (error: any) {
     // Если расшифровка не удалась, возвращаем исходное значение
     // Это позволяет работать с данными, которые были созданы до внедрения шифрования
-    console.log(`Decryption failed, returning original value: ${error.message || 'Unknown error'}`);
+    const errorMessage = error.message || 'Unknown error';
+    const errorCode = error.code || 'No error code';
+    console.error(`Decryption error [${errorCode}]: ${errorMessage} for value: ${value.substring(0, 10)}...`);
     return value;
   }
 }

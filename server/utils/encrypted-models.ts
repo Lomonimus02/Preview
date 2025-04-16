@@ -8,7 +8,7 @@ import {
 
 // Список полей, которые должны быть зашифрованы для каждой модели
 export const encryptedFields = {
-  users: ['email', 'phone'] as (keyof User)[],
+  users: ['firstName', 'lastName', 'email', 'phone'] as (keyof User)[],
   messages: ['content'] as (keyof Message)[],
   documents: ['fileUrl', 'description'] as (keyof Document)[],
   grades: ['comment'] as (keyof Grade)[],

@@ -142,10 +142,31 @@ export function decrypt(encryptedText: string): string {
   }
   
   try {
+    // Проверяем длину текста, чтобы избежать ошибок при расшифровке
+    if (encryptedText.length % 2 !== 0) {
+      console.warn('Decryption warning: Encrypted text length is not even, might not be a valid hex string');
+      return encryptedText;
+    }
+    
     const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, encryptionKey, encryptionIv);
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+    let decrypted;
+    
+    try {
+      decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      
+      // Проверяем результат на валидность UTF-8
+      if (decrypted.includes('\uFFFD')) {
+        console.warn('Decryption warning: Result contains invalid UTF-8 characters, returning original');
+        return encryptedText;
+      }
+      
+      return decrypted;
+    } catch (cryptoError) {
+      console.error('Crypto decryption error:', cryptoError);
+      // Возвращаем исходный текст при ошибке
+      return encryptedText;
+    }
   } catch (error) {
     console.error('Decryption error:', error);
     // Возвращаем исходный текст вместо выбрасывания исключения
