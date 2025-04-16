@@ -4,8 +4,19 @@ import { setupVite, serveStatic, log } from "./vite";
 import { testConnection } from "./db";
 import dotenv from "dotenv";
 import { Server } from "http";
+import * as https from "https";
 import path from "path";
 import { initializeEncryption } from "./utils/encryption";
+import { checkSSLCertificates, loadSSLCertificates } from "./ssl-config";
+
+// Расширяем интерфейс Request из express для поддержки поля secure
+declare global {
+  namespace Express {
+    interface Request {
+      secure?: boolean;
+    }
+  }
+}
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -23,6 +34,47 @@ let isDbHealthy = false;
 const DB_HEALTH_CHECK_INTERVAL = 30000; // 30 секунд
 // Таймер для периодической проверки соединения с БД
 let dbHealthCheckTimer: NodeJS.Timeout | null = null;
+// Флаг, указывающий, доступен ли HTTPS
+let isHttpsAvailable = false;
+
+// Функция для определения, является ли запрос защищенным (HTTPS)
+function isSecureRequest(req: Request): boolean {
+  return Boolean(
+    req.secure || // Стандартный признак для Express, если сервер напрямую обслуживает HTTPS
+    req.protocol === 'https' || // Иногда req.protocol устанавливается корректно
+    req.headers['x-forwarded-proto'] === 'https' || // Для запросов через прокси
+    req.headers['x-forwarded-ssl'] === 'on' || // Альтернативный заголовок
+    req.socket.encrypted // Проверка шифрования сокета
+  );
+}
+
+// Middleware для перенаправления с HTTP на HTTPS
+app.use((req, res, next) => {
+  // Проверяем, включен ли HTTPS и не является ли соединение уже защищенным
+  if (isHttpsAvailable && !req.secure) {
+    // Если запрос пришел не через HTTPS, но HTTPS доступен, перенаправляем на HTTPS
+    const host = req.headers.host?.replace(/:.*/, '') || 'localhost';
+    const httpsPort = 5443; // Порт HTTPS сервера
+    
+    // Проверяем, идет ли запрос от локального сервера разработки (Vite)
+    const isDevRequest = req.headers['user-agent']?.includes('vite');
+    
+    // Если это запрос от Vite в режиме разработки, не перенаправляем
+    if (isDevRequest || req.path.startsWith('/@vite') || req.path.includes('.hot-update.')) {
+      return next();
+    }
+    
+    // Строим URL для редиректа на HTTPS
+    const redirectUrl = `https://${host}:${httpsPort}${req.url}`;
+    console.log(`Redirecting from HTTP to HTTPS: ${redirectUrl}`);
+    
+    // Перенаправляем запрос на HTTPS
+    return res.redirect(302, redirectUrl);
+  }
+  
+  // Если HTTPS не доступен или запрос уже пришел через HTTPS, продолжаем обработку как обычно
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -92,7 +144,7 @@ async function checkDatabaseHealth() {
 }
 
 // Функция для очистки ресурсов при завершении работы сервера
-function setupGracefulShutdown(server: Server) {
+function setupGracefulShutdown(servers: Server[]) {
   const signals = ['SIGINT', 'SIGTERM', 'SIGQUIT'];
   
   signals.forEach(signal => {
@@ -104,13 +156,28 @@ function setupGracefulShutdown(server: Server) {
         clearTimeout(dbHealthCheckTimer);
       }
       
-      // Закрытие сервера
-      server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
+      // Подсчитываем количество успешно закрытых серверов
+      let closedServers = 0;
+      const totalServers = servers.length;
+      
+      // Функция для проверки, все ли серверы закрыты
+      const checkAllServersClosed = () => {
+        closedServers++;
+        if (closedServers === totalServers) {
+          console.log('All servers closed');
+          process.exit(0);
+        }
+      };
+      
+      // Закрытие всех серверов
+      servers.forEach(server => {
+        server.close(() => {
+          console.log('Server instance closed');
+          checkAllServersClosed();
+        });
       });
       
-      // Если сервер не закрывается в течение 10 секунд, принудительно завершаем процесс
+      // Если серверы не закрываются в течение 10 секунд, принудительно завершаем процесс
       setTimeout(() => {
         console.error('Server close timeout, forcing exit');
         process.exit(1);
@@ -174,6 +241,9 @@ function setupGracefulShutdown(server: Server) {
     } else {
       console.log('Encryption system initialized successfully');
     }
+
+    // Проверяем доступность SSL-сертификатов
+    isHttpsAvailable = await checkSSLCertificates();
   } catch (err: unknown) {
     const error = err as Error;
     console.error('Fatal error during database connection attempts:', error);
@@ -181,10 +251,39 @@ function setupGracefulShutdown(server: Server) {
     isDbHealthy = false;
   }
   
-  const server = await registerRoutes(app);
+  // Создаем HTTP сервер
+  const httpServer = await registerRoutes(app);
+  
+  // Создаем массив всех серверов для корректного завершения работы
+  const servers: Server[] = [httpServer];
+  
+  // Создаем HTTPS сервер, если доступны сертификаты
+  let httpsServer: https.Server | null = null;
+  
+  if (isHttpsAvailable) {
+    try {
+      const sslCerts = await loadSSLCertificates();
+      
+      if (sslCerts) {
+        // Создаем HTTPS сервер с использованием тех же настроек Express
+        httpsServer = https.createServer({
+          key: sslCerts.key,
+          cert: sslCerts.cert
+        }, app);
+        
+        // Добавляем HTTPS сервер в список для корректного завершения работы
+        servers.push(httpsServer);
+        
+        console.log('HTTPS server created successfully');
+      }
+    } catch (error: any) {
+      console.error(`Failed to create HTTPS server: ${error.message}`);
+      isHttpsAvailable = false;
+    }
+  }
 
-  // Настраиваем корректное завершение работы сервера
-  setupGracefulShutdown(server);
+  // Настраиваем корректное завершение работы серверов
+  setupGracefulShutdown(servers);
 
   // Создаем интерфейс для ошибок PostgreSQL
   interface PostgresError extends Error {
@@ -277,37 +376,66 @@ function setupGracefulShutdown(server: Server) {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
-    await setupVite(app, server);
+    await setupVite(app, httpServer);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
+  // Порты для HTTP и HTTPS серверов
+  const httpPort = 5000;  // основной порт для HTTP
+  const httpsPort = 5443; // порт для HTTPS (опционально)
   
-  // Обработчик ошибок при запуске сервера
-  function startServer() {
-    server.listen({
-      port,
+  // Функция запуска HTTP сервера
+  function startHttpServer() {
+    httpServer.listen({
+      port: httpPort,
       host: "0.0.0.0",
       reusePort: true,
     }, () => {
-      log(`serving on port ${port}`);
+      log(`HTTP server is running on port ${httpPort}`);
     }).on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
-        console.error(`Port ${port} is already in use. Waiting 3 seconds to retry...`);
+        console.error(`Port ${httpPort} is already in use. Waiting 3 seconds to retry...`);
         setTimeout(() => {
-          console.log('Attempting to restart server...');
-          server.close();
-          startServer();
+          console.log('Attempting to restart HTTP server...');
+          httpServer.close();
+          startHttpServer();
         }, 3000);
       } else {
-        console.error('Error starting server:', err);
+        console.error('Error starting HTTP server:', err);
       }
     });
   }
   
-  startServer();
+  // Функция запуска HTTPS сервера, если доступен
+  function startHttpsServer() {
+    if (httpsServer && isHttpsAvailable) {
+      httpsServer.listen({
+        port: httpsPort,
+        host: "0.0.0.0",
+        reusePort: true,
+      }, () => {
+        log(`HTTPS server is running on port ${httpsPort}`);
+      }).on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`Port ${httpsPort} is already in use. Waiting 3 seconds to retry...`);
+          setTimeout(() => {
+            console.log('Attempting to restart HTTPS server...');
+            httpsServer?.close();
+            startHttpsServer();
+          }, 3000);
+        } else {
+          console.error('Error starting HTTPS server:', err);
+        }
+      });
+    }
+  }
+  
+  // Запускаем HTTP сервер
+  startHttpServer();
+  
+  // Запускаем HTTPS сервер, если доступен
+  if (isHttpsAvailable && httpsServer) {
+    startHttpsServer();
+  }
 })();
