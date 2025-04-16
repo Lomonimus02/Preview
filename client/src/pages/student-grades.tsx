@@ -760,6 +760,56 @@ export default function StudentGrades() {
     return "text-red-600";
   };
   
+  // Компонент для отображения среднего балла по предмету
+  interface SubjectAverageCellProps {
+    subject: any;
+    displayPeriod: string;
+    startDate: Date;
+    endDate: Date;
+    calculateAverage: (subject: any) => Promise<string>;
+    getColorClass: (average: string) => string;
+  }
+  
+  // Компонент для отображения среднего балла
+  const SubjectAverageCell: React.FC<SubjectAverageCellProps> = ({ 
+    subject, 
+    displayPeriod, 
+    startDate, 
+    endDate, 
+    calculateAverage,
+    getColorClass
+  }) => {
+    const [average, setAverage] = useState<string>("-");
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+    
+    useEffect(() => {
+      const fetchAverage = async () => {
+        setIsLoading(true);
+        try {
+          const result = await calculateAverage(subject);
+          setAverage(result);
+        } catch (error) {
+          console.error("Error calculating average:", error);
+          setAverage("-");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchAverage();
+    }, [subject, displayPeriod, startDate, endDate, calculateAverage]);
+    
+    if (isLoading) {
+      return <span className="text-gray-400">·····</span>;
+    }
+    
+    return (
+      <span className={getColorClass(average)}>
+        {average}
+      </span>
+    );
+  };
+  
   // Переключение на предыдущий месяц
   // Переключение на предыдущий учебный год
   const goToPreviousYear = () => {
@@ -975,8 +1025,8 @@ export default function StudentGrades() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {subjectsWithGrades.map((subject) => (
-                        <TableRow key={subject.customId || subject.id}>
+                      {subjectsWithGrades.map((subject: any) => (
+                        <TableRow key={(subject as any).customId || subject.id}>
                           <TableCell className="font-medium sticky left-0 bg-white shadow-[4px_0_8px_-4px_rgba(0,0,0,0.1)] z-10">
                             {subject.subgroupId 
                               ? getDisplayName(subject) 
@@ -989,38 +1039,14 @@ export default function StudentGrades() {
                             </TableCell>
                           ))}
                           <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]`}>
-                            {(() => {
-                              // Встроенный компонент для отображения среднего балла
-                              const [average, setAverage] = useState<string>("-");
-                              const [isLoading, setIsLoading] = useState<boolean>(true);
-                              
-                              useEffect(() => {
-                                const fetchAverage = async () => {
-                                  setIsLoading(true);
-                                  try {
-                                    const result = await calculateAverageForSubject(subject);
-                                    setAverage(result);
-                                  } catch (error) {
-                                    console.error("Error calculating average:", error);
-                                    setAverage("-");
-                                  } finally {
-                                    setIsLoading(false);
-                                  }
-                                };
-                                
-                                fetchAverage();
-                              }, [subject, displayPeriod, startDate, endDate]);
-                              
-                              if (isLoading) {
-                                return <span className="text-gray-400">·····</span>;
-                              }
-                              
-                              return (
-                                <span className={getAverageGradeColor(average)}>
-                                  {average}
-                                </span>
-                              );
-                            })()}
+                            <SubjectAverageCell 
+                              subject={subject} 
+                              displayPeriod={displayPeriod} 
+                              startDate={startDate} 
+                              endDate={endDate} 
+                              calculateAverage={calculateAverageForSubject}
+                              getColorClass={getAverageGradeColor}
+                            />
                           </TableCell>
                         </TableRow>
                       ))}

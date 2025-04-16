@@ -19,11 +19,9 @@ declare module 'express-session' {
   }
 }
 
-// Расширяем типы для поддержки свойства encrypted в Socket
-declare module "http" {
-  interface Socket {
-    encrypted?: boolean;
-  }
+// Определяем тип для socket с шифрованием 
+interface EncryptedSocket {
+  encrypted: boolean;
 }
 
 const scryptAsync = promisify(scrypt);
@@ -75,7 +73,7 @@ export function setupAuth(app: Express) {
       req.secure || // Стандартное свойство Express
       req.header('x-forwarded-proto') === 'https' || // Для запросов через прокси
       req.header('x-forwarded-ssl') === 'on' || // Альтернативный заголовок
-      (req.socket && req.socket.encrypted) // Проверка шифрования сокета (с использованием нашего расширенного типа)
+      (req.socket && typeof (req.socket as any).encrypted !== 'undefined' && (req.socket as any).encrypted) // Безопасная проверка шифрования сокета с явным приведением типа
     );
     
     // Устанавливаем secure атрибут только для HTTPS запросов
