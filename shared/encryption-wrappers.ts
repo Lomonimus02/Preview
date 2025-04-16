@@ -11,12 +11,26 @@ export function encryptField(value: string | null): string | null {
 }
 
 /**
+ * Проверяет, может ли строка быть зашифрованной
+ * @param text Строка для проверки
+ * @returns true если строка может быть зашифрованной (состоит только из hex-символов)
+ */
+function isPossiblyEncrypted(text: string): boolean {
+  return /^[0-9a-f]+$/i.test(text);
+}
+
+/**
  * Расшифровывает поле из базы данных
  * @param value Зашифрованное значение
  * @returns Расшифрованное значение или null, если значение пустое
  */
 export function decryptField(value: string | null): string | null {
   if (!value) return null;
+  
+  // Если строка не похожа на зашифрованную, возвращаем как есть
+  if (!isPossiblyEncrypted(value)) {
+    return value;
+  }
   
   try {
     return decrypt(value);

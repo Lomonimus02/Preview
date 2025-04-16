@@ -118,8 +118,28 @@ export function encrypt(text: string): string {
  * @param encryptedText Зашифрованный текст в формате hex
  * @returns Расшифрованный текст
  */
+/**
+ * Определяет, является ли строка зашифрованной с помощью нашего алгоритма
+ * @param text Текст для проверки
+ * @returns true, если текст зашифрован
+ */
+function isEncrypted(text: string): boolean {
+  // Зашифрованный текст должен быть hex-строкой
+  return /^[0-9a-f]+$/i.test(text);
+}
+
+/**
+ * Расшифровывает данные, зашифрованные с помощью функции encrypt
+ * @param encryptedText Зашифрованный текст в формате hex
+ * @returns Расшифрованный текст или исходный текст, если расшифровка не удалась
+ */
 export function decrypt(encryptedText: string): string {
   if (!encryptedText) return encryptedText;
+  
+  // Если текст не похож на зашифрованный, возвращаем как есть
+  if (!isEncrypted(encryptedText)) {
+    return encryptedText;
+  }
   
   try {
     const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, encryptionKey, encryptionIv);
@@ -128,7 +148,8 @@ export function decrypt(encryptedText: string): string {
     return decrypted;
   } catch (error) {
     console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt data');
+    // Возвращаем исходный текст вместо выбрасывания исключения
+    return encryptedText;
   }
 }
 
