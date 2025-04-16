@@ -613,13 +613,30 @@ export default function StudentGrades() {
     }
   };
   
-  // Расчет среднего балла по предмету или предмету+подгруппе
+  // Расчет среднего балла по предмету или предмету+подгруппе, только для выбранного периода
   const calculateAverageForSubject = async (subject: any) => {
     // Получаем ID предмета и подгруппы из customId или из объекта предмета
     const subjectKey = typeof subject === 'string' ? subject : (subject.customId || `${subject.id}`);
     const [subjectId, subgroupId] = typeof subjectKey === 'string' 
       ? subjectKey.split('-').map(id => id ? parseInt(id) : null) 
       : [subject.id, subject.subgroupId];
+    
+    // Проверяем наличие оценок в данном периоде по этому предмету/подгруппе
+    // Фильтруем оценки по предмету и подгруппе (если указана) и периоду
+    let subjectGrades = filteredGradesByPeriod.filter(g => {
+      if (g.subjectId !== subjectId) return false;
+      
+      // Если указана подгруппа, проверяем соответствие
+      if (subgroupId !== null) {
+        return g.subgroupId === subgroupId;
+      }
+      
+      // Если подгруппа не указана в ключе, включаем только оценки без подгрупп
+      return !g.subgroupId;
+    });
+    
+    // Если нет оценок за выбранный период, сразу возвращаем прочерк
+    if (subjectGrades.length === 0) return "-";
     
     // Проверяем, есть ли уже загруженные данные в состоянии subjectAverages
     const cacheKey = subgroupId ? `${subjectId}-${subgroupId}` : `${subjectId}`;
@@ -636,31 +653,12 @@ export default function StudentGrades() {
             [cacheKey]: apiAverage
           }));
           
-          // Возвращаем процент из API
-          return apiAverage.percentage;
+          // Но не используем глобальный средний балл, а считаем только для текущего периода
         }
       } catch (error) {
         console.error("Ошибка при загрузке средних оценок:", error);
       }
-    } else {
-      // Если данные уже есть в кэше, возвращаем их
-      return subjectAverages[cacheKey].percentage;
     }
-    
-    // Если не удалось получить данные из API, используем локальный расчет (обратная совместимость)
-    
-    // Фильтруем оценки по предмету и подгруппе (если указана) и периоду
-    let subjectGrades = filteredGradesByPeriod.filter(g => {
-      if (g.subjectId !== subjectId) return false;
-      
-      // Если указана подгруппа, проверяем соответствие
-      if (subgroupId !== null) {
-        return g.subgroupId === subgroupId;
-      }
-      
-      // Если подгруппа не указана в ключе, включаем только оценки без подгрупп
-      return !g.subgroupId;
-    });
     
     // Оценки должны быть привязаны к конкретным урокам через scheduleId
     // Без этой привязки они могут дублироваться во всех уроках одного предмета
@@ -674,8 +672,6 @@ export default function StudentGrades() {
     // Используем уникальные оценки для расчёта.
     // Если нет привязанных к урокам оценок, используем все оценки (обратная совместимость)
     subjectGrades = uniqueGrades.length > 0 ? uniqueGrades : subjectGrades;
-    
-    if (subjectGrades.length === 0) return "-";
     
     // Для накопительной системы оценивания используем тот же алгоритм, что и в журнале учителя
     if (gradingSystem === GradingSystemEnum.CUMULATIVE) {
@@ -992,8 +988,39 @@ export default function StudentGrades() {
                               {renderGradeCell(subject, day)}
                             </TableCell>
                           ))}
-                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)] ${getAverageGradeColor(subjectAverages[String(subject.id)]?.percentage || "-")}`}>
-                            {subjectAverages[String(subject.id)]?.percentage || "-"}
+                          <TableCell className={`text-center bg-gray-50 font-semibold sticky right-0 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.1)]`}>
+                            {(() => {
+                              // Встроенный компонент для отображения среднего балла
+                              const [average, setAverage] = useState<string>("-");
+                              const [isLoading, setIsLoading] = useState<boolean>(true);
+                              
+                              useEffect(() => {
+                                const fetchAverage = async () => {
+                                  setIsLoading(true);
+                                  try {
+                                    const result = await calculateAverageForSubject(subject);
+                                    setAverage(result);
+                                  } catch (error) {
+                                    console.error("Error calculating average:", error);
+                                    setAverage("-");
+                                  } finally {
+                                    setIsLoading(false);
+                                  }
+                                };
+                                
+                                fetchAverage();
+                              }, [subject, displayPeriod, startDate, endDate]);
+                              
+                              if (isLoading) {
+                                return <span className="text-gray-400">·····</span>;
+                              }
+                              
+                              return (
+                                <span className={getAverageGradeColor(average)}>
+                                  {average}
+                                </span>
+                              );
+                            })()}
                           </TableCell>
                         </TableRow>
                       ))}
