@@ -746,187 +746,148 @@ export default function HomeworkPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <Form {...editHomeworkForm}>
-            <form onSubmit={editHomeworkForm.handleSubmit((values) => {
-                console.log("Отправка формы редактирования с данными:", values);
-                if (homeworkToEdit) {
-                  updateHomeworkMutation.mutate({ id: homeworkToEdit.id, data: values });
-                }
-              })} className="space-y-4"
-              id="edit-homework-form"
-            >
-              <FormField
-                control={editHomeworkForm.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Название задания</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Введите название задания" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editHomeworkForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Описание задания</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Введите подробное описание задания" 
-                        className="min-h-[120px]"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          {homeworkToEdit && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-title">Название задания</Label>
+                  <Input 
+                    id="edit-title"
+                    value={homeworkToEdit.title} 
+                    onChange={(e) => setHomeworkToEdit({...homeworkToEdit, title: e.target.value})}
+                    placeholder="Введите название задания"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="edit-description">Описание задания</Label>
+                  <Textarea 
+                    id="edit-description"
+                    value={homeworkToEdit.description} 
+                    onChange={(e) => setHomeworkToEdit({...homeworkToEdit, description: e.target.value})}
+                    placeholder="Введите подробное описание задания" 
+                    className="min-h-[120px]" 
+                  />
+                </div>
+              </div>
               
               <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={editHomeworkForm.control}
-                  name="classId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Класс</FormLabel>
-                      <Select
-                        value={field.value?.toString()}
-                        onValueChange={(value) => field.onChange(parseInt(value))}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите класс" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {classes.map((cls) => (
-                            <SelectItem key={cls.id} value={cls.id.toString()}>
-                              {cls.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="edit-class">Класс</Label>
+                  <Select
+                    value={homeworkToEdit.classId.toString()}
+                    onValueChange={(value) => {
+                      const classId = parseInt(value);
+                      setHomeworkToEdit({...homeworkToEdit, classId});
+                    }}
+                  >
+                    <SelectTrigger id="edit-class">
+                      <SelectValue placeholder="Выберите класс" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id.toString()}>
+                          {cls.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 
-                <FormField
-                  control={editHomeworkForm.control}
-                  name="subjectId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Предмет</FormLabel>
-                      <Select
-                        value={field.value?.toString()}
-                        onValueChange={(value) => field.onChange(parseInt(value))}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Выберите предмет" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {subjects.map((subject) => (
-                            <SelectItem key={subject.id} value={subject.id.toString()}>
-                              {subject.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="edit-subject">Предмет</Label>
+                  <Select
+                    value={homeworkToEdit.subjectId.toString()}
+                    onValueChange={(value) => {
+                      const subjectId = parseInt(value);
+                      setHomeworkToEdit({...homeworkToEdit, subjectId});
+                    }}
+                  >
+                    <SelectTrigger id="edit-subject">
+                      <SelectValue placeholder="Выберите предмет" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map((subject) => (
+                        <SelectItem key={subject.id} value={subject.id.toString()}>
+                          {subject.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-
-              <FormField
-                control={editHomeworkForm.control}
-                name="scheduleId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Урок</FormLabel>
-                    <Select
-                      value={field.value?.toString()}
-                      onValueChange={(value) => field.onChange(parseInt(value))}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите урок" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {editSelectedSchedules.map((schedule) => (
-                          <SelectItem key={schedule.id} value={schedule.id.toString()}>
-                            {schedule.scheduleDate ? format(new Date(schedule.scheduleDate), "d MMMM yyyy", { locale: ru }) : ""} {schedule.startTime}
-                          </SelectItem>
-                        ))}
-                        {editSelectedSchedules.length === 0 && (
-                          <SelectItem value="placeholder" disabled>Сначала выберите класс и предмет</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               
-              <FormField
-                control={editHomeworkForm.control}
-                name="dueDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Срок выполнения</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PP", { locale: ru })
-                            ) : (
-                              <span>Выберите дату</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) => date < new Date("1900-01-01")}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="space-y-2">
+                <Label htmlFor="edit-schedule">Урок</Label>
+                <Select
+                  value={homeworkToEdit.scheduleId?.toString() || ""}
+                  onValueChange={(value) => {
+                    const scheduleId = parseInt(value);
+                    setHomeworkToEdit({...homeworkToEdit, scheduleId});
+                  }}
+                >
+                  <SelectTrigger id="edit-schedule">
+                    <SelectValue placeholder="Выберите урок" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {editSelectedSchedules.map((schedule) => (
+                      <SelectItem key={schedule.id} value={schedule.id.toString()}>
+                        {schedule.scheduleDate ? format(new Date(schedule.scheduleDate), "d MMMM yyyy", { locale: ru }) : ""} {schedule.startTime}
+                      </SelectItem>
+                    ))}
+                    {editSelectedSchedules.length === 0 && (
+                      <SelectItem value="placeholder" disabled>Сначала выберите класс и предмет</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-due-date">Срок выполнения</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="edit-due-date"
+                      variant={"outline"}
+                      className={cn(
+                        "w-full pl-3 text-left font-normal"
+                      )}
+                    >
+                      {format(new Date(homeworkToEdit.dueDate), "PP", { locale: ru })}
+                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={new Date(homeworkToEdit.dueDate)}
+                      onSelect={(date) => {
+                        if (date) {
+                          setHomeworkToEdit({...homeworkToEdit, dueDate: date.toISOString()})
+                        }
+                      }}
+                      disabled={(date) => date < new Date("1900-01-01")}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
               
               <DialogFooter>
                 <Button 
-                  type="submit" 
+                  type="button" 
                   disabled={updateHomeworkMutation.isPending}
-                  form="edit-homework-form"
+                  onClick={() => {
+                    console.log("Отправка прямого обновления с данными:", homeworkToEdit);
+                    const { id, ...data } = homeworkToEdit;
+                    updateHomeworkMutation.mutate({ id, data });
+                  }}
                 >
                   {updateHomeworkMutation.isPending ? 'Сохранение...' : 'Сохранить изменения'}
                 </Button>
               </DialogFooter>
-            </form>
-          </Form>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
       
