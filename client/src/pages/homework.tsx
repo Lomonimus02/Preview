@@ -154,10 +154,27 @@ export default function HomeworkPage() {
     },
   });
   
-  // Получить уроки для выбранного класса и предмета
+  // Форма для редактирования (отдельная от формы создания)
+  const editHomeworkForm = useForm<z.infer<typeof homeworkFormSchema>>({
+    resolver: zodResolver(homeworkFormSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      subjectId: undefined,
+      classId: undefined,
+      scheduleId: undefined,
+    },
+  });
+  
+  // Получить уроки для выбранного класса и предмета (форма создания)
   const classId = homeworkForm.watch("classId");
   const subjectId = homeworkForm.watch("subjectId");
   
+  // Получить уроки для выбранного класса и предмета (форма редактирования)
+  const editClassId = editHomeworkForm.watch("classId");
+  const editSubjectId = editHomeworkForm.watch("subjectId");
+  
+  // Получаем список расписаний для формы создания
   useEffect(() => {
     if (classId && subjectId) {
       const filteredSchedules = schedules.filter(
@@ -170,6 +187,23 @@ export default function HomeworkPage() {
       setSelectedSchedules([]);
     }
   }, [classId, subjectId, schedules]);
+  
+  // Состояние для расписаний формы редактирования
+  const [editSelectedSchedules, setEditSelectedSchedules] = useState<Schedule[]>([]);
+  
+  // Получаем список расписаний для формы редактирования
+  useEffect(() => {
+    if (editClassId && editSubjectId) {
+      const filteredSchedules = schedules.filter(
+        (schedule) => 
+          schedule.classId === editClassId && 
+          schedule.subjectId === editSubjectId
+      );
+      setEditSelectedSchedules(filteredSchedules);
+    } else {
+      setEditSelectedSchedules([]);
+    }
+  }, [editClassId, editSubjectId, schedules]);
 
   // Form for submitting homework
   const submissionForm = useForm<z.infer<typeof submissionFormSchema>>({
@@ -456,7 +490,7 @@ export default function HomeworkPage() {
                             <DropdownMenuItem
                               onClick={() => {
                                 setHomeworkToEdit(hw);
-                                homeworkForm.reset({
+                                editHomeworkForm.reset({
                                   title: hw.title,
                                   description: hw.description,
                                   classId: hw.classId,
@@ -697,8 +731,8 @@ export default function HomeworkPage() {
             </DialogDescription>
           </DialogHeader>
           
-          <Form {...homeworkForm}>
-            <form onSubmit={homeworkForm.handleSubmit((values) => {
+          <Form {...editHomeworkForm}>
+            <form onSubmit={editHomeworkForm.handleSubmit((values) => {
                 if (homeworkToEdit) {
                   updateHomeworkMutation.mutate({ id: homeworkToEdit.id, data: values });
                 }
@@ -706,7 +740,7 @@ export default function HomeworkPage() {
               id="edit-homework-form"
             >
               <FormField
-                control={homeworkForm.control}
+                control={editHomeworkForm.control}
                 name="title"
                 render={({ field }) => (
                   <FormItem>
@@ -720,7 +754,7 @@ export default function HomeworkPage() {
               />
               
               <FormField
-                control={homeworkForm.control}
+                control={editHomeworkForm.control}
                 name="description"
                 render={({ field }) => (
                   <FormItem>
@@ -739,7 +773,7 @@ export default function HomeworkPage() {
               
               <div className="grid grid-cols-2 gap-4">
                 <FormField
-                  control={homeworkForm.control}
+                  control={editHomeworkForm.control}
                   name="classId"
                   render={({ field }) => (
                     <FormItem>
@@ -767,7 +801,7 @@ export default function HomeworkPage() {
                 />
                 
                 <FormField
-                  control={homeworkForm.control}
+                  control={editHomeworkForm.control}
                   name="subjectId"
                   render={({ field }) => (
                     <FormItem>
@@ -796,7 +830,7 @@ export default function HomeworkPage() {
               </div>
 
               <FormField
-                control={homeworkForm.control}
+                control={editHomeworkForm.control}
                 name="scheduleId"
                 render={({ field }) => (
                   <FormItem>
@@ -811,12 +845,12 @@ export default function HomeworkPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {selectedSchedules.map((schedule) => (
+                        {editSelectedSchedules.map((schedule) => (
                           <SelectItem key={schedule.id} value={schedule.id.toString()}>
                             {schedule.scheduleDate ? format(new Date(schedule.scheduleDate), "d MMMM yyyy", { locale: ru }) : ""} {schedule.startTime}
                           </SelectItem>
                         ))}
-                        {selectedSchedules.length === 0 && (
+                        {editSelectedSchedules.length === 0 && (
                           <SelectItem value="placeholder" disabled>Сначала выберите класс и предмет</SelectItem>
                         )}
                       </SelectContent>
