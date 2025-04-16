@@ -10,7 +10,7 @@ import { ChatTypeEnum } from '@shared/schema';
 
 interface ChatContextMenuProps {
   children: React.ReactNode;
-  chatType: ChatTypeEnum;
+  chatType: string;
   isCreator: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
