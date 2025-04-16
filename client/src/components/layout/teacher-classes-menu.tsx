@@ -108,78 +108,112 @@ export function TeacherClassesMenu() {
   });
 
   // Создаем список уникальных комбинаций класс-предмет-подгруппа на основе расписания
-  const classSubjectCombinations: ClassSubjectCombination[] = schedules
-    .reduce((combinations, schedule) => {
+  const classSubjectCombinations: ClassSubjectCombination[] = (() => {
+    // Создаем промежуточную структуру для группировки расписаний
+    type ScheduleGroup = {
+      classId: number;
+      subjectId: number;
+      // Для каждого предмета сохраняем все его подгруппы
+      subgroups: {
+        id: number;
+        name: string;
+        hasLessons: boolean; // Флаг, указывающий, есть ли у подгруппы проведенные уроки
+      }[];
+      // Флаг, указывающий, есть ли у предмета уроки без привязки к подгруппам
+      hasNonSubgroupLessons: boolean;
+    };
+    
+    // Группировка по классам и предметам
+    const groupedSchedules: { [key: string]: ScheduleGroup } = {};
+    
+    // Проходим по всем расписаниям и группируем их
+    schedules.forEach(schedule => {
       // Проверяем, что у расписания есть и класс, и предмет
-      if (!schedule.classId || !schedule.subjectId) return combinations;
-
+      if (!schedule.classId || !schedule.subjectId) return;
+      
       // Найдем класс и предмет в соответствующих списках
       const classInfo = classes.find(c => c.id === schedule.classId);
       const subjectInfo = subjects.find(s => s.id === schedule.subjectId);
-
+      
       // Если информация о классе или предмете не найдена, пропускаем
-      if (!classInfo || !subjectInfo) return combinations;
-
-      // Проверяем, есть ли подгруппа для этого расписания
-      const subgroupId = schedule.subgroupId || undefined;
-
-      // Находим информацию о подгруппе, если она указана
-      const subgroupInfo = subgroupId !== undefined
-        ? subgroups.find(sg => sg.id === subgroupId) 
-        : null;
-
-      // Для всех уроков добавляем стандартную комбинацию класс-предмет без подгруппы,
-      // если её еще нет в списке
-      const existingCombination = combinations.find(
-        c => c.classId === schedule.classId && 
-             c.subjectId === schedule.subjectId && 
-             !c.isSubgroup
-      );
-
-      // Если комбинации нет в списке, добавляем
-      if (!existingCombination) {
-        combinations.push({
+      if (!classInfo || !subjectInfo) return;
+      
+      // Ключ для группировки: classId-subjectId
+      const key = `${schedule.classId}-${schedule.subjectId}`;
+      
+      // Если группа не существует, создаем ее
+      if (!groupedSchedules[key]) {
+        groupedSchedules[key] = {
           classId: schedule.classId,
-          className: classInfo.name,
           subjectId: schedule.subjectId,
+          subgroups: [],
+          hasNonSubgroupLessons: false
+        };
+      }
+      
+      // Если расписание связано с подгруппой
+      if (schedule.subgroupId) {
+        const subgroupInfo = subgroups.find(sg => sg.id === schedule.subgroupId);
+        if (subgroupInfo) {
+          // Проверяем, есть ли уже эта подгруппа в списке
+          const existingSubgroup = groupedSchedules[key].subgroups.find(sg => sg.id === schedule.subgroupId);
+          if (!existingSubgroup) {
+            groupedSchedules[key].subgroups.push({
+              id: schedule.subgroupId,
+              name: subgroupInfo.name,
+              hasLessons: true
+            });
+          }
+        }
+      } else {
+        // Если это урок без привязки к подгруппе, отмечаем это в группе
+        groupedSchedules[key].hasNonSubgroupLessons = true;
+      }
+    });
+    
+    // Преобразуем сгруппированные данные в результирующий массив
+    const result: ClassSubjectCombination[] = [];
+    
+    // Проходим по всем группам
+    Object.values(groupedSchedules).forEach(group => {
+      const classInfo = classes.find(c => c.id === group.classId)!;
+      const subjectInfo = subjects.find(s => s.id === group.subjectId)!;
+      
+      // Если у предмета есть уроки без подгрупп или нет подгрупп вообще
+      if (group.hasNonSubgroupLessons || group.subgroups.length === 0) {
+        // Добавляем комбинацию класс-предмет
+        result.push({
+          classId: group.classId,
+          className: classInfo.name,
+          subjectId: group.subjectId,
           subjectName: subjectInfo.name,
           isSubgroup: false
         });
       }
-
-      // Если это расписание с подгруппой, дополнительно добавляем его как отдельный пункт
-      if (subgroupInfo) {
-        console.log("Найдена подгруппа в расписании:", {
-          scheduleId: schedule.id,
-          subgroupId,
-          subgroupName: subgroupInfo.name
+      
+      // Если есть подгруппы, добавляем их
+      group.subgroups.forEach(subgroup => {
+        // Определяем, нужно ли отображать название предмета
+        // Если у предмета есть уроки без подгрупп, то показываем предмет+подгруппа
+        // Иначе показываем только подгруппу
+        result.push({
+          classId: group.classId,
+          className: classInfo.name,
+          subjectId: group.subjectId,
+          subjectName: group.hasNonSubgroupLessons ? subjectInfo.name : "", // Пустое название предмета, если нет обычных уроков
+          subgroupId: subgroup.id,
+          subgroupName: subgroup.name,
+          isSubgroup: true
         });
-        
-        // Проверяем, есть ли уже такая комбинация с подгруппой в списке
-        const existingSubgroupCombination = combinations.find(
-          c => c.classId === schedule.classId && 
-               c.subjectId === schedule.subjectId && 
-               c.subgroupId === subgroupId
-        );
-
-        // Если комбинации с подгруппой нет в списке, добавляем
-        if (!existingSubgroupCombination) {
-          combinations.push({
-            classId: schedule.classId,
-            className: classInfo.name,
-            subjectId: schedule.subjectId,
-            subjectName: subjectInfo.name,
-            subgroupId: subgroupId,
-            subgroupName: subgroupInfo.name,
-            isSubgroup: true
-          });
-        }
-      }
-
-      return combinations;
-    }, [] as ClassSubjectCombination[]);
+      });
+    });
     
-  // Сортируем комбинации сначала по имени класса, затем по имени предмета, затем подгруппы вместе с их предметами
+    console.log("Сформированные комбинации класс-предмет-подгруппа:", result);
+    
+    return result;
+  })();
+  
+  // Сортируем комбинации: сначала по имени класса, затем по имени предмета
   classSubjectCombinations.sort((a, b) => {
     // Сначала сортируем по имени класса
     if (a.className !== b.className) {
@@ -191,14 +225,14 @@ export function TeacherClassesMenu() {
       return a.subjectName.localeCompare(b.subjectName);
     }
     
-    // Если один из элементов - подгруппа, а другой нет, ставим обычный предмет вперед
-    if (a.isSubgroup !== b.isSubgroup) {
-      return a.isSubgroup ? 1 : -1; // Обычные предметы идут первыми
-    }
-    
     // Если оба элемента - подгруппы, сортируем по имени подгруппы
     if (a.isSubgroup && b.isSubgroup && a.subgroupName && b.subgroupName) {
       return a.subgroupName.localeCompare(b.subgroupName);
+    }
+    
+    // Если один из элементов - подгруппа, а другой нет, ставим обычный предмет вперед
+    if (a.isSubgroup !== b.isSubgroup) {
+      return a.isSubgroup ? 1 : -1; // Обычные предметы идут первыми
     }
     
     return 0;
@@ -272,8 +306,10 @@ export function TeacherClassesMenu() {
                   >
                     <span className="truncate">
                       {item.isSubgroup && item.subgroupName 
-                        ? `${item.subgroupName} - ${item.className}`
-                        : `${item.subjectName} - ${item.className}`
+                        ? (item.subjectName 
+                           ? `${item.subjectName} (${item.subgroupName}) - ${item.className}` // Если есть и предмет, и подгруппа
+                           : `${item.subgroupName} - ${item.className}`) // Если только подгруппа без предмета
+                        : `${item.subjectName} - ${item.className}` // Обычный предмет без подгруппы
                       }
                     </span>
                   </div>
