@@ -613,7 +613,7 @@ export default function StudentGrades() {
     }
   };
   
-  // Расчет среднего балла по предмету или предмету+подгруппе, только для выбранного периода
+  // Расчет среднего балла по предмету или предмету+подгруппе для выбранного периода
   const calculateAverageForSubject = async (subject: any) => {
     // Получаем ID предмета и подгруппы из customId или из объекта предмета
     const subjectKey = typeof subject === 'string' ? subject : (subject.customId || `${subject.id}`);
@@ -623,7 +623,7 @@ export default function StudentGrades() {
     
     // Проверяем наличие оценок в данном периоде по этому предмету/подгруппе
     // Фильтруем оценки по предмету и подгруппе (если указана) и периоду
-    let subjectGrades = filteredGradesByPeriod.filter(g => {
+    const subjectGradesInPeriod = filteredGradesByPeriod.filter(g => {
       if (g.subjectId !== subjectId) return false;
       
       // Если указана подгруппа, проверяем соответствие
@@ -636,115 +636,154 @@ export default function StudentGrades() {
     });
     
     // Если нет оценок за выбранный период, сразу возвращаем прочерк
-    if (subjectGrades.length === 0) return "-";
+    if (subjectGradesInPeriod.length === 0) return "-";
     
-    // Проверяем, есть ли уже загруженные данные в состоянии subjectAverages
-    const cacheKey = subgroupId ? `${subjectId}-${subgroupId}` : `${subjectId}`;
-    
-    if (!subjectAverages[cacheKey]) {
-      // Если нет в кэше, загружаем данные из API
-      try {
-        const apiAverage = await loadSubjectAverage(subjectId, subgroupId || undefined);
-        
-        if (apiAverage) {
-          // Сохраняем в кэш для последующих использований
-          setSubjectAverages(prev => ({
-            ...prev,
-            [cacheKey]: apiAverage
-          }));
-          
-          // Но не используем глобальный средний балл, а считаем только для текущего периода
-        }
-      } catch (error) {
-        console.error("Ошибка при загрузке средних оценок:", error);
+    // Теперь запрашиваем средний балл с сервера, но потом пересчитываем локально для конкретного периода
+    try {
+      // Получаем все оценки из API для выбранного периода
+      const apiUrl = `/api/student-subject-average?studentId=${user!.id}&subjectId=${subjectId}${subgroupId ? `&subgroupId=${subgroupId}` : ''}`;
+      const response = await fetch(apiUrl);
+      
+      if (!response.ok) {
+        console.error('Failed to fetch subject average:', response.statusText);
+        return "-";
       }
-    }
-    
-    // Оценки должны быть привязаны к конкретным урокам через scheduleId
-    // Без этой привязки они могут дублироваться во всех уроках одного предмета
-    
-    // Фильтруем оценки, оставляя только те, что привязаны к конкретным урокам
-    const uniqueGrades = subjectGrades.filter(grade => {
-      // Всегда используем оценки, которые имеют привязку к конкретному уроку
-      return grade.scheduleId !== null && grade.scheduleId !== undefined;
-    });
-    
-    // Используем уникальные оценки для расчёта.
-    // Если нет привязанных к урокам оценок, используем все оценки (обратная совместимость)
-    subjectGrades = uniqueGrades.length > 0 ? uniqueGrades : subjectGrades;
-    
-    // Для накопительной системы оценивания используем тот же алгоритм, что и в журнале учителя
-    if (gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      // Для каждой оценки ищем соответствующее задание
-      let totalEarnedScore = 0;
-      let totalMaxScore = 0;
       
-      // Обрабатываем оценки, связанные с заданиями
-      subjectGrades.forEach(grade => {
-        // Определяем связанное задание (сначала по assignmentId, затем по scheduleId)
-        let relatedAssignment = null;
-        
-        if (grade.assignmentId) {
-          relatedAssignment = assignments.find(a => a.id === grade.assignmentId);
-        }
-        
-        if (!relatedAssignment && grade.scheduleId) {
-          relatedAssignment = assignments.find(a => a.scheduleId === grade.scheduleId);
-        }
-        
-        if (relatedAssignment) {
-          // Если нашли задание, добавляем баллы
-          totalEarnedScore += grade.grade;
-          totalMaxScore += Number(relatedAssignment.maxScore);
-        }
+      // Для расчета процента только для оценок текущего периода
+      
+      // Фильтруем оценки, оставляя только те, что привязаны к конкретным урокам
+      const uniqueGrades = subjectGradesInPeriod.filter(grade => {
+        // Всегда используем оценки, которые имеют привязку к конкретному уроку
+        return grade.scheduleId !== null && grade.scheduleId !== undefined;
       });
       
-      // Если нет максимального балла, возвращаем прочерк
-      if (totalMaxScore === 0) return "-";
+      // Используем уникальные оценки для расчёта если они есть
+      // Иначе используем все оценки периода (обратная совместимость)
+      const gradesToUse = uniqueGrades.length > 0 ? uniqueGrades : subjectGradesInPeriod;
       
-      // Вычисляем процент выполнения и форматируем его
-      const percentage = (totalEarnedScore / totalMaxScore) * 100;
-      
-      // Ограничиваем максимальный процент до 100%
-      const cappedPercentage = Math.min(percentage, 100);
-      
-      return `${cappedPercentage.toFixed(1)}%`;
-    } else {
-      // Для пятибалльной системы оценивания - используем алгоритм с весами, как в журнале учителя
-      
-      // Весовые коэффициенты для разных типов оценок
-      const weights: Record<string, number> = {
-        'test': 2,
-        'exam': 3,
-        'homework': 1,
-        'project': 2,
-        'classwork': 1,
-        'Текущая': 1,
-        'Контрольная': 2,
-        'Экзамен': 3,
-        'Практическая': 1.5,
-        'Домашняя': 1
-      };
-      
-      let weightedSum = 0;
-      let totalWeight = 0;
-      
-      subjectGrades.forEach(grade => {
-        const weight = weights[grade.gradeType] || 1;
-        weightedSum += grade.grade * weight;
-        totalWeight += weight;
-      });
-      
-      // Если нет оценок с весами, возвращаем "-"
-      if (totalWeight === 0) return "-";
-      
-      const average = weightedSum / totalWeight;
-      
-      // Переводим в проценты от максимальной оценки (5.0) для согласованности отображения
-      const percentScore = (average / 5) * 100;
-      const cappedPercentScore = Math.min(percentScore, 100);
-      
-      return `${cappedPercentScore.toFixed(1)}%`;
+      // Для накопительной системы оценивания
+      if (gradingSystem === GradingSystemEnum.CUMULATIVE) {
+        // Для каждой оценки ищем соответствующее задание
+        let totalEarnedScore = 0;
+        let totalMaxScore = 0;
+        
+        // Обрабатываем оценки, связанные с заданиями
+        for (const grade of gradesToUse) {
+          // Определяем связанное задание (сначала по assignmentId, затем по scheduleId)
+          let relatedAssignment = null;
+          
+          if (grade.assignmentId) {
+            relatedAssignment = assignments.find(a => a.id === grade.assignmentId);
+            
+            // Если не найдено в кэше, пробуем получить с сервера
+            if (!relatedAssignment) {
+              try {
+                const assignmentResponse = await fetch(`/api/assignments/${grade.assignmentId}`);
+                if (assignmentResponse.ok) {
+                  relatedAssignment = await assignmentResponse.json();
+                }
+              } catch (error) {
+                console.error(`Ошибка при загрузке задания ${grade.assignmentId}:`, error);
+              }
+            }
+          }
+          
+          if (!relatedAssignment && grade.scheduleId) {
+            relatedAssignment = assignments.find(a => a.scheduleId === grade.scheduleId);
+            
+            // Если не найдено в кэше, пробуем получить задания для расписания
+            if (!relatedAssignment) {
+              try {
+                const scheduleAssignmentsResponse = await fetch(`/api/assignments/schedule/${grade.scheduleId}`);
+                if (scheduleAssignmentsResponse.ok) {
+                  const scheduleAssignments = await scheduleAssignmentsResponse.json();
+                  if (scheduleAssignments.length > 0) {
+                    relatedAssignment = scheduleAssignments[0];
+                  }
+                }
+              } catch (error) {
+                console.error(`Ошибка при загрузке заданий для урока ${grade.scheduleId}:`, error);
+              }
+            }
+          }
+          
+          if (relatedAssignment) {
+            // Если нашли задание, добавляем баллы
+            totalEarnedScore += grade.grade;
+            totalMaxScore += Number(relatedAssignment.maxScore);
+          } else {
+            // Если не нашли задание, используем виртуальный максимальный балл как на сервере
+            totalEarnedScore += grade.grade;
+            totalMaxScore += 10.0; // Виртуальный maxScore, как в API
+          }
+        }
+        
+        // Если нет максимального балла, возвращаем прочерк
+        if (totalMaxScore === 0) return "-";
+        
+        // Вычисляем процент выполнения и форматируем его
+        const percentage = (totalEarnedScore / totalMaxScore) * 100;
+        
+        // Ограничиваем максимальный процент до 100%
+        const cappedPercentage = Math.min(percentage, 100);
+        
+        return `${cappedPercentage.toFixed(1)}%`;
+      } else {
+        // Для пятибалльной системы оценивания - используем алгоритм с весами
+        
+        // Весовые коэффициенты для разных типов оценок
+        const weights: Record<string, number> = {
+          'test': 2,
+          'exam': 3,
+          'homework': 1,
+          'project': 2,
+          'classwork': 1,
+          'current_work': 1, // Текущая
+          'control_work': 2, // Контрольная
+          'exam_work': 3,    // Экзамен
+          'practical_work': 1.5, // Практическая
+          'test_work': 2,    // Тест
+          'Текущая': 1,
+          'Контрольная': 2,
+          'Экзамен': 3,
+          'Практическая': 1.5,
+          'Домашняя': 1
+        };
+        
+        let weightedSum = 0;
+        let totalWeight = 0;
+        
+        gradesToUse.forEach(grade => {
+          // Если есть тип задания, используем его для веса
+          let gradeType = grade.gradeType || 'classwork';
+          
+          // Проверяем, есть ли связанное задание для получения типа
+          if (grade.assignmentId) {
+            const assignment = assignments.find(a => a.id === grade.assignmentId);
+            if (assignment) {
+              gradeType = assignment.assignmentType;
+            }
+          }
+          
+          const weight = weights[gradeType] || 1;
+          weightedSum += grade.grade * weight;
+          totalWeight += weight;
+        });
+        
+        // Если нет оценок с весами, возвращаем "-"
+        if (totalWeight === 0) return "-";
+        
+        const average = weightedSum / totalWeight;
+        
+        // Переводим в проценты от максимальной оценки (5.0) для согласованности отображения
+        const percentScore = (average / 5) * 100;
+        const cappedPercentScore = Math.min(percentScore, 100);
+        
+        return `${cappedPercentScore.toFixed(1)}%`;
+      }
+    } catch (error) {
+      console.error("Ошибка при расчёте средней оценки:", error);
+      return "-";
     }
   };
   
