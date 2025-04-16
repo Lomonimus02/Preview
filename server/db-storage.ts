@@ -437,25 +437,33 @@ export class DatabaseStorage implements IStorage {
   // ===== Message operations =====
   async getMessage(id: number): Promise<Message | undefined> {
     const result = await db.select().from(messages).where(eq(messages.id, id)).limit(1);
-    return result[0];
+    return decryptMessage(result[0]);
   }
 
   async getMessagesBySender(senderId: number): Promise<Message[]> {
-    return await db.select().from(messages).where(eq(messages.senderId, senderId));
+    const messagesList = await db.select().from(messages).where(eq(messages.senderId, senderId));
+    return decryptMessages(messagesList);
   }
 
   async getMessagesByReceiver(receiverId: number): Promise<Message[]> {
-    return await db.select().from(messages).where(eq(messages.receiverId, receiverId));
+    // Примечание: в новой схеме больше нет поля receiverId, эта функция оставлена для обратной совместимости
+    // Вместо этого используются чаты
+    return [];
   }
 
   async createMessage(message: InsertMessage): Promise<Message> {
+    // Шифруем сообщение перед сохранением
+    const encryptedMessage = encryptMessage(message);
     const [newMessage] = await db.insert(messages).values({
-      ...message,
-      content: message.message,  // Поле в БД называется content
+      ...encryptedMessage,
+      content: encryptedMessage.message,  // Поле в БД называется content
     }).returning();
+    
+    // Расшифровываем сообщение перед возвратом
+    const decryptedMessage = decryptMessage(newMessage);
     return {
-      ...newMessage,
-      message: newMessage.content, // Преобразуем обратно для совместимости с интерфейсом
+      ...decryptedMessage,
+      message: decryptedMessage.content, // Преобразуем обратно для совместимости с интерфейсом
     } as unknown as Message;
   }
 
@@ -465,9 +473,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(messages.id, id))
       .returning();
     
+    // Расшифруем сообщение перед возвратом
+    const decryptedMessage = decryptMessage(updatedMessage);
     return {
-      ...updatedMessage,
-      message: updatedMessage.content, // Преобразуем для совместимости с интерфейсом
+      ...decryptedMessage,
+      message: decryptedMessage?.content, // Преобразуем для совместимости с интерфейсом
     } as unknown as Message;
   }
   
@@ -482,9 +492,11 @@ export class DatabaseStorage implements IStorage {
     // Удаляем сообщение используя имя таблицы из схемы
     await db.delete(schema.messages).where(eq(schema.messages.id, id));
     
+    // Расшифровываем сообщение перед возвратом
+    const decryptedMessage = decryptMessage(message[0]);
     return {
-      ...message[0],
-      message: message[0].content, // Преобразуем для совместимости с интерфейсом
+      ...decryptedMessage,
+      message: decryptedMessage?.content, // Преобразуем для совместимости с интерфейсом
     } as unknown as Message;
   }
   
@@ -592,9 +604,10 @@ export class DatabaseStorage implements IStorage {
   
   // ===== Chat messages operations =====
   async getChatMessages(chatId: number): Promise<Message[]> {
-    return await db.select().from(messages)
+    const messagesList = await db.select().from(messages)
       .where(eq(messages.chatId, chatId))
       .orderBy(sql`messages.sent_at DESC`);
+    return decryptMessages(messagesList);
   }
   
   async updateChat(id: number, chatData: Partial<InsertChat>): Promise<Chat | undefined> {
@@ -640,14 +653,18 @@ export class DatabaseStorage implements IStorage {
       sentAt: new Date()
     };
     
-    const [newMessage] = await db.insert(messages).values(messageData).returning();
+    // Шифруем данные перед сохранением
+    const encryptedData = encryptMessage(messageData);
+    
+    const [newMessage] = await db.insert(messages).values(encryptedData).returning();
     
     // Обновляем время последнего сообщения в чате
     await db.update(chats)
       .set({ lastMessageAt: new Date() })
       .where(eq(chats.id, message.chatId));
     
-    return newMessage;
+    // Расшифровываем перед возвратом
+    return decryptMessage(newMessage);
   }
   
   async markLastReadMessage(chatId: number, userId: number, messageId: number): Promise<void> {
