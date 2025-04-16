@@ -19,6 +19,13 @@ declare module 'express-session' {
   }
 }
 
+// Расширяем типы для поддержки свойства encrypted в Socket
+declare module "http" {
+  interface Socket {
+    encrypted?: boolean;
+  }
+}
+
 const scryptAsync = promisify(scrypt);
 
 async function hashPassword(password: string) {
@@ -44,6 +51,7 @@ export function setupAuth(app: Express) {
   // Определяем, работаем ли мы в production и доступен ли HTTPS
   const isHttpsAvailable = Boolean(process.env.HTTPS_AVAILABLE) || process.env.NODE_ENV === 'production';
   
+  // Базовые настройки сессии
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET || "school-management-secret",
     resave: false,
@@ -51,14 +59,38 @@ export function setupAuth(app: Express) {
     store: dataStorage.sessionStore,
     cookie: {
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      secure: isHttpsAvailable, // Используем secure cookie только при доступном HTTPS
       httpOnly: true, // Защита от XSS атак, должна быть всегда включена
-      sameSite: 'strict' // Защита от CSRF атак
+      sameSite: 'lax' // Защита от CSRF атак, но позволяет переходы с других сайтов
     }
   };
-
+  
   app.set("trust proxy", 1);
   app.use(session(sessionSettings));
+  
+  // Middleware для динамической настройки secure атрибута cookie
+  // Должно идти после инициализации сессии, но до пасспорта
+  app.use((req, res, next) => {
+    // Определяем, использует ли запрос HTTPS
+    const isSecureRequest = Boolean(
+      req.secure || // Стандартное свойство Express
+      req.header('x-forwarded-proto') === 'https' || // Для запросов через прокси
+      req.header('x-forwarded-ssl') === 'on' || // Альтернативный заголовок
+      (req.socket && req.socket.encrypted) // Проверка шифрования сокета (с использованием нашего расширенного типа)
+    );
+    
+    // Устанавливаем secure атрибут только для HTTPS запросов
+    if (req.session && req.session.cookie) {
+      req.session.cookie.secure = isSecureRequest;
+      
+      // Логируем состояние безопасности для отладки
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug(`Cookie secure set to ${isSecureRequest ? 'true' : 'false'} for request to ${req.path}`);
+      }
+    }
+    
+    next();
+  });
+  
   app.use(passport.initialize());
   app.use(passport.session());
 
