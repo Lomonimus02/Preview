@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { dbStorage } from "./db-storage";
 import { db } from "./db";
-import { upload, getFileType, getFileUrl } from './utils/file-upload';
+import { upload, getFileType, getFileUrl, moveUploadedFile, prepareFileForDownload } from './utils/file-upload';
+import * as fs from 'fs/promises';
 import path from "path";
 import express from "express";
 
@@ -2803,6 +2804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(documents);
   });
 
+  // Маршрут для создания документа (без файла)
   app.post("/api/documents", isAuthenticated, async (req, res) => {
     const document = await dataStorage.createDocument({
       ...req.body,
@@ -2818,6 +2820,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     res.status(201).json(document);
+  });
+  
+  // Маршрут для загрузки файла документа с шифрованием
+  app.post("/api/documents/upload", isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      // Проверяем, загружен ли файл
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      
+      // Определяем, нужно ли шифровать файл
+      const shouldEncrypt = req.body.encrypt === 'true' || req.body.encrypt === true;
+      
+      // Путь к временному файлу
+      const tempFilePath = path.join(process.cwd(), 'uploads', 'temp', req.file.filename);
+      
+      // Обрабатываем загруженный файл (шифруем или просто перемещаем)
+      const { filename, isEncrypted } = await moveUploadedFile(tempFilePath, shouldEncrypt);
+      
+      // Формируем URL для доступа к файлу
+      const fileUrl = getFileUrl(filename, isEncrypted);
+      
+      // Определяем тип файла (изображение, видео, документ)
+      const fileType = getFileType(req.file.mimetype);
+      
+      // Создаем запись о документе в базе данных
+      const document = await dataStorage.createDocument({
+        title: req.body.title || req.file.originalname,
+        description: req.body.description || null,
+        fileUrl,
+        uploaderId: req.user.id,
+        schoolId: req.body.schoolId ? parseInt(req.body.schoolId) : null,
+        classId: req.body.classId ? parseInt(req.body.classId) : null,
+        subjectId: req.body.subjectId ? parseInt(req.body.subjectId) : null,
+        isEncrypted: isEncrypted
+      });
+      
+      // Логируем действие
+      await dataStorage.createSystemLog({
+        userId: req.user.id,
+        action: "document_uploaded",
+        details: `Uploaded encrypted document: ${document.title}`,
+        ipAddress: req.ip
+      });
+      
+      // Отправляем информацию о загруженном документе
+      res.status(201).json({
+        success: true,
+        document,
+        file: {
+          fileUrl,
+          fileType,
+          originalName: req.file.originalname,
+          size: req.file.size,
+          isEncrypted
+        }
+      });
+    } catch (error) {
+      console.error("Error uploading document:", error);
+      res.status(500).json({ message: "Failed to upload document", error: error.message });
+    }
+  });
+  
+  // Маршрут для скачивания документа (с расшифровкой при необходимости)
+  app.get("/api/documents/download/:id", isAuthenticated, async (req, res) => {
+    try {
+      // Получаем информацию о документе
+      const documentId = parseInt(req.params.id);
+      const document = await dataStorage.getDocument(documentId);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      // Получаем имя файла из URL
+      const fileUrl = document.fileUrl;
+      const filename = path.basename(fileUrl);
+      const isEncrypted = document.isEncrypted || false;
+      
+      // Подготавливаем файл для скачивания (расшифровываем при необходимости)
+      const { filePath, deleteAfter } = await prepareFileForDownload(filename, isEncrypted);
+      
+      // Скачиваем файл
+      res.download(filePath, document.title, (err) => {
+        if (err) {
+          console.error('Download error:', err);
+          return res.status(500).send('Error downloading file');
+        }
+        
+        // Если это временный расшифрованный файл, удаляем его после скачивания
+        if (deleteAfter) {
+          // Удаляем файл через 5 секунд, чтобы дать время на скачивание
+          setTimeout(async () => {
+            try {
+              await fs.unlink(filePath);
+            } catch (error) {
+              console.error('Error removing temp file:', error);
+            }
+          }, 5000);
+        }
+      });
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      res.status(500).json({ message: "Failed to download document", error: error.message });
+    }
   });
 
   // Messages API
