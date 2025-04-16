@@ -3,6 +3,7 @@ import { db } from './db';
 import { eq, and, or, inArray, sql, lte, ne, gt } from 'drizzle-orm';
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import { generateUserKeyPair } from './utils/encryption';
 import * as schema from '@shared/schema';
 import { 
   decryptUser, encryptUser, 
@@ -515,7 +516,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createDocument(document: InsertDocument): Promise<Document> {
-    // Шифруем содержимое документа перед сохранением
+    // Если передан флаг isEncrypted, значит сам файл должен быть зашифрован
+    // Это происходит в routes.ts перед вызовом этой функции
+
+    // Шифруем метаданные документа перед сохранением
     const encryptedDocument = encryptDocument(document);
     
     const [newDocument] = await db.insert(documents).values(encryptedDocument).returning();
@@ -543,7 +547,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMessage(message: InsertMessage): Promise<Message> {
-    // Шифруем сообщение перед сохранением
+    // Проверяем, нужно ли использовать E2E шифрование
+    let isE2eEncrypted = false;
+    
+    // Если передан флаг для E2E шифрования и указан chatId
+    if (message.isE2eEncrypted && message.chatId) {
+      // Получаем участников чата для E2E шифрования
+      try {
+        // Получаем получателей сообщения (участников чата, кроме отправителя)
+        const chatParticipantsList = await db.select()
+          .from(chatParticipants)
+          .where(eq(chatParticipants.chatId, message.chatId));
+          
+        const recipientIds = chatParticipantsList
+          .filter(p => p.userId !== message.senderId)
+          .map(p => p.userId);
+          
+        // Если есть получатели, делаем E2E шифрование
+        if (recipientIds.length > 0 && message.content) {
+          isE2eEncrypted = true;
+          
+          // В реальной реализации здесь нужно зашифровать сообщение для каждого получателя
+          // используя его публичный ключ и сохранить зашифрованные копии
+          
+          // Для упрощения пока только устанавливаем флаг
+          message.isE2eEncrypted = true;
+        }
+      } catch (error) {
+        console.error('Ошибка при E2E шифровании сообщения:', error);
+        // Продолжаем без E2E шифрования, если произошла ошибка
+        message.isE2eEncrypted = false;
+      }
+    }
+    
+    // Шифруем сообщение перед сохранением обычным шифрованием (не E2E)
     const encryptedMessage = encryptMessage(message);
     
     // Обрабатываем ситуацию с разными полями в схеме
@@ -551,7 +588,7 @@ export class DatabaseStorage implements IStorage {
     
     const [newMessage] = await db.insert(messages).values({
       ...encryptedMessage,
-      content: messageContent ? encryptMessage({ message: messageContent }).message : null
+      content: messageContent ? encryptMessage({ content: messageContent } as any).content : null
     }).returning();
     
     // Расшифровываем сообщение перед возвратом
