@@ -26,6 +26,7 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
+
 import {
   Form,
   FormControl,
@@ -750,7 +751,7 @@ export default function HomeworkPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-title">Название задания</Label>
+                  <FormLabel htmlFor="edit-title">Название задания</FormLabel>
                   <Input 
                     id="edit-title"
                     value={homeworkToEdit.title} 
@@ -760,7 +761,7 @@ export default function HomeworkPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-description">Описание задания</Label>
+                  <FormLabel htmlFor="edit-description">Описание задания</FormLabel>
                   <Textarea 
                     id="edit-description"
                     value={homeworkToEdit.description} 
@@ -773,7 +774,7 @@ export default function HomeworkPage() {
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="edit-class">Класс</Label>
+                  <FormLabel htmlFor="edit-class">Класс</FormLabel>
                   <Select
                     value={homeworkToEdit.classId.toString()}
                     onValueChange={(value) => {
@@ -795,7 +796,7 @@ export default function HomeworkPage() {
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="edit-subject">Предмет</Label>
+                  <FormLabel htmlFor="edit-subject">Предмет</FormLabel>
                   <Select
                     value={homeworkToEdit.subjectId.toString()}
                     onValueChange={(value) => {
@@ -818,7 +819,7 @@ export default function HomeworkPage() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="edit-schedule">Урок</Label>
+                <FormLabel htmlFor="edit-schedule">Урок</FormLabel>
                 <Select
                   value={homeworkToEdit.scheduleId?.toString() || ""}
                   onValueChange={(value) => {
@@ -843,7 +844,7 @@ export default function HomeworkPage() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="edit-due-date">Срок выполнения</Label>
+                <FormLabel htmlFor="edit-due-date">Срок выполнения</FormLabel>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -879,8 +880,16 @@ export default function HomeworkPage() {
                   disabled={updateHomeworkMutation.isPending}
                   onClick={() => {
                     console.log("Отправка прямого обновления с данными:", homeworkToEdit);
-                    const { id, ...data } = homeworkToEdit;
-                    updateHomeworkMutation.mutate({ id, data });
+                    if (homeworkToEdit) {
+                      const { id, ...dataWithPossiblyNullScheduleId } = homeworkToEdit;
+                      // Убедимся, что scheduleId - это число, а не null
+                      const data = {
+                        ...dataWithPossiblyNullScheduleId,
+                        scheduleId: dataWithPossiblyNullScheduleId.scheduleId || 0,
+                        dueDate: new Date(dataWithPossiblyNullScheduleId.dueDate)
+                      };
+                      updateHomeworkMutation.mutate({ id, data });
+                    }
                   }}
                 >
                   {updateHomeworkMutation.isPending ? 'Сохранение...' : 'Сохранить изменения'}
