@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Filter, Search, Upload, Clock, CalendarIcon, FileUpIcon, CheckCircle, Edit, Trash2, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -26,7 +25,6 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
-
 import {
   Form,
   FormControl,
@@ -61,20 +59,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 
-// Schema for homework creation with dueDate field
+// Schema for homework creation (обновленная схема без dueDate, только с scheduleId)
 const homeworkFormSchema = insertHomeworkSchema
+  .omit({ dueDate: true })
   .extend({
     title: z.string().min(1, "Название обязательно"),
     description: z.string().min(1, "Описание обязательно"),
@@ -83,9 +76,6 @@ const homeworkFormSchema = insertHomeworkSchema
     }),
     classId: z.number({
       required_error: "Выберите класс",
-    }),
-    dueDate: z.date({
-      required_error: "Выберите срок выполнения",
     }),
     scheduleId: z.number({
       required_error: "Выберите урок",
@@ -161,32 +151,13 @@ export default function HomeworkPage() {
       subjectId: undefined,
       classId: undefined,
       scheduleId: undefined,
-      dueDate: undefined,
     },
   });
   
-  // Форма для редактирования (отдельная от формы создания)
-  const editHomeworkForm = useForm<z.infer<typeof homeworkFormSchema>>({
-    resolver: zodResolver(homeworkFormSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      subjectId: undefined,
-      classId: undefined,
-      scheduleId: undefined,
-      dueDate: undefined,
-    },
-  });
-  
-  // Получить уроки для выбранного класса и предмета (форма создания)
+  // Получить уроки для выбранного класса и предмета
   const classId = homeworkForm.watch("classId");
   const subjectId = homeworkForm.watch("subjectId");
   
-  // Получить уроки для выбранного класса и предмета (форма редактирования)
-  const editClassId = editHomeworkForm.watch("classId");
-  const editSubjectId = editHomeworkForm.watch("subjectId");
-  
-  // Получаем список расписаний для формы создания
   useEffect(() => {
     if (classId && subjectId) {
       const filteredSchedules = schedules.filter(
@@ -199,23 +170,6 @@ export default function HomeworkPage() {
       setSelectedSchedules([]);
     }
   }, [classId, subjectId, schedules]);
-  
-  // Состояние для расписаний формы редактирования
-  const [editSelectedSchedules, setEditSelectedSchedules] = useState<Schedule[]>([]);
-  
-  // Получаем список расписаний для формы редактирования
-  useEffect(() => {
-    if (editClassId && editSubjectId) {
-      const filteredSchedules = schedules.filter(
-        (schedule) => 
-          schedule.classId === editClassId && 
-          schedule.subjectId === editSubjectId
-      );
-      setEditSelectedSchedules(filteredSchedules);
-    } else {
-      setEditSelectedSchedules([]);
-    }
-  }, [editClassId, editSubjectId, schedules]);
 
   // Form for submitting homework
   const submissionForm = useForm<z.infer<typeof submissionFormSchema>>({
@@ -254,23 +208,20 @@ export default function HomeworkPage() {
   // Update homework mutation
   const updateHomeworkMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number, data: z.infer<typeof homeworkFormSchema> }) => {
-      console.log("Отправляемые данные для обновления:", { id, data });
       const res = await apiRequest(`/api/homework/${id}`, "PATCH", data);
       return res.json();
     },
-    onSuccess: (data) => {
-      console.log("Домашнее задание успешно обновлено:", data);
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/homework"] });
       setIsEditDialogOpen(false);
       setHomeworkToEdit(null);
-      editHomeworkForm.reset(); // Сбрасываем форму редактирования
+      homeworkForm.reset();
       toast({
         title: "Домашнее задание обновлено",
         description: "Изменения успешно сохранены",
       });
     },
     onError: (error) => {
-      console.error("Ошибка при обновлении домашнего задания:", error);
       toast({
         title: "Ошибка",
         description: error.message || "Не удалось обновить домашнее задание",
@@ -505,13 +456,12 @@ export default function HomeworkPage() {
                             <DropdownMenuItem
                               onClick={() => {
                                 setHomeworkToEdit(hw);
-                                editHomeworkForm.reset({
+                                homeworkForm.reset({
                                   title: hw.title,
                                   description: hw.description,
                                   classId: hw.classId,
                                   subjectId: hw.subjectId,
                                   scheduleId: hw.scheduleId || undefined,
-                                  dueDate: new Date(hw.dueDate),
                                 });
                                 setIsEditDialogOpen(true);
                               }}
@@ -747,156 +697,141 @@ export default function HomeworkPage() {
             </DialogDescription>
           </DialogHeader>
           
-          {homeworkToEdit && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 gap-4">
-                <div className="space-y-2">
-                  <FormLabel htmlFor="edit-title">Название задания</FormLabel>
-                  <Input 
-                    id="edit-title"
-                    value={homeworkToEdit.title} 
-                    onChange={(e) => setHomeworkToEdit({...homeworkToEdit, title: e.target.value})}
-                    placeholder="Введите название задания"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <FormLabel htmlFor="edit-description">Описание задания</FormLabel>
-                  <Textarea 
-                    id="edit-description"
-                    value={homeworkToEdit.description} 
-                    onChange={(e) => setHomeworkToEdit({...homeworkToEdit, description: e.target.value})}
-                    placeholder="Введите подробное описание задания" 
-                    className="min-h-[120px]" 
-                  />
-                </div>
-              </div>
+          <Form {...homeworkForm}>
+            <form onSubmit={homeworkForm.handleSubmit((values) => {
+                if (homeworkToEdit) {
+                  updateHomeworkMutation.mutate({ id: homeworkToEdit.id, data: values });
+                }
+              })} className="space-y-4"
+            >
+              <FormField
+                control={homeworkForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Название задания</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Введите название задания" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={homeworkForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Описание задания</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Введите подробное описание задания" 
+                        className="min-h-[120px]"
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <FormLabel htmlFor="edit-class">Класс</FormLabel>
-                  <Select
-                    value={homeworkToEdit.classId.toString()}
-                    onValueChange={(value) => {
-                      const classId = parseInt(value);
-                      setHomeworkToEdit({...homeworkToEdit, classId});
-                    }}
-                  >
-                    <SelectTrigger id="edit-class">
-                      <SelectValue placeholder="Выберите класс" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {classes.map((cls) => (
-                        <SelectItem key={cls.id} value={cls.id.toString()}>
-                          {cls.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <FormField
+                  control={homeworkForm.control}
+                  name="classId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Класс</FormLabel>
+                      <Select
+                        value={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите класс" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {classes.map((cls) => (
+                            <SelectItem key={cls.id} value={cls.id.toString()}>
+                              {cls.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
-                <div className="space-y-2">
-                  <FormLabel htmlFor="edit-subject">Предмет</FormLabel>
-                  <Select
-                    value={homeworkToEdit.subjectId.toString()}
-                    onValueChange={(value) => {
-                      const subjectId = parseInt(value);
-                      setHomeworkToEdit({...homeworkToEdit, subjectId});
-                    }}
-                  >
-                    <SelectTrigger id="edit-subject">
-                      <SelectValue placeholder="Выберите предмет" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {subjects.map((subject) => (
-                        <SelectItem key={subject.id} value={subject.id.toString()}>
-                          {subject.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <FormField
+                  control={homeworkForm.control}
+                  name="subjectId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Предмет</FormLabel>
+                      <Select
+                        value={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(parseInt(value))}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Выберите предмет" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {subjects.map((subject) => (
+                            <SelectItem key={subject.id} value={subject.id.toString()}>
+                              {subject.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              
-              <div className="space-y-2">
-                <FormLabel htmlFor="edit-schedule">Урок</FormLabel>
-                <Select
-                  value={homeworkToEdit.scheduleId?.toString() || ""}
-                  onValueChange={(value) => {
-                    const scheduleId = parseInt(value);
-                    setHomeworkToEdit({...homeworkToEdit, scheduleId});
-                  }}
-                >
-                  <SelectTrigger id="edit-schedule">
-                    <SelectValue placeholder="Выберите урок" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {editSelectedSchedules.map((schedule) => (
-                      <SelectItem key={schedule.id} value={schedule.id.toString()}>
-                        {schedule.scheduleDate ? format(new Date(schedule.scheduleDate), "d MMMM yyyy", { locale: ru }) : ""} {schedule.startTime}
-                      </SelectItem>
-                    ))}
-                    {editSelectedSchedules.length === 0 && (
-                      <SelectItem value="placeholder" disabled>Сначала выберите класс и предмет</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <FormLabel htmlFor="edit-due-date">Срок выполнения</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="edit-due-date"
-                      variant={"outline"}
-                      className={cn(
-                        "w-full pl-3 text-left font-normal"
-                      )}
+
+              <FormField
+                control={homeworkForm.control}
+                name="scheduleId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Урок</FormLabel>
+                    <Select
+                      value={field.value?.toString()}
+                      onValueChange={(value) => field.onChange(parseInt(value))}
                     >
-                      {format(new Date(homeworkToEdit.dueDate), "PP", { locale: ru })}
-                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={new Date(homeworkToEdit.dueDate)}
-                      onSelect={(date) => {
-                        if (date) {
-                          setHomeworkToEdit({...homeworkToEdit, dueDate: date.toISOString()})
-                        }
-                      }}
-                      disabled={(date) => date < new Date("1900-01-01")}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите урок" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {selectedSchedules.map((schedule) => (
+                          <SelectItem key={schedule.id} value={schedule.id.toString()}>
+                            {schedule.scheduleDate ? format(new Date(schedule.scheduleDate), "d MMMM yyyy", { locale: ru }) : ""} {schedule.startTime}
+                          </SelectItem>
+                        ))}
+                        {selectedSchedules.length === 0 && (
+                          <SelectItem value="placeholder" disabled>Сначала выберите класс и предмет</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
               <DialogFooter>
-                <Button 
-                  type="button" 
-                  disabled={updateHomeworkMutation.isPending}
-                  onClick={() => {
-                    console.log("Отправка прямого обновления с данными:", homeworkToEdit);
-                    if (homeworkToEdit) {
-                      const { id, ...dataWithPossiblyNullScheduleId } = homeworkToEdit;
-                      // Убедимся, что scheduleId - это число, а не null
-                      const data = {
-                        ...dataWithPossiblyNullScheduleId,
-                        scheduleId: dataWithPossiblyNullScheduleId.scheduleId || 0,
-                        dueDate: new Date(dataWithPossiblyNullScheduleId.dueDate)
-                      };
-                      updateHomeworkMutation.mutate({ id, data });
-                    }
-                  }}
-                >
+                <Button type="submit" disabled={updateHomeworkMutation.isPending}>
                   {updateHomeworkMutation.isPending ? 'Сохранение...' : 'Сохранить изменения'}
                 </Button>
               </DialogFooter>
-            </div>
-          )}
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
       
