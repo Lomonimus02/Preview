@@ -148,27 +148,38 @@ export function decrypt(encryptedText: string): string {
       return encryptedText;
     }
     
-    const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, encryptionKey, encryptionIv);
-    let decrypted;
+    // Дополнительная проверка на содержимое строки
+    if (!/^[0-9a-f]+$/i.test(encryptedText)) {
+      console.warn('Decryption warning: Text contains non-hex characters');
+      return encryptedText;
+    }
     
+    // Попытка расшифровать текст
     try {
-      decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
+      const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, encryptionKey, encryptionIv);
+      let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
       
-      // Проверяем результат на валидность UTF-8
-      if (decrypted.includes('\uFFFD')) {
-        console.warn('Decryption warning: Result contains invalid UTF-8 characters, returning original');
+      try {
+        decrypted += decipher.final('utf8');
+        
+        // Проверяем результат на валидность UTF-8
+        if (decrypted.includes('\uFFFD')) {
+          console.warn('Decryption warning: Result contains invalid UTF-8 characters, returning original');
+          return encryptedText;
+        }
+        
+        return decrypted;
+      } catch (finalError: any) {
+        console.warn(`Decryption final error: ${finalError.message || 'Unknown error'}`);
         return encryptedText;
       }
-      
-      return decrypted;
-    } catch (cryptoError) {
-      console.error('Crypto decryption error:', cryptoError);
+    } catch (cryptoError: any) {
+      console.warn(`Crypto decryption error: ${cryptoError.message || 'Unknown error'}, code: ${cryptoError.code || 'none'}`);
       // Возвращаем исходный текст при ошибке
       return encryptedText;
     }
-  } catch (error) {
-    console.error('Decryption error:', error);
+  } catch (error: any) {
+    console.error(`Decryption error: ${error.message || 'Unknown error'}`);
     // Возвращаем исходный текст вместо выбрасывания исключения
     return encryptedText;
   }
@@ -186,8 +197,8 @@ export async function encryptFile(sourceFilePath: string, destinationFilePath: s
     const encryptedData = Buffer.concat([cipher.update(fileData), cipher.final()]);
     
     await fs.writeFile(destinationFilePath, encryptedData);
-  } catch (error) {
-    console.error('File encryption error:', error);
+  } catch (error: any) {
+    console.error(`File encryption error: ${error.message || 'Unknown error'}`);
     throw new Error('Failed to encrypt file');
   }
 }
@@ -199,14 +210,54 @@ export async function encryptFile(sourceFilePath: string, destinationFilePath: s
  */
 export async function decryptFile(sourceFilePath: string, destinationFilePath: string): Promise<void> {
   try {
-    const encryptedData = await fs.readFile(sourceFilePath);
-    const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, encryptionKey, encryptionIv);
-    const decryptedData = Buffer.concat([decipher.update(encryptedData), decipher.final()]);
+    // Проверяем существование исходного файла
+    try {
+      await fs.access(sourceFilePath);
+    } catch (accessError) {
+      console.error(`Source file not found: ${sourceFilePath}`);
+      throw new Error(`Source file not found: ${sourceFilePath}`);
+    }
     
-    await fs.writeFile(destinationFilePath, decryptedData);
-  } catch (error) {
-    console.error('File decryption error:', error);
-    throw new Error('Failed to decrypt file');
+    // Читаем зашифрованные данные
+    const encryptedData = await fs.readFile(sourceFilePath);
+    
+    // Проверяем размер файла
+    if (encryptedData.length === 0) {
+      console.error('File decryption error: Empty file');
+      throw new Error('Failed to decrypt file: Empty file');
+    }
+    
+    // Создаем расшифровщик и пробуем расшифровать данные
+    try {
+      const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, encryptionKey, encryptionIv);
+      let decryptedData;
+      
+      try {
+        // Расшифровываем данные
+        const updatedData = decipher.update(encryptedData);
+        const finalData = decipher.final();
+        decryptedData = Buffer.concat([updatedData, finalData]);
+        
+        // Записываем расшифрованные данные в файл
+        await fs.writeFile(destinationFilePath, decryptedData);
+      } catch (decipherError: any) {
+        console.error(`File decryption error during final: ${decipherError.message || 'Unknown error'}`);
+        
+        // Если файл не может быть расшифрован (возможно не зашифрован),
+        // просто копируем исходный файл
+        console.warn('Copying original file instead of decryption due to error');
+        await fs.copyFile(sourceFilePath, destinationFilePath);
+      }
+    } catch (cryptoError: any) {
+      console.error(`Crypto error during file decryption: ${cryptoError.message || 'Unknown error'}`);
+      
+      // Если криптографическая операция не удалась, копируем исходный файл
+      console.warn('Copying original file instead of decryption due to crypto error');
+      await fs.copyFile(sourceFilePath, destinationFilePath);
+    }
+  } catch (error: any) {
+    console.error(`File decryption error: ${error.message || 'Unknown error'}`);
+    throw new Error(`Failed to decrypt file: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -223,8 +274,8 @@ export async function encryptMessage(message: string, recipientPublicKey: string
     );
     
     return encryptedData.toString('base64');
-  } catch (error) {
-    console.error('Message encryption error:', error);
+  } catch (error: any) {
+    console.error(`Message encryption error: ${error.message || 'Unknown error'}`);
     throw new Error('Failed to encrypt message');
   }
 }
@@ -242,9 +293,9 @@ export async function decryptMessage(encryptedMessage: string): Promise<string> 
     );
     
     return decryptedData.toString('utf8');
-  } catch (error) {
-    console.error('Message decryption error:', error);
-    throw new Error('Failed to decrypt message');
+  } catch (error: any) {
+    console.error(`Message decryption error: ${error.message || 'Unknown error'}`);
+    throw new Error(`Failed to decrypt message: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -252,8 +303,8 @@ export async function decryptMessage(encryptedMessage: string): Promise<string> 
 export async function getServerPublicKey(): Promise<string> {
   try {
     return await fs.readFile(RSA_PUBLIC_KEY_PATH, 'utf8');
-  } catch (error) {
-    console.error('Failed to get server public key:', error);
+  } catch (error: any) {
+    console.error(`Failed to get server public key: ${error.message || 'Unknown error'}`);
     throw new Error('Failed to get server public key');
   }
 }
