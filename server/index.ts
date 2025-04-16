@@ -5,6 +5,7 @@ import { testConnection } from "./db";
 import dotenv from "dotenv";
 import { Server } from "http";
 import path from "path";
+import { initializeEncryption } from "./utils/encryption";
 
 // Загружаем переменные окружения
 dotenv.config();
@@ -164,6 +165,15 @@ function setupGracefulShutdown(server: Server) {
     
     // Запускаем периодическую проверку соединения с БД
     dbHealthCheckTimer = setTimeout(checkDatabaseHealth, DB_HEALTH_CHECK_INTERVAL);
+
+    // Инициализируем систему шифрования
+    console.log('Initializing encryption system...');
+    const encryptionInitialized = await initializeEncryption();
+    if (!encryptionInitialized) {
+      console.error('Failed to initialize encryption system!');
+    } else {
+      console.log('Encryption system initialized successfully');
+    }
   } catch (err: unknown) {
     const error = err as Error;
     console.error('Fatal error during database connection attempts:', error);
