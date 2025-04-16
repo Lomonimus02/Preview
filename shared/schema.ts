@@ -28,6 +28,10 @@ export const users = pgTable("users", {
   // Текущая активная роль, выбранная пользователем
   activeRole: text("active_role").$type<UserRoleEnum>(),
   schoolId: integer("school_id"),
+  // Публичный ключ пользователя для E2E шифрования сообщений
+  publicKey: text("public_key"),
+  // Приватный ключ пользователя (зашифрованный)
+  privateKey: text("private_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -157,6 +161,8 @@ export const documents = pgTable("documents", {
   schoolId: integer("school_id"),
   classId: integer("class_id"),
   subjectId: integer("subject_id"),
+  // Флаг, указывающий что файл зашифрован
+  isEncrypted: boolean("is_encrypted").default(false),
   uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
 });
 
