@@ -418,52 +418,79 @@ export class DatabaseStorage implements IStorage {
   // ===== Attendance operations =====
   async getAttendance(id: number): Promise<Attendance | undefined> {
     const result = await db.select().from(attendance).where(eq(attendance.id, id)).limit(1);
-    return result[0];
+    if (!result[0]) return undefined;
+    // Расшифровываем перед возвратом
+    return decryptAttendance(result[0]);
   }
 
   async getAttendanceByStudent(studentId: number): Promise<Attendance[]> {
-    return await db.select().from(attendance).where(eq(attendance.studentId, studentId));
+    const records = await db.select().from(attendance).where(eq(attendance.studentId, studentId));
+    // Расшифровываем записи посещаемости
+    return decryptAttendances(records);
   }
 
   async getAttendanceByClass(classId: number): Promise<Attendance[]> {
-    return await db.select().from(attendance).where(eq(attendance.classId, classId));
+    const records = await db.select().from(attendance).where(eq(attendance.classId, classId));
+    // Расшифровываем записи посещаемости
+    return decryptAttendances(records);
   }
   
   async getAttendanceBySchedule(scheduleId: number): Promise<Attendance[]> {
-    return await db.select().from(attendance).where(eq(attendance.scheduleId, scheduleId));
+    const records = await db.select().from(attendance).where(eq(attendance.scheduleId, scheduleId));
+    // Расшифровываем записи посещаемости
+    return decryptAttendances(records);
   }
 
   async createAttendance(attendanceData: InsertAttendance): Promise<Attendance> {
-    const [newAttendance] = await db.insert(attendance).values(attendanceData).returning();
-    return newAttendance;
+    // Шифруем данные перед сохранением
+    const encryptedData = encryptAttendance(attendanceData);
+    
+    const [newAttendance] = await db.insert(attendance).values(encryptedData).returning();
+    
+    // Расшифровываем перед возвратом
+    return decryptAttendance(newAttendance) as Attendance;
   }
 
   // ===== Document operations =====
   async getDocument(id: number): Promise<Document | undefined> {
     const result = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
-    return result[0];
+    if (!result[0]) return undefined;
+    // Расшифровываем перед возвратом
+    return decryptDocument(result[0]);
   }
 
   async getDocumentsBySchool(schoolId: number): Promise<Document[]> {
-    return await db.select().from(documents).where(eq(documents.schoolId, schoolId));
+    const docs = await db.select().from(documents).where(eq(documents.schoolId, schoolId));
+    // Расшифровываем документы
+    return decryptDocuments(docs);
   }
 
   async getDocumentsByClass(classId: number): Promise<Document[]> {
-    return await db.select().from(documents).where(eq(documents.classId, classId));
+    const docs = await db.select().from(documents).where(eq(documents.classId, classId));
+    // Расшифровываем документы
+    return decryptDocuments(docs);
   }
 
   async getDocumentsBySubject(subjectId: number): Promise<Document[]> {
-    return await db.select().from(documents).where(eq(documents.subjectId, subjectId));
+    const docs = await db.select().from(documents).where(eq(documents.subjectId, subjectId));
+    // Расшифровываем документы
+    return decryptDocuments(docs);
   }
 
   async createDocument(document: InsertDocument): Promise<Document> {
-    const [newDocument] = await db.insert(documents).values(document).returning();
-    return newDocument;
+    // Шифруем содержимое документа перед сохранением
+    const encryptedDocument = encryptDocument(document);
+    
+    const [newDocument] = await db.insert(documents).values(encryptedDocument).returning();
+    
+    // Расшифровываем перед возвратом
+    return decryptDocument(newDocument) as Document;
   }
 
   // ===== Message operations =====
   async getMessage(id: number): Promise<Message | undefined> {
     const result = await db.select().from(messages).where(eq(messages.id, id)).limit(1);
+    if (!result[0]) return undefined;
     return decryptMessage(result[0]);
   }
 
@@ -481,16 +508,24 @@ export class DatabaseStorage implements IStorage {
   async createMessage(message: InsertMessage): Promise<Message> {
     // Шифруем сообщение перед сохранением
     const encryptedMessage = encryptMessage(message);
+    
+    // Обрабатываем ситуацию с разными полями в схеме
+    const messageContent = message.content || message.message; // Поддерживаем оба варианта
+    
     const [newMessage] = await db.insert(messages).values({
       ...encryptedMessage,
-      content: encryptedMessage.message,  // Поле в БД называется content
+      content: messageContent ? encryptMessage({ message: messageContent }).message : null
     }).returning();
     
     // Расшифровываем сообщение перед возвратом
+    if (!newMessage) return {} as Message;
+    
     const decryptedMessage = decryptMessage(newMessage);
+    if (!decryptedMessage) return {} as Message;
+    
     return {
       ...decryptedMessage,
-      message: decryptedMessage.content, // Преобразуем обратно для совместимости с интерфейсом
+      message: decryptedMessage.content // Преобразуем обратно для совместимости с интерфейсом
     } as unknown as Message;
   }
 
@@ -500,11 +535,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(messages.id, id))
       .returning();
     
+    if (!updatedMessage) return undefined;
+    
     // Расшифруем сообщение перед возвратом
     const decryptedMessage = decryptMessage(updatedMessage);
+    if (!decryptedMessage) return undefined;
+    
     return {
       ...decryptedMessage,
-      message: decryptedMessage?.content, // Преобразуем для совместимости с интерфейсом
+      message: decryptedMessage.content, // Преобразуем для совместимости с интерфейсом
     } as unknown as Message;
   }
   
@@ -521,9 +560,11 @@ export class DatabaseStorage implements IStorage {
     
     // Расшифровываем сообщение перед возвратом
     const decryptedMessage = decryptMessage(message[0]);
+    if (!decryptedMessage) return undefined;
+    
     return {
       ...decryptedMessage,
-      message: decryptedMessage?.content, // Преобразуем для совместимости с интерфейсом
+      message: decryptedMessage.content, // Преобразуем для совместимости с интерфейсом
     } as unknown as Message;
   }
   
@@ -672,7 +713,7 @@ export class DatabaseStorage implements IStorage {
     const messageData = {
       chatId: message.chatId,
       senderId: message.senderId,
-      content: message.content || null,
+      content: message.content || message.message || null,
       hasAttachment: message.hasAttachment || false,
       attachmentType: message.attachmentType || null,
       attachmentUrl: message.attachmentUrl || null,
@@ -685,13 +726,22 @@ export class DatabaseStorage implements IStorage {
     
     const [newMessage] = await db.insert(messages).values(encryptedData).returning();
     
+    if (!newMessage) {
+      throw new Error("Failed to create chat message");
+    }
+    
     // Обновляем время последнего сообщения в чате
     await db.update(chats)
       .set({ lastMessageAt: new Date() })
       .where(eq(chats.id, message.chatId));
     
     // Расшифровываем перед возвратом
-    return decryptMessage(newMessage);
+    const decryptedMessage = decryptMessage(newMessage);
+    if (!decryptedMessage) {
+      throw new Error("Failed to decrypt created message");
+    }
+    
+    return decryptedMessage;
   }
   
   async markLastReadMessage(chatId: number, userId: number, messageId: number): Promise<void> {
@@ -743,8 +793,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(notifications.id, id))
       .returning();
     
+    if (!updatedNotification) return undefined;
+    
     // Расшифровываем перед возвратом
-    return decryptNotification(updatedNotification);
+    return decryptNotification(updatedNotification) as Notification;
   }
 
   // ===== Parent-Student operations =====
