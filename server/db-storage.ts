@@ -689,18 +689,25 @@ export class DatabaseStorage implements IStorage {
   // ===== Notification operations =====
   async getNotification(id: number): Promise<Notification | undefined> {
     const result = await db.select().from(notifications).where(eq(notifications.id, id)).limit(1);
-    return result[0];
+    if (!result[0]) return undefined;
+    // Расшифровываем перед возвратом
+    return decryptNotification(result[0]) as Notification;
   }
 
   async getNotificationsByUser(userId: number): Promise<Notification[]> {
-    return await db.select().from(notifications).where(eq(notifications.userId, userId));
+    const notifications = await db.select().from(notifications).where(eq(notifications.userId, userId));
+    // Расшифровываем все уведомления
+    return decryptNotifications(notifications);
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    // В схеме уже используется поле content, так что не нужно переименовывать
-    const [newNotification] = await db.insert(notifications).values(notification).returning();
+    // Шифруем содержимое уведомления перед сохранением
+    const encryptedNotification = encryptNotification(notification);
     
-    return newNotification;
+    const [newNotification] = await db.insert(notifications).values(encryptedNotification).returning();
+    
+    // Расшифровываем перед возвратом
+    return decryptNotification(newNotification) as Notification;
   }
 
   async markNotificationAsRead(id: number): Promise<Notification | undefined> {
