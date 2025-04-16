@@ -703,6 +703,7 @@ export default function HomeworkPage() {
                   updateHomeworkMutation.mutate({ id: homeworkToEdit.id, data: values });
                 }
               })} className="space-y-4"
+              id="edit-homework-form"
             >
               <FormField
                 control={homeworkForm.control}
@@ -826,7 +827,11 @@ export default function HomeworkPage() {
               />
               
               <DialogFooter>
-                <Button type="submit" disabled={updateHomeworkMutation.isPending}>
+                <Button 
+                  type="submit" 
+                  disabled={updateHomeworkMutation.isPending}
+                  form="edit-homework-form"
+                >
                   {updateHomeworkMutation.isPending ? 'Сохранение...' : 'Сохранить изменения'}
                 </Button>
               </DialogFooter>
