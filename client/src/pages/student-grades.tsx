@@ -353,6 +353,15 @@ export default function StudentGrades() {
     return eachDayOfInterval({ start: startDate, end: endDate });
   }, [startDate, endDate]);
   
+  // Фильтруем оценки по выбранному периоду
+  const filteredGradesByPeriod = useMemo(() => {
+    return grades.filter(grade => {
+      // Для каждой оценки проверяем, попадает ли она в выбранный период
+      const gradeDate = new Date(grade.createdAt);
+      return gradeDate >= startDate && gradeDate <= endDate;
+    });
+  }, [grades, startDate, endDate]);
+  
   // Группируем оценки по предметам и датам
   const gradesBySubjectAndDate: GradesByDate = useMemo(() => {
     const result: GradesByDate = {};
@@ -362,8 +371,8 @@ export default function StudentGrades() {
       result[subject.id] = {};
     });
     
-    // Заполняем оценками
-    grades.forEach(grade => {
+    // Заполняем оценками, только которые входят в выбранный период
+    filteredGradesByPeriod.forEach(grade => {
       // Получаем дату в формате строки для использования как ключ
       const date = new Date(grade.createdAt).toISOString().split('T')[0];
       
@@ -390,7 +399,7 @@ export default function StudentGrades() {
     });
     
     return result;
-  }, [grades, subjects, assignments]);
+  }, [filteredGradesByPeriod, subjects, assignments]);
   
   // Функция для отображения оценок для конкретного предмета/подгруппы и даты
   const renderGradeCell = (subject: any, date: Date) => {
@@ -418,7 +427,7 @@ export default function StudentGrades() {
       // Для наших целей можем взять scheduleId из assignment и проверить, привязан ли он к нужной дате
       
       // Для каждого assignment найдем оценки, которые имеют scheduleId для урока на эту дату
-      return grades
+      return filteredGradesByPeriod
         .filter(g => {
           // Проверяем, что оценка относится к текущему предмету
           if (g.subjectId !== subjectId) return false;
@@ -440,7 +449,7 @@ export default function StudentGrades() {
     })();
     
     // Получаем оценки для указанного предмета и даты, с учетом расписания
-    const cellGrades = grades.filter(grade => {
+    const cellGrades = filteredGradesByPeriod.filter(grade => {
       // Проверяем предмет
       if (grade.subjectId !== subjectId) return false;
       
@@ -640,8 +649,8 @@ export default function StudentGrades() {
     
     // Если не удалось получить данные из API, используем локальный расчет (обратная совместимость)
     
-    // Фильтруем оценки по предмету и подгруппе (если указана)
-    let subjectGrades = grades.filter(g => {
+    // Фильтруем оценки по предмету и подгруппе (если указана) и периоду
+    let subjectGrades = filteredGradesByPeriod.filter(g => {
       if (g.subjectId !== subjectId) return false;
       
       // Если указана подгруппа, проверяем соответствие
@@ -1022,11 +1031,7 @@ export default function StudentGrades() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {grades
-                        .filter(grade => {
-                          const gradeDate = new Date(grade.createdAt);
-                          return gradeDate >= startDate && gradeDate <= endDate;
-                        })
+                      {filteredGradesByPeriod
                         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                         .map(grade => {
                           // Ищем соответствующее задание (сначала по assignmentId, затем по scheduleId)
@@ -1044,7 +1049,7 @@ export default function StudentGrades() {
                             <TableRow 
                               key={grade.id} 
                               className="cursor-pointer hover:bg-gray-50"
-                              onClick={() => handleGradeClick(grade, assignment)}
+                              onClick={() => handleGradeClick(grade, assignment || null)}
                             >
                               <TableCell>
                                 {format(new Date(grade.createdAt), 'dd.MM.yyyy')}
