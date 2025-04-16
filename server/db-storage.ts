@@ -4,7 +4,17 @@ import { eq, and, or, inArray, sql, lte, ne, gt } from 'drizzle-orm';
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import * as schema from '@shared/schema';
-import { decryptUser, encryptUser, decryptMessage, encryptMessage, decryptMessages, decryptUsers } from "./utils/encrypted-models";
+import { 
+  decryptUser, encryptUser, 
+  decryptMessage, encryptMessage, 
+  decryptCumulativeGrade, encryptCumulativeGrade, 
+  decryptGrade, encryptGrade, 
+  decryptDocument, encryptDocument, 
+  decryptAttendance, encryptAttendance,
+  decryptNotification, encryptNotification,
+  decryptUsers, decryptMessages, decryptNotifications, 
+  decryptGrades, decryptCumulativeGrades, decryptDocuments, decryptAttendances
+} from "./utils/encrypted-models";
 import {
   User, InsertUser,
   School, InsertSchool,
@@ -355,33 +365,50 @@ export class DatabaseStorage implements IStorage {
   // ===== Grade operations =====
   async getGrade(id: number): Promise<Grade | undefined> {
     const result = await db.select().from(grades).where(eq(grades.id, id)).limit(1);
-    return result[0];
+    if (!result[0]) return undefined;
+    // Расшифровываем перед возвратом
+    return decryptGrade(result[0]);
   }
 
   async getGradesByStudent(studentId: number): Promise<Grade[]> {
-    return await db.select().from(grades).where(eq(grades.studentId, studentId));
+    const studentGrades = await db.select().from(grades).where(eq(grades.studentId, studentId));
+    // Расшифровываем оценки
+    return decryptGrades(studentGrades);
   }
 
   async getGradesByClass(classId: number): Promise<Grade[]> {
-    return await db.select().from(grades).where(eq(grades.classId, classId));
+    const classGrades = await db.select().from(grades).where(eq(grades.classId, classId));
+    // Расшифровываем оценки
+    return decryptGrades(classGrades);
   }
 
   async getGradesBySubject(subjectId: number): Promise<Grade[]> {
-    return await db.select().from(grades).where(eq(grades.subjectId, subjectId));
+    const subjectGrades = await db.select().from(grades).where(eq(grades.subjectId, subjectId));
+    // Расшифровываем оценки
+    return decryptGrades(subjectGrades);
   }
 
   async createGrade(grade: InsertGrade): Promise<Grade> {
-    const [newGrade] = await db.insert(grades).values(grade).returning();
-    return newGrade;
+    // Шифруем поля
+    const encryptedGrade = encryptGrade(grade);
+    
+    const [newGrade] = await db.insert(grades).values(encryptedGrade).returning();
+    
+    // Расшифровываем перед возвратом
+    return decryptGrade(newGrade) as Grade;
   }
   
   async updateGrade(id: number, gradeData: Partial<InsertGrade>): Promise<Grade | undefined> {
+    // Шифруем поля
+    const encryptedGradeData = encryptGrade(gradeData as InsertGrade);
+    
     const [updatedGrade] = await db.update(grades)
-      .set(gradeData)
+      .set(encryptedGradeData)
       .where(eq(grades.id, id))
       .returning();
     
-    return updatedGrade;
+    // Расшифровываем перед возвратом
+    return decryptGrade(updatedGrade);
   }
   
   async deleteGrade(id: number): Promise<void> {
@@ -695,9 +722,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNotificationsByUser(userId: number): Promise<Notification[]> {
-    const notifications = await db.select().from(notifications).where(eq(notifications.userId, userId));
+    const userNotifications = await db.select().from(notifications).where(eq(notifications.userId, userId));
     // Расшифровываем все уведомления
-    return decryptNotifications(notifications);
+    return decryptNotifications(userNotifications);
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
@@ -716,7 +743,8 @@ export class DatabaseStorage implements IStorage {
       .where(eq(notifications.id, id))
       .returning();
     
-    return updatedNotification;
+    // Расшифровываем перед возвратом
+    return decryptNotification(updatedNotification);
   }
 
   // ===== Parent-Student operations =====
@@ -960,35 +988,54 @@ export class DatabaseStorage implements IStorage {
   // ===== Cumulative Grade operations =====
   async getCumulativeGrade(id: number): Promise<CumulativeGrade | undefined> {
     const result = await db.select().from(cumulativeGrades).where(eq(cumulativeGrades.id, id)).limit(1);
-    return result[0];
+    if (!result[0]) return undefined;
+    // Расшифровываем перед возвратом
+    return decryptCumulativeGrade(result[0]);
   }
 
   async getCumulativeGradesByAssignment(assignmentId: number): Promise<CumulativeGrade[]> {
-    return await db.select().from(cumulativeGrades).where(eq(cumulativeGrades.assignmentId, assignmentId));
+    const grades = await db.select().from(cumulativeGrades).where(eq(cumulativeGrades.assignmentId, assignmentId));
+    // Расшифровываем оценки
+    return decryptCumulativeGrades(grades);
   }
 
   async getCumulativeGradesByStudent(studentId: number): Promise<CumulativeGrade[]> {
-    return await db.select().from(cumulativeGrades).where(eq(cumulativeGrades.studentId, studentId));
+    const grades = await db.select().from(cumulativeGrades).where(eq(cumulativeGrades.studentId, studentId));
+    // Расшифровываем оценки
+    return decryptCumulativeGrades(grades);
   }
 
   async createCumulativeGrade(grade: InsertCumulativeGrade): Promise<CumulativeGrade> {
-    const [newGrade] = await db.insert(cumulativeGrades).values(grade).returning();
-    return newGrade;
+    // Шифруем поля
+    const encryptedGrade = encryptCumulativeGrade(grade);
+    
+    const [newGrade] = await db.insert(cumulativeGrades).values(encryptedGrade).returning();
+    
+    // Расшифровываем перед возвратом
+    return decryptCumulativeGrade(newGrade) as CumulativeGrade;
   }
 
   async updateCumulativeGrade(id: number, gradeData: Partial<InsertCumulativeGrade>): Promise<CumulativeGrade | undefined> {
+    // Шифруем поля
+    const encryptedGradeData = encryptCumulativeGrade(gradeData as InsertCumulativeGrade);
+    
     const [updatedGrade] = await db.update(cumulativeGrades)
-      .set(gradeData)
+      .set(encryptedGradeData)
       .where(eq(cumulativeGrades.id, id))
       .returning();
-    return updatedGrade;
+    
+    // Расшифровываем перед возвратом
+    return decryptCumulativeGrade(updatedGrade);
   }
 
   async deleteCumulativeGrade(id: number): Promise<CumulativeGrade | undefined> {
     const [deletedGrade] = await db.delete(cumulativeGrades)
       .where(eq(cumulativeGrades.id, id))
       .returning();
-    return deletedGrade;
+    
+    if (!deletedGrade) return undefined;
+    // Расшифровываем перед возвратом
+    return decryptCumulativeGrade(deletedGrade);
   }
 
   async getStudentCumulativeGradesByAssignment(studentId: number, assignmentId: number): Promise<CumulativeGrade | undefined> {
@@ -998,7 +1045,10 @@ export class DatabaseStorage implements IStorage {
         eq(cumulativeGrades.assignmentId, assignmentId)
       ))
       .limit(1);
-    return result[0];
+      
+    if (!result[0]) return undefined;
+    // Расшифровываем перед возвратом
+    return decryptCumulativeGrade(result[0]);
   }
 
   // Helper method to calculate average scores for all assignments in a class
