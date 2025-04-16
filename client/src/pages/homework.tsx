@@ -496,6 +496,7 @@ export default function HomeworkPage() {
                                   classId: hw.classId,
                                   subjectId: hw.subjectId,
                                   scheduleId: hw.scheduleId || undefined,
+                                  dueDate: new Date(hw.dueDate),
                                 });
                                 setIsEditDialogOpen(true);
                               }}
