@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Filter, Search, Upload, Clock, CalendarIcon, FileUpIcon, CheckCircle, Edit, Trash2, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -59,15 +60,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { ru } from "date-fns/locale";
 
-// Schema for homework creation (обновленная схема без dueDate, только с scheduleId)
+// Schema for homework creation with dueDate field
 const homeworkFormSchema = insertHomeworkSchema
-  .omit({ dueDate: true })
   .extend({
     title: z.string().min(1, "Название обязательно"),
     description: z.string().min(1, "Описание обязательно"),
@@ -76,6 +82,9 @@ const homeworkFormSchema = insertHomeworkSchema
     }),
     classId: z.number({
       required_error: "Выберите класс",
+    }),
+    dueDate: z.date({
+      required_error: "Выберите срок выполнения",
     }),
     scheduleId: z.number({
       required_error: "Выберите урок",
@@ -151,6 +160,7 @@ export default function HomeworkPage() {
       subjectId: undefined,
       classId: undefined,
       scheduleId: undefined,
+      dueDate: undefined,
     },
   });
   
@@ -163,6 +173,7 @@ export default function HomeworkPage() {
       subjectId: undefined,
       classId: undefined,
       scheduleId: undefined,
+      dueDate: undefined,
     },
   });
   
@@ -856,6 +867,46 @@ export default function HomeworkPage() {
                         )}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editHomeworkForm.control}
+                name="dueDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Срок выполнения</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PP", { locale: ru })
+                            ) : (
+                              <span>Выберите дату</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date("1900-01-01")}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
