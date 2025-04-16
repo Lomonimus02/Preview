@@ -280,13 +280,7 @@ export default function HomeworkPage() {
   });
 
   const onSubmitHomework = (values: z.infer<typeof homeworkFormSchema>) => {
-    if (homeworkToEdit) {
-      // Если есть задание для редактирования, используем мутацию обновления
-      updateHomeworkMutation.mutate({ id: homeworkToEdit.id, data: values });
-    } else {
-      // Иначе создаем новое задание
-      createHomeworkMutation.mutate(values);
-    }
+    createHomeworkMutation.mutate(values);
   };
 
   const onSubmitSubmission = (values: z.infer<typeof submissionFormSchema>) => {
@@ -694,17 +688,7 @@ export default function HomeworkPage() {
       </Dialog>
       
       {/* Edit Homework Dialog */}
-      <Dialog 
-        open={isEditDialogOpen} 
-        onOpenChange={(open) => {
-          setIsEditDialogOpen(open);
-          if (!open) {
-            // Когда диалог закрывается, сбрасываем homeworkToEdit
-            setHomeworkToEdit(null);
-            homeworkForm.reset();
-          }
-        }}
-      >
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
             <DialogTitle>Редактировать домашнее задание</DialogTitle>
@@ -714,7 +698,11 @@ export default function HomeworkPage() {
           </DialogHeader>
           
           <Form {...homeworkForm}>
-            <form onSubmit={homeworkForm.handleSubmit(onSubmitHomework)} className="space-y-4"
+            <form onSubmit={homeworkForm.handleSubmit((values) => {
+                if (homeworkToEdit) {
+                  updateHomeworkMutation.mutate({ id: homeworkToEdit.id, data: values });
+                }
+              })} className="space-y-4"
             >
               <FormField
                 control={homeworkForm.control}
@@ -838,8 +826,8 @@ export default function HomeworkPage() {
               />
               
               <DialogFooter>
-                <Button type="submit" disabled={updateHomeworkMutation.isPending || createHomeworkMutation.isPending}>
-                  {(updateHomeworkMutation.isPending || createHomeworkMutation.isPending) ? 'Сохранение...' : 'Сохранить изменения'}
+                <Button type="submit" disabled={updateHomeworkMutation.isPending}>
+                  {updateHomeworkMutation.isPending ? 'Сохранение...' : 'Сохранить изменения'}
                 </Button>
               </DialogFooter>
             </form>
