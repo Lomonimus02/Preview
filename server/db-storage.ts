@@ -135,6 +135,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
+    // Генерируем пару RSA ключей для пользователя
+    try {
+      // Только если ключи еще не предоставлены
+      if (!user.publicKey || !user.privateKey) {
+        const { publicKey, privateKey } = generateUserKeyPair();
+        user.publicKey = publicKey;
+        user.privateKey = privateKey;
+      }
+    } catch (error) {
+      console.error('Ошибка при генерации ключей пользователя:', error);
+      // Продолжаем даже если генерация ключей не удалась
+    }
+
     // Шифруем чувствительные поля
     const encryptedUserData = encryptUser(user);
     const [newUser] = await db.insert(users).values(encryptedUserData).returning();

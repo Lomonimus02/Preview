@@ -205,6 +205,7 @@ export const messages = pgTable("messages", {
   attachmentUrl: text("attachment_url"),                 // URL вложения
   isRead: boolean("is_read").default(false).notNull(),   // Прочитано ли сообщение (устаревшее, используем lastReadMessageId)
   sentAt: timestamp("sent_at").defaultNow().notNull(),   // Когда отправлено
+  isE2eEncrypted: boolean("is_e2e_encrypted").default(false), // Флаг сквозного шифрования
 });
 
 // Notifications table
