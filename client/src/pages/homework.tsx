@@ -249,7 +249,7 @@ export default function HomeworkPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/homework"] });
       setIsEditDialogOpen(false);
       setHomeworkToEdit(null);
-      homeworkForm.reset();
+      editHomeworkForm.reset(); // Сбрасываем форму редактирования
       toast({
         title: "Домашнее задание обновлено",
         description: "Изменения успешно сохранены",
