@@ -53,40 +53,32 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
     return startOfWeek(new Date(), { weekStartsOn: 1 });
   });
   
-  const [emblaRef, emblaApi] = useEmblaCarousel({ 
-    loop: false,
-    align: "start",
-    dragFree: true
-  });
+  // Используем простой ref вместо Embla для более гибкого управления прокруткой
 
   // Создаем массив дат для текущей недели
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
   
   // Обработчик колесика мыши для горизонтальной прокрутки
+  const scrollableRef = useRef<HTMLDivElement>(null);
+  
   const handleWheel = useCallback(
     (event: React.WheelEvent) => {
-      if (!emblaApi) return;
+      const container = scrollableRef.current;
+      if (!container) return;
       
       event.preventDefault();
       
       // Определение направления и интенсивности прокрутки
       const delta = event.deltaY || event.deltaX;
-      const scrollAmount = delta * 0.5; // Настраиваем чувствительность прокрутки
+      const scrollAmount = delta * 1.5; // Повышенная чувствительность прокрутки
       
-      // Прокрутка карусели
-      // Используем DOM-элемент напрямую для плавной прокрутки
-      const container = emblaApi.containerNode();
-      if (container) {
-        // Добавляем плавную прокрутку через стили
-        container.style.scrollBehavior = 'smooth';
-        container.scrollLeft += scrollAmount;
-        // Сбрасываем стиль после прокрутки для корректной работы других функций
-        setTimeout(() => {
-          container.style.scrollBehavior = '';
-        }, 300);
-      }
+      // Плавная прокрутка через анимацию
+      container.scrollBy({
+        left: scrollAmount,
+        behavior: 'smooth'
+      });
     },
-    [emblaApi]
+    []
   );
   
   // Обработчики переключения недель
@@ -102,20 +94,29 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
 
   // Скролл к текущему дню, когда меняется неделя
   useEffect(() => {
-    if (emblaApi) {
+    if (scrollableRef.current) {
       // Находим индекс сегодняшнего дня в массиве дат недели
       const today = new Date();
       const todayIndex = weekDates.findIndex(date => isSameDay(date, today));
       
-      // Если сегодняшний день в текущей неделе, скроллим к нему
+      // Получаем ширину дня
+      const dayWidth = scrollableRef.current.offsetWidth / 7;
+      
       if (todayIndex >= 0) {
-        emblaApi.scrollTo(todayIndex);
+        // Если сегодняшний день в текущей неделе, скроллим к нему
+        scrollableRef.current.scrollTo({
+          left: dayWidth * todayIndex,
+          behavior: 'smooth'
+        });
       } else {
         // Иначе скроллим к началу недели
-        emblaApi.scrollTo(0);
+        scrollableRef.current.scrollTo({
+          left: 0,
+          behavior: 'smooth'
+        });
       }
     }
-  }, [emblaApi, weekDates, currentWeekStart]);
+  }, [weekDates, currentWeekStart]);
 
   // Получаем дни недели на русском
   const getDayName = (date: Date) => {
@@ -188,7 +189,8 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         </Button>
       </div>
       
-      <div className="overflow-hidden touch-pan-y overscroll-x-none flex-grow" ref={emblaRef} onWheel={handleWheel}>
+      <div className="overflow-x-auto touch-pan-y overscroll-x-none flex-grow scrollbar-hide" 
+        ref={scrollableRef} onWheel={handleWheel}>
         <div className="flex h-full gap-0.5 xs:gap-1 sm:gap-2 md:gap-3">
           {weekDates.map((date) => (
             <div className="flex-shrink-0 h-full w-[calc(100%/7-0.4rem)] min-w-[300px] max-w-[400px]" key={format(date, "yyyy-MM-dd")}>
