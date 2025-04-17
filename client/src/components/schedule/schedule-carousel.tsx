@@ -131,7 +131,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   const weekRangeText = `${format(currentWeekStart, "d MMM", { locale: ru })} - ${format(currentWeekEnd, "d MMM yyyy", { locale: ru })}`;
 
   return (
-    <div className="h-[calc(100vh-7rem)] flex flex-col mb-1">
+    <div className="h-full flex flex-col">
       <div className="flex flex-wrap justify-between items-center mb-1 xs:mb-2 gap-1 px-1">
         <Button 
           variant="outline" 
