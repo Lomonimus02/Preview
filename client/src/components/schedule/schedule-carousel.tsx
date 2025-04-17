@@ -71,10 +71,12 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
       
       // Определение направления и интенсивности прокрутки
       const delta = event.deltaY || event.deltaX;
-      const scrollAmount = delta * 0.5; // Настраиваем чувствительность прокрутки
       
-      // Прокрутка карусели
-      emblaApi.scrollBy(scrollAmount);
+      // Прокрутка карусели: используем нативный scrollLeft вместо API метода
+      const container = emblaApi.containerNode();
+      if (container) {
+        container.scrollLeft += delta * 0.5; // Настраиваем чувствительность прокрутки
+      }
     },
     [emblaApi]
   );
