@@ -65,28 +65,38 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   // Обработчик колесика мыши для горизонтальной прокрутки
   const handleWheel = useCallback(
     (event: React.WheelEvent) => {
-      if (!emblaApi) return;
+      // Проверяем наличие контейнера и Embla API
+      const emblaContainer = emblaRef.current;
+      if (!emblaContainer) return;
       
+      // Предотвращаем стандартную прокрутку страницы
       event.preventDefault();
       
-      // Определение направления и интенсивности прокрутки
-      const delta = event.deltaY || event.deltaX;
-      const scrollAmount = delta * 0.5; // Настраиваем чувствительность прокрутки
+      // Получаем значение прокрутки (deltaY - вертикальная прокрутка колесика)
+      const delta = event.deltaY;
       
-      // Прокрутка карусели
-      // Используем DOM-элемент напрямую для плавной прокрутки
-      const container = emblaApi.containerNode();
-      if (container) {
-        // Добавляем плавную прокрутку через стили
-        container.style.scrollBehavior = 'smooth';
-        container.scrollLeft += scrollAmount;
-        // Сбрасываем стиль после прокрутки для корректной работы других функций
+      // Настраиваем чувствительность (меньшее значение = более плавная прокрутка)
+      const sensitivity = 1.5; 
+      
+      // Вычисляем на сколько нужно прокрутить
+      const scrollStep = delta * sensitivity;
+      
+      // Получаем текущий контейнер и прокручиваем его напрямую
+      const scrollContainer = emblaContainer.querySelector(".flex");
+      if (scrollContainer) {
+        // Устанавливаем плавную прокрутку
+        scrollContainer.style.scrollBehavior = 'smooth';
+        
+        // Прокручиваем
+        scrollContainer.scrollLeft += scrollStep;
+        
+        // Сбрасываем стиль после прокрутки чтобы не мешать стандартному поведению
         setTimeout(() => {
-          container.style.scrollBehavior = '';
+          scrollContainer.style.scrollBehavior = '';
         }, 300);
       }
     },
-    [emblaApi]
+    [emblaRef]
   );
   
   // Обработчики переключения недель
