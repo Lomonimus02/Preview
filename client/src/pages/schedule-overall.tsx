@@ -20,9 +20,8 @@ export default function OverallSchedulePage() {
   const { isSchoolAdmin } = useRoleCheck();
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   
-  // Проверка доступа (администраторы школы и директора должны иметь доступ)
-  const { isPrincipal } = useRoleCheck();
-  if (!isSchoolAdmin() && !isPrincipal()) {
+  // Проверка доступа (только администраторы школы должны иметь доступ)
+  if (!isSchoolAdmin()) {
     return (
       <MainLayout>
         <div className="container mx-auto py-8">
