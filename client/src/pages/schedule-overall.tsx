@@ -119,17 +119,17 @@ export default function OverallSchedulePage() {
   });
   
   return (
-    <MainLayout>
-      <div className="container mx-auto py-8">
+    <MainLayout customClass="h-screen flex flex-col overflow-hidden">
+      <div className="container mx-auto py-4 flex flex-col h-full overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center items-center min-h-[50vh]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-3 text-lg">Загрузка расписания...</span>
           </div>
         ) : (
-          <>
-            <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <h1 className="text-3xl font-bold">Общее расписание школы</h1>
+          <div className="flex flex-col h-full overflow-hidden">
+            <div className="mb-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 flex-shrink-0">
+              <h1 className="text-2xl md:text-3xl font-bold">Общее расписание школы</h1>
               
               <div className="w-full md:w-72">
                 <Select 
@@ -167,31 +167,33 @@ export default function OverallSchedulePage() {
               </div>
             </div>
             
-            {filteredSchedules.length > 0 ? (
-              <ScheduleCarousel
-                schedules={filteredSchedules}
-                subjects={subjects}
-                teachers={teachers}
-                classes={classes}
-                grades={grades}
-                homework={homework}
-                currentUser={user}
-                isAdmin={isSchoolAdmin()}
-                subgroups={subgroups}
-                showClassNames={true} // Включаем отображение имени класса для каждого урока в общем расписании
-                onAddSchedule={() => {}} // Пустая функция, т.к. не используем добавление расписания на этой странице
-              />
-            ) : (
-              <Alert>
-                <AlertTitle>Расписание отсутствует</AlertTitle>
-                <AlertDescription>
-                  {selectedFilter === "all" 
-                    ? "В школе еще не создано расписание" 
-                    : "Не найдено расписание с указанными параметрами фильтра"}
-                </AlertDescription>
-              </Alert>
-            )}
-          </>
+            <div className="flex-grow overflow-hidden">
+              {filteredSchedules.length > 0 ? (
+                <ScheduleCarousel
+                  schedules={filteredSchedules}
+                  subjects={subjects}
+                  teachers={teachers}
+                  classes={classes}
+                  grades={grades}
+                  homework={homework}
+                  currentUser={user}
+                  isAdmin={isSchoolAdmin()}
+                  subgroups={subgroups}
+                  showClassNames={true} // Включаем отображение имени класса для каждого урока в общем расписании
+                  onAddSchedule={() => {}} // Пустая функция, т.к. не используем добавление расписания на этой странице
+                />
+              ) : (
+                <Alert>
+                  <AlertTitle>Расписание отсутствует</AlertTitle>
+                  <AlertDescription>
+                    {selectedFilter === "all" 
+                      ? "В школе еще не создано расписание" 
+                      : "Не найдено расписание с указанными параметрами фильтра"}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </MainLayout>

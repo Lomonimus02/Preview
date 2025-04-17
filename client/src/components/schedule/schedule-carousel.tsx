@@ -206,7 +206,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
       <div className="overflow-hidden touch-pan-y overscroll-x-none flex-grow" ref={emblaRef} onWheel={handleWheel}>
         <div className="flex h-full gap-0.5 xs:gap-1 sm:gap-2 md:gap-3">
           {weekDates.map((date) => (
-            <div className="flex-shrink-0 h-full w-[calc(100%/7-0.4rem)] min-w-[300px] max-w-[400px]" key={format(date, "yyyy-MM-dd")}>
+            <div className="flex-shrink-0 h-full min-w-[300px] max-w-[400px] w-[calc(100%/7-0.4rem)]" key={format(date, "yyyy-MM-dd")}>
               <ScheduleDayCard
                 date={date}
                 dayName={getDayName(date)}
