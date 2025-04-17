@@ -538,7 +538,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   return (
     <>
-      <Card className="w-full h-full shadow-md flex flex-col max-h-[calc(100vh-12rem)] overflow-hidden">
+      <Card className="w-full h-full shadow-md flex flex-col max-h-[calc(100vh-16rem)] md:max-h-[calc(100vh-12rem)] overflow-hidden">
         <CardHeader className="text-center py-1 xs:py-1.5 sm:py-2 bg-white sticky top-0 z-10">
           <CardTitle className="text-lg sm:text-xl">{dayName}</CardTitle>
           <div className="text-xs xs:text-sm text-gray-500">{formattedDate}</div>
@@ -1063,7 +1063,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог для просмотра детальной информации об оценке */}
       <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
+        <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Информация об оценке</DialogTitle>
             <DialogDescription>
