@@ -356,7 +356,7 @@ export default function DocumentsPage() {
       
       {/* Upload Document Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Загрузить документ</DialogTitle>
             <DialogDescription>
