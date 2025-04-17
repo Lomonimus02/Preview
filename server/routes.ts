@@ -2942,9 +2942,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/messages", isAuthenticated, async (req, res) => {
+    // Force enable E2E encryption, regardless of what client provided
     const message = await dataStorage.createMessage({
       ...req.body,
-      senderId: req.user.id
+      senderId: req.user.id,
+      isE2eEncrypted: true // Always force E2E encryption
     });
     
     // Create notification for the receiver
@@ -4857,14 +4859,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You are not a participant of this chat" });
       }
       
-      // Создаем сообщение
+      // Создаем сообщение с обязательным E2E шифрованием
       const newMessage = await dataStorage.createChatMessage({
         chatId,
         senderId: req.user.id,
         content: content || null,
         hasAttachment: !!hasAttachment,
         attachmentType: attachmentType || null,
-        attachmentUrl: attachmentUrl || null
+        attachmentUrl: attachmentUrl || null,
+        isE2eEncrypted: true // Принудительно включаем E2E шифрование для всех сообщений
       });
       
       // Получаем информацию об отправителе
