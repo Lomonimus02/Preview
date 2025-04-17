@@ -625,17 +625,17 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
                     return (
                       <div className="space-y-1">
                         {slotsToShow.map(({ slot, schedules, isEmpty }) => (
-                          <div key={slot.slotNumber} className="time-slot rounded-lg border border-gray-100">
+                          <div key={slot.slotNumber} className={`time-slot rounded-lg border border-gray-100 ${isEmpty ? 'empty-slot' : ''}`}>
                             {/* Заголовок слота - компактная версия */}
-                            <div className="p-0.5 bg-gray-50 rounded-t-lg border-b border-gray-100 flex items-center justify-between">
+                            <div className={`${isEmpty ? 'p-0.5' : 'p-1'} bg-gray-50 rounded-t-lg border-b border-gray-100 flex items-center justify-between`}>
                               <div className="font-medium text-xs text-gray-800">{slot.slotNumber} урок</div>
                               <div className="text-xs text-gray-600">{slot.startTime}</div>
                             </div>
                             
                             {/* Содержимое слота */}
-                            <div className="p-0.5">
+                            <div className={`${isEmpty ? 'p-0' : 'p-1'}`}>
                               {isEmpty ? (
-                                <div className="h-4 flex items-center justify-center text-xs text-gray-400">
+                                <div className="h-3 flex items-center justify-center text-xs text-gray-400">
                                   <span>—</span>
                                 </div>
                               ) : (
@@ -737,7 +737,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог с детальной информацией об уроке */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
+        <DialogContent className="sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Информация об уроке</DialogTitle>
             <DialogDescription>
