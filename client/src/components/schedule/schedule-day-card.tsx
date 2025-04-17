@@ -538,7 +538,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   return (
     <>
-      <Card className="min-w-[170px] w-[calc(100vw-2rem)] xs:min-w-[250px] sm:w-full sm:max-w-[380px] h-[min(60vh,420px)] overflow-y-auto shadow-md">
+      <Card className="min-w-[170px] w-[calc(100vw-2rem)] xs:min-w-[250px] sm:w-full sm:max-w-[380px] h-[min(80vh,650px)] overflow-y-auto shadow-md">
         <CardHeader className="text-center py-1.5 xs:py-2 sm:py-3 bg-white sticky top-0 z-10">
           <CardTitle className="text-lg sm:text-xl">{dayName}</CardTitle>
           <div className="text-xs xs:text-sm text-gray-500">{formattedDate}</div>
