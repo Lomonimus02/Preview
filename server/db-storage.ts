@@ -649,17 +649,25 @@ export class DatabaseStorage implements IStorage {
   
   // ===== Chat operations =====
   async createChat(chat: InsertChat): Promise<Chat> {
+    // Шифруем поле name перед сохранением
+    const encryptedChat = encryptChat(chat);
+    
     const [newChat] = await db.insert(chats).values({
-      ...chat,
+      ...encryptedChat,
       createdAt: new Date(),
       lastMessageAt: null
     }).returning();
-    return newChat;
+    
+    // Расшифровываем поле name перед возвратом
+    return decryptChat(newChat) as Chat;
   }
   
   async getChat(id: number): Promise<Chat | undefined> {
     const result = await db.select().from(chats).where(eq(chats.id, id)).limit(1);
-    return result[0];
+    if (result.length === 0) return undefined;
+    
+    // Расшифровываем поле name перед возвратом
+    return decryptChat(result[0]) as Chat;
   }
   
   async getUserChats(userId: number): Promise<Chat[]> {
@@ -682,8 +690,11 @@ export class DatabaseStorage implements IStorage {
       .where(inArray(chats.id, chatIds))
       .orderBy(sql`chats.last_message_at DESC NULLS LAST`);
       
+    // Расшифровываем поля name в чатах
+    const decryptedChats = decryptChats(userChats);
+      
     // Для каждого чата рассчитываем количество непрочитанных сообщений
-    const result = await Promise.all(userChats.map(async (chat) => {
+    const result = await Promise.all(decryptedChats.map(async (chat) => {
       // Получаем lastReadMessageId для данного пользователя в этом чате
       const lastReadMessageId = participationMap.get(chat.id);
       
@@ -720,7 +731,9 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getUsersChatBySchool(schoolId: number): Promise<Chat[]> {
-    return await db.select().from(chats).where(eq(chats.schoolId, schoolId));
+    const schoolChats = await db.select().from(chats).where(eq(chats.schoolId, schoolId));
+    // Расшифровываем поля name в чатах
+    return decryptChats(schoolChats);
   }
   
   // ===== Chat participant operations =====
@@ -758,12 +771,20 @@ export class DatabaseStorage implements IStorage {
   }
   
   async updateChat(id: number, chatData: Partial<InsertChat>): Promise<Chat | undefined> {
+    // Если обновляем name поле, шифруем его
+    if (chatData.name !== undefined) {
+      chatData = encryptChat(chatData);
+    }
+    
     await db.update(chats)
       .set(chatData)
       .where(eq(chats.id, id));
     
     const result = await db.select().from(chats).where(eq(chats.id, id)).limit(1);
-    return result[0];
+    if (!result[0]) return undefined;
+    
+    // Расшифровываем name перед возвратом
+    return decryptChat(result[0]) as Chat;
   }
   
   async deleteChat(id: number): Promise<Chat | undefined> {
@@ -784,7 +805,8 @@ export class DatabaseStorage implements IStorage {
     await db.delete(chats)
       .where(eq(chats.id, id));
     
-    return chat;
+    // Расшифровываем name перед возвратом
+    return decryptChat(chat) as Chat;
   }
   
   async createChatMessage(message: InsertMessage): Promise<Message> {

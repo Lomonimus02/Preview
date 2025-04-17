@@ -124,3 +124,19 @@ export function encryptCumulativeGrade(grade: InsertCumulativeGrade): InsertCumu
 export function decryptCumulativeGrades(grades: CumulativeGrade[]): CumulativeGrade[] {
   return grades.map(grade => decryptCumulativeGrade(grade)) as CumulativeGrade[];
 }
+
+// Функции для обработки чатов
+export function decryptChat(chat: Chat | null): Chat | null {
+  if (!chat) return null;
+  return decryptModel(chat, encryptedFields.chats);
+}
+
+export function encryptChat(chat: InsertChat): InsertChat {
+  if (!chat) return chat;
+  return encryptModel(chat, encryptedFields.chats as (keyof InsertChat)[]);
+}
+
+// Функция для расшифровки массива чатов
+export function decryptChats(chats: Chat[]): Chat[] {
+  return chats.map(chat => decryptChat(chat)) as Chat[];
+}
