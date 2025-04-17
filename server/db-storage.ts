@@ -14,7 +14,8 @@ import {
   decryptAttendance, encryptAttendance,
   decryptNotification, encryptNotification,
   decryptUsers, decryptMessages, decryptNotifications, 
-  decryptGrades, decryptCumulativeGrades, decryptDocuments, decryptAttendances
+  decryptGrades, decryptCumulativeGrades, decryptDocuments, decryptAttendances,
+  decryptChat, encryptChat, decryptChats
 } from "./utils/encrypted-models";
 import {
   User, InsertUser,
