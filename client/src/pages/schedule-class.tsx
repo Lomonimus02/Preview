@@ -230,8 +230,8 @@ export default function ClassSchedulePage() {
                     gradesLoading || subgroupsLoading;
   
   return (
-    <MainLayout>
-      <div className="container mx-auto py-8">
+    <MainLayout className="overflow-hidden">
+      <div className="container mx-auto py-8 h-full flex flex-col">
         {isLoading ? (
           <div className="flex justify-center items-center min-h-[50vh]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -239,8 +239,8 @@ export default function ClassSchedulePage() {
           </div>
         ) : (
           <>
-            <div className="mb-6 flex items-center justify-between">
-              <h1 className="text-3xl font-bold">
+            <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 flex-shrink-0">
+              <h1 className="text-2xl sm:text-3xl font-bold">
                 Расписание класса: {classData?.name || `#${classId}`}
               </h1>
               {!canView && (
@@ -250,7 +250,7 @@ export default function ClassSchedulePage() {
                     setScheduleToEdit(null);
                     setIsScheduleFormOpen(true);
                   }}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 shrink-0"
                 >
                   <Plus size={16} />
                   Добавить урок
@@ -258,7 +258,7 @@ export default function ClassSchedulePage() {
               )}
             </div>
             
-            <div className="flex flex-wrap items-center gap-4 mb-8">
+            <div className="flex flex-wrap items-center gap-4 mb-4 flex-shrink-0">
               <Link href={`/schedule-class/${classId}`} className={`px-4 py-2 rounded-md font-medium ${!location.includes('time-slots') ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}>
                 Расписание
               </Link>
@@ -270,22 +270,24 @@ export default function ClassSchedulePage() {
             </div>
             
             {schedules.length > 0 ? (
-              <ScheduleCarousel
-                schedules={schedules}
-                subjects={subjects}
-                teachers={teachers}
-                classes={classes}
-                grades={grades}
-                homework={homework}
-                currentUser={user}
-                isAdmin={isSchoolAdmin()}
-                subgroups={subgroups}
-                showClassNames={false} // В расписании класса не показываем название класса для каждого урока
-                onAddSchedule={handleAddSchedule} // Обработчик добавления урока
-                onEditSchedule={handleEditSchedule} // Обработчик редактирования урока
-                onDeleteSchedule={handleDeleteSchedule} // Обработчик удаления урока
-                canView={canView} // Передаем флаг режима просмотра для директора
-              />
+              <div className="flex-grow overflow-hidden">
+                <ScheduleCarousel
+                  schedules={schedules}
+                  subjects={subjects}
+                  teachers={teachers}
+                  classes={classes}
+                  grades={grades}
+                  homework={homework}
+                  currentUser={user}
+                  isAdmin={isSchoolAdmin()}
+                  subgroups={subgroups}
+                  showClassNames={false} // В расписании класса не показываем название класса для каждого урока
+                  onAddSchedule={handleAddSchedule} // Обработчик добавления урока
+                  onEditSchedule={handleEditSchedule} // Обработчик редактирования урока
+                  onDeleteSchedule={handleDeleteSchedule} // Обработчик удаления урока
+                  canView={canView} // Передаем флаг режима просмотра для директора
+                />
+              </div>
             ) : (
               <Alert>
                 <AlertTitle>Расписание отсутствует</AlertTitle>

@@ -119,8 +119,8 @@ export default function OverallSchedulePage() {
   });
   
   return (
-    <MainLayout>
-      <div className="container mx-auto py-8">
+    <MainLayout className="overflow-hidden">
+      <div className="container mx-auto py-8 h-full flex flex-col">
         {isLoading ? (
           <div className="flex justify-center items-center min-h-[50vh]">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -128,10 +128,10 @@ export default function OverallSchedulePage() {
           </div>
         ) : (
           <>
-            <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <h1 className="text-3xl font-bold">Общее расписание школы</h1>
+            <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 flex-shrink-0">
+              <h1 className="text-2xl sm:text-3xl font-bold">Общее расписание школы</h1>
               
-              <div className="w-full md:w-72">
+              <div className="w-full md:w-72 shrink-0">
                 <Select 
                   value={selectedFilter} 
                   onValueChange={setSelectedFilter}
@@ -168,19 +168,21 @@ export default function OverallSchedulePage() {
             </div>
             
             {filteredSchedules.length > 0 ? (
-              <ScheduleCarousel
-                schedules={filteredSchedules}
-                subjects={subjects}
-                teachers={teachers}
-                classes={classes}
-                grades={grades}
-                homework={homework}
-                currentUser={user}
-                isAdmin={isSchoolAdmin()}
-                subgroups={subgroups}
-                showClassNames={true} // Включаем отображение имени класса для каждого урока в общем расписании
-                onAddSchedule={() => {}} // Пустая функция, т.к. не используем добавление расписания на этой странице
-              />
+              <div className="flex-grow overflow-hidden">
+                <ScheduleCarousel
+                  schedules={filteredSchedules}
+                  subjects={subjects}
+                  teachers={teachers}
+                  classes={classes}
+                  grades={grades}
+                  homework={homework}
+                  currentUser={user}
+                  isAdmin={isSchoolAdmin()}
+                  subgroups={subgroups}
+                  showClassNames={true} // Включаем отображение имени класса для каждого урока в общем расписании
+                  onAddSchedule={() => {}} // Пустая функция, т.к. не используем добавление расписания на этой странице
+                />
+              </div>
             ) : (
               <Alert>
                 <AlertTitle>Расписание отсутствует</AlertTitle>
