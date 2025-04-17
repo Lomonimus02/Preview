@@ -684,7 +684,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог для создания домашнего задания */}
       <Dialog open={isHomeworkDialogOpen} onOpenChange={setIsHomeworkDialogOpen}>
-        <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
+        <DialogContent className="sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Добавить домашнее задание</DialogTitle>
             <DialogDescription>
@@ -709,7 +709,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог для создания/редактирования задания */}
       <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-        <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
+        <DialogContent className="sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>{selectedAssignment ? "Редактировать задание" : "Создать задание"}</DialogTitle>
             <DialogDescription>
@@ -1012,7 +1012,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог с формой для заданий (накопительная система оценок) */}
       <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-        <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
+        <DialogContent className="sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedAssignment ? "Редактирование задания" : "Создание задания"}
@@ -1063,7 +1063,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог для просмотра детальной информации об оценке */}
       <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
-        <DialogContent className="sm:max-w-xl md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
+        <DialogContent className="sm:max-w-xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Информация об оценке</DialogTitle>
             <DialogDescription>
