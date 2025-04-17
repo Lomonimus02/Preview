@@ -14,7 +14,6 @@
   /* Специальные стили только для страницы расписания */
   html, body {
     height: 100%;
-    overflow: auto;
   }
   .schedule-container {
     height: 100% !important;

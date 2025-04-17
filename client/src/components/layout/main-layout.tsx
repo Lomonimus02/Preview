@@ -41,7 +41,7 @@ export function MainLayout({ children, className }: MainLayoutProps) {
         
         {/* Main Content */}
         <main 
-          className={`flex-1 bg-gray-50 p-4 transition-all duration-300 overflow-hidden 
+          className={`flex-1 bg-gray-50 p-4 transition-all duration-300 overflow-auto 
             ${!sidebarOpen ? 'md:w-full' : ''} 
             ${className ? className : ''}`}
         >
