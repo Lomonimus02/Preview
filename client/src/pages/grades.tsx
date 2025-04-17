@@ -328,7 +328,7 @@ export default function Grades() {
       
       {/* Add Grade Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Добавить оценку</DialogTitle>
             <DialogDescription>

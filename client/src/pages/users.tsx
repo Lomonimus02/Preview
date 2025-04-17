@@ -655,7 +655,7 @@ export default function UsersPage() {
     <MainLayout>
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Удаление пользователя</DialogTitle>
             <DialogDescription>

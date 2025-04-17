@@ -488,7 +488,7 @@ export default function SchedulePage() {
         
         {/* Class Students Dialog */}
         <Dialog open={isClassStudentsDialogOpen} onOpenChange={setIsClassStudentsDialogOpen}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
             <DialogHeader>
               <DialogTitle>Ученики класса {getClassName(selectedClassId || 0)}</DialogTitle>
               <DialogDescription>
@@ -568,7 +568,7 @@ export default function SchedulePage() {
         
         {/* Add Grade Dialog */}
         <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
             <DialogHeader>
               <DialogTitle>Добавить оценку</DialogTitle>
               <DialogDescription>
