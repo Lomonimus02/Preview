@@ -160,7 +160,7 @@ export const ScheduleForm: React.FC<ScheduleFormProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>
             {initialValues ? "Редактировать урок" : "Добавить урок в расписание"}

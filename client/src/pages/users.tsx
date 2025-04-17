@@ -655,7 +655,7 @@ export default function UsersPage() {
     <MainLayout>
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Удаление пользователя</DialogTitle>
             <DialogDescription>
@@ -1159,7 +1159,7 @@ export default function UsersPage() {
       
       {/* Add User Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md max-w-[95vw] w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Добавить пользователя</DialogTitle>
             <DialogDescription>
@@ -1539,7 +1539,7 @@ export default function UsersPage() {
       
       {/* Edit User Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md max-w-[95vw] w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Редактировать пользователя</DialogTitle>
             <DialogDescription>
