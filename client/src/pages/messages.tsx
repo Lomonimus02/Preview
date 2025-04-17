@@ -903,71 +903,75 @@ export default function MessagesPage() {
                                 {message.hasAttachment && message.attachmentUrl && (
                                   <div className="mt-2">
                                     {message.attachmentType === 'image' ? (
-                                      <a 
-                                        href={message.attachmentUrl} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="block"
+                                      <div 
+                                        onClick={() => window.open(message.attachmentUrl, '_blank')}
+                                        className="cursor-pointer"
                                       >
                                         <img 
-                                          src={message.attachmentUrl.startsWith('http') ? message.attachmentUrl : message.attachmentUrl} 
+                                          src={`${message.attachmentUrl}?nocache=${Date.now()}`}
                                           alt="Изображение" 
                                           className="max-w-full h-auto max-h-[300px] rounded-md hover:opacity-90 transition-opacity border border-gray-200 shadow-sm"
                                           onError={(e) => {
                                             console.error('Ошибка загрузки изображения:', message.attachmentUrl);
-                                            e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTMgMTRIMTFWNEgxM1YxNFoiIGZpbGw9ImN1cnJlbnRDb2xvciI+PC9wYXRoPjxwYXRoIGQ9Ik0xMyAyMEgxMVYxOEgxM1YyMFoiIGZpbGw9ImN1cnJlbnRDb2xvciI+PC9wYXRoPjwvc3ZnPg==';
-                                            e.currentTarget.alt = 'Не удалось загрузить изображение';
-                                            e.currentTarget.classList.add('p-4', 'bg-red-50');
+                                            // Пробуем повторить запрос с параметром nocache, если это ошибка кеширования
+                                            if (!e.currentTarget.src.includes('retry')) {
+                                              e.currentTarget.src = `${message.attachmentUrl}?retry=true&nocache=${Date.now()}`;
+                                            } else {
+                                              // Если повторная попытка не удалась, показываем заглушку
+                                              e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTMgMTRIMTFWNEgxM1YxNFoiIGZpbGw9ImN1cnJlbnRDb2xvciI+PC9wYXRoPjxwYXRoIGQ9Ik0xMyAyMEgxMVYxOEgxM1YyMFoiIGZpbGw9ImN1cnJlbnRDb2xvciI+PC9wYXRoPjwvc3ZnPg==';
+                                              e.currentTarget.alt = 'Не удалось загрузить изображение';
+                                              e.currentTarget.classList.add('p-4', 'bg-red-50');
+                                            }
                                           }}
                                         />
-                                      </a>
+                                      </div>
                                     ) : message.attachmentType === 'video' ? (
                                       <div className="rounded-md overflow-hidden border border-gray-200 shadow-sm">
                                         <div className="relative">
                                           <video 
-                                            src={message.attachmentUrl}
+                                            src={`${message.attachmentUrl}?nocache=${Date.now()}`}
                                             controls
                                             className="max-w-full w-full rounded-t-md bg-black"
                                             controlsList="nodownload"
                                             preload="metadata"
-                                            poster={message.attachmentUrl + '?poster=true'}
                                           />
                                           <div className="absolute inset-0 bg-black/30 pointer-events-none flex items-center justify-center">
                                             <Play className="h-12 w-12 text-white opacity-80" />
                                           </div>
                                         </div>
                                         <div className="flex p-2 gap-2 bg-gray-50">
-                                          <a 
-                                            href={message.attachmentUrl} 
-                                            download
+                                          <button 
+                                            onClick={() => window.open(message.attachmentUrl, '_blank')}
                                             className="flex items-center p-1.5 bg-gray-100 justify-center text-xs rounded flex-1 hover:bg-gray-200 transition-colors"
                                           >
                                             <Download className="h-3 w-3 mr-1" />
                                             <span>Скачать</span>
-                                          </a>
-                                          <a 
-                                            href={message.attachmentUrl} 
-                                            target="_blank"
-                                            rel="noopener noreferrer"
+                                          </button>
+                                          <button 
+                                            onClick={() => window.open(message.attachmentUrl, '_blank')}
                                             className="flex items-center p-1.5 bg-gray-100 justify-center text-xs rounded flex-1 hover:bg-gray-200 transition-colors"
                                           >
                                             <ExternalLink className="h-3 w-3 mr-1" />
                                             <span>Открыть</span>
-                                          </a>
+                                          </button>
                                         </div>
                                       </div>
                                     ) : (
-                                      <a 
-                                        href={message.attachmentUrl} 
-                                        download
-                                        className="flex items-center p-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors border border-gray-200 shadow-sm"
+                                      <div 
+                                        onClick={() => window.open(message.attachmentUrl, '_blank')}
+                                        className="flex items-center p-2 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors border border-gray-200 shadow-sm cursor-pointer"
                                       >
                                         <FileIcon className="h-5 w-5 mr-2 text-gray-600" />
-                                        <span className="text-sm truncate flex-grow">
-                                          {message.attachmentUrl.split('/').pop() || 'Документ'}
-                                        </span>
-                                        <span className="text-xs bg-gray-200 px-2 py-1 rounded-full ml-2">Скачать</span>
-                                      </a>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm font-medium truncate">
+                                            {message.attachmentUrl.split('/').pop() || 'Документ'}
+                                          </p>
+                                          <p className="text-xs text-gray-500">
+                                            Документ
+                                          </p>
+                                        </div>
+                                        <Download className="h-4 w-4 flex-shrink-0 text-gray-400 ml-3" />
+                                      </div>
                                     )}
                                   </div>
                                 )}
