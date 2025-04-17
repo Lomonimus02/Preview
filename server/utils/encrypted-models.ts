@@ -3,7 +3,7 @@ import {
   User, Message, InsertUser, InsertMessage, 
   Grade, InsertGrade, Document, InsertDocument,
   Notification, InsertNotification, Attendance, InsertAttendance,
-  CumulativeGrade, InsertCumulativeGrade
+  CumulativeGrade, InsertCumulativeGrade, Chat, InsertChat
 } from '@shared/schema';
 
 // Список полей, которые должны быть зашифрованы для каждой модели
@@ -14,7 +14,8 @@ export const encryptedFields = {
   grades: ['comment'] as (keyof Grade)[],
   attendance: ['comment'] as (keyof Attendance)[],
   notifications: ['content'] as (keyof Notification)[],
-  cumulativeGrades: ['comment'] as (keyof CumulativeGrade)[]
+  cumulativeGrades: ['comment'] as (keyof CumulativeGrade)[],
+  chats: ['name'] as (keyof Chat)[]
 };
 
 // Функции для обработки пользователей
