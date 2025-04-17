@@ -136,7 +136,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         <Button 
           variant="outline" 
           onClick={goToPreviousWeek}
-          className="gap-1 text-xs sm:text-sm h-8 xs:h-9"
+          className="gap-1 text-xs sm:text-sm h-8 xs:h-9 flex-shrink-0"
           size="sm"
         >
           <FiChevronLeft className="shrink-0" /> 
@@ -152,7 +152,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         <Button 
           variant="outline" 
           onClick={goToNextWeek}
-          className="gap-1 text-xs sm:text-sm h-8 xs:h-9"
+          className="gap-1 text-xs sm:text-sm h-8 xs:h-9 flex-shrink-0"
           size="sm"
         >
           <span className="hidden sm:inline">След. неделя</span>
@@ -164,7 +164,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
       <div className="overflow-hidden touch-pan-y overscroll-x-none flex-grow" ref={emblaRef}>
         <div className="flex h-full gap-0.5 xs:gap-1 sm:gap-2 md:gap-3">
           {weekDates.map((date) => (
-            <div className="flex-shrink-0 h-full w-[calc(100%/7-0.5rem)] min-w-[260px]" key={format(date, "yyyy-MM-dd")}>
+            <div className="flex-shrink-0 h-full w-[calc(100%/7-0.5rem)] min-w-[260px] max-w-[350px]" key={format(date, "yyyy-MM-dd")}>
               <ScheduleDayCard
                 date={date}
                 dayName={getDayName(date)}
