@@ -4756,28 +4756,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "You are not a participant of this chat" });
       }
       
+      // Перемещаем файл из временной директории с шифрованием
+      const tempFilePath = req.file.path;
+      const { filename, isEncrypted } = await moveUploadedFile(tempFilePath, true); // добавляем шифрование
+      
       // Определяем тип файла
       const attachmentType = getFileType(req.file.mimetype);
       
-      // Формируем URL файла
-      const attachmentUrl = getFileUrl(req.file.filename);
+      // Создаем URL-маршрут для получения файла через специальный endpoint
+      const attachmentUrl = `/api/chats/files/${filename}`;
       
       // Возвращаем информацию о загруженном файле
       res.status(201).json({
         success: true,
         file: {
-          filename: req.file.filename,
+          filename: filename,
           originalname: req.file.originalname,
           mimetype: req.file.mimetype,
           size: req.file.size,
           url: attachmentUrl,
-          type: attachmentType
+          type: attachmentType,
+          isEncrypted: isEncrypted
         }
       });
       
     } catch (error) {
       console.error("Error uploading file for chat:", error);
       res.status(500).json({ message: "Failed to upload file", error: error.message });
+    }
+  });
+  
+  // Маршрут для получения и отображения файлов чата
+  app.get("/api/chats/files/:filename", async (req, res) => {
+    try {
+      const filename = req.params.filename;
+      
+      // Проверяем, существует ли файл в зашифрованной директории
+      let isEncrypted = false;
+      const encryptedPath = path.join(process.cwd(), 'uploads', 'encrypted', filename);
+      const regularPath = path.join(process.cwd(), 'uploads', filename);
+      
+      try {
+        await fs.access(encryptedPath);
+        isEncrypted = true;
+      } catch (err) {
+        try {
+          await fs.access(regularPath);
+        } catch (err) {
+          return res.status(404).json({ message: "File not found" });
+        }
+      }
+      
+      // Если файл зашифрован, расшифровываем его перед отправкой
+      if (isEncrypted) {
+        const { filePath, deleteAfter } = await prepareFileForDownload(filename, true);
+        
+        // Отправляем файл и после отправки удаляем временный расшифрованный файл
+        res.sendFile(filePath, (err) => {
+          if (err) {
+            console.error('Error sending file:', err);
+            return res.status(500).send('Error sending file');
+          }
+          
+          // Если это временный расшифрованный файл, удаляем его после отправки
+          if (deleteAfter) {
+            setTimeout(async () => {
+              try {
+                await fs.unlink(filePath);
+              } catch (error) {
+                console.error('Error removing temp file:', error);
+              }
+            }, 5000); // Удаляем через 5 секунд
+          }
+        });
+      } else {
+        // Если файл не зашифрован, просто отправляем его
+        res.sendFile(regularPath);
+      }
+    } catch (error) {
+      console.error("Error accessing chat file:", error);
+      res.status(500).json({ message: "Failed to access file", error: error.message });
     }
   });
 
