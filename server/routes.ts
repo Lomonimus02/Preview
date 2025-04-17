@@ -3748,6 +3748,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Получение всех оценок для класса
+  app.get("/api/grades-by-class/:classId", isAuthenticated, async (req, res) => {
+    try {
+      const classId = parseInt(req.params.classId);
+      
+      // Проверка прав доступа
+      const userHasAccess = await checkUserHasAccessToClass(req.user, classId);
+      if (!userHasAccess) {
+        return res.status(403).json({ message: "Access denied to this class data" });
+      }
+      
+      // Получаем все оценки для данного класса
+      const gradesData = await db
+        .select()
+        .from(grades)
+        .where(eq(grades.classId, classId));
+      
+      // Загружаем информацию о расписании для каждой оценки, связанной с уроком
+      const extendedGrades = await Promise.all(
+        gradesData.map(async (grade) => {
+          let result = { ...grade };
+          
+          // Если оценка связана с уроком (scheduleId указан), загружаем информацию о расписании
+          if (grade.scheduleId) {
+            const schedule = await dataStorage.getSchedule(grade.scheduleId);
+            if (schedule) {
+              result.schedule = schedule;
+            }
+          }
+          
+          return result;
+        })
+      );
+      
+      res.json(extendedGrades);
+    } catch (error) {
+      console.error('Error fetching class grades:', error);
+      res.status(500).json({ message: 'Failed to fetch class grades', error: error.message });
+    }
+  });
+  
   // Получение расписания студента для классного руководителя
   app.get("/api/student-schedules/:studentId", isAuthenticated, async (req, res) => {
     try {
