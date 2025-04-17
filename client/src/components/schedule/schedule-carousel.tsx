@@ -77,7 +77,13 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
       // Используем DOM-элемент напрямую для плавной прокрутки
       const container = emblaApi.containerNode();
       if (container) {
+        // Добавляем плавную прокрутку через стили
+        container.style.scrollBehavior = 'smooth';
         container.scrollLeft += scrollAmount;
+        // Сбрасываем стиль после прокрутки для корректной работы других функций
+        setTimeout(() => {
+          container.style.scrollBehavior = '';
+        }, 300);
       }
     },
     [emblaApi]
