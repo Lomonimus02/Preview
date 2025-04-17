@@ -19,7 +19,7 @@ export default function ClassTeacherDashboard() {
   const { user } = useAuth();
   const { isClassTeacher, isTeacher } = useRoleCheck();
   const { toast } = useToast();
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+
   const [classId, setClassId] = useState<number | null>(null);
   
   // Проверяем права доступа пользователя (не обязательно активная роль должна быть class_teacher)
@@ -94,17 +94,7 @@ export default function ClassTeacherDashboard() {
     enabled: !!classId,
   });
 
-  // Получаем расписание выбранного ученика или расписание класса
-  const { data: studentSchedule = [], isLoading: scheduleLoading } = useQuery({
-    queryKey: ["/api/student-schedules", selectedStudentId],
-    queryFn: async () => {
-      if (!selectedStudentId) return [];
-      const res = await apiRequest(`/api/student-schedules/${selectedStudentId}`, "GET");
-      if (!res.ok) throw new Error("Не удалось загрузить расписание ученика");
-      return res.json();
-    },
-    enabled: !!selectedStudentId,
-  });
+
 
   // Получаем расписание всего класса
   const { data: classSchedule = [] } = useQuery({
@@ -114,7 +104,7 @@ export default function ClassTeacherDashboard() {
       if (!res.ok) throw new Error("Не удалось загрузить расписание класса");
       return res.json();
     },
-    enabled: !!classId && !selectedStudentId,
+    enabled: !!classId,
   });
 
   // Получение дополнительных данных для отображения расписания
@@ -143,10 +133,7 @@ export default function ClassTeacherDashboard() {
     enabled: !!user,
   });
 
-  // Выбор ученика для просмотра его расписания
-  const handleSelectStudent = (studentId: number) => {
-    setSelectedStudentId(studentId === selectedStudentId ? null : studentId);
-  };
+
 
   if (!user || !isClassTeacher()) {
     return (
@@ -175,14 +162,7 @@ export default function ClassTeacherDashboard() {
               </p>
             )}
           </div>
-          {selectedStudentId && (
-            <Button 
-              variant="outline" 
-              onClick={() => setSelectedStudentId(null)}
-            >
-              Вернуться к классу
-            </Button>
-          )}
+
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -223,12 +203,9 @@ export default function ClassTeacherDashboard() {
                 <p>Загрузка списка учеников...</p>
               ) : students.length > 0 ? (
                 students.map(student => (
-                  <Card key={student.id} className={`hover:border-primary transition-all ${selectedStudentId === student.id ? 'border-primary' : ''}`}>
+                  <Card key={student.id} className="hover:border-primary transition-all">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-lg">{student.lastName} {student.firstName}</CardTitle>
-                      {student.patronymic && (
-                        <CardDescription>{student.patronymic}</CardDescription>
-                      )}
                     </CardHeader>
                     <CardContent className="pb-2">
                       <div className="grid grid-cols-2 gap-1 text-sm">
@@ -272,38 +249,7 @@ export default function ClassTeacherDashboard() {
               )}
             </div>
             
-            {selectedStudentId && (
-              <>
-                <Separator className="my-6" />
-                <div className="mb-4">
-                  <h3 className="text-xl font-semibold mb-2">
-                    Расписание ученика: {students.find(s => s.id === selectedStudentId)?.lastName} {students.find(s => s.id === selectedStudentId)?.firstName}
-                  </h3>
-                </div>
-                
-                {scheduleLoading ? (
-                  <p>Загрузка расписания ученика...</p>
-                ) : studentSchedule.length > 0 ? (
-                  <ScheduleCarousel
-                    schedules={studentSchedule}
-                    subjects={subjects}
-                    teachers={teachers}
-                    classes={classes}
-                    grades={grades}
-                    homework={homework}
-                    currentUser={user}
-                    isAdmin={false}
-                  />
-                ) : (
-                  <Alert>
-                    <AlertTitle>Расписание отсутствует</AlertTitle>
-                    <AlertDescription>
-                      Для этого ученика нет активного расписания
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </>
-            )}
+
           </TabsContent>
           
           <TabsContent value="schedule">
