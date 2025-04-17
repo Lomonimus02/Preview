@@ -3759,11 +3759,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied to this class data" });
       }
       
-      // Получаем все оценки для данного класса
-      const gradesData = await db
-        .select()
-        .from(grades)
-        .where(eq(grades.classId, classId));
+      // Получаем все оценки для класса через хранилище данных
+      const gradesData = await dataStorage.getGradesByClass(classId);
       
       // Загружаем информацию о расписании для каждой оценки, связанной с уроком
       const extendedGrades = await Promise.all(
@@ -3775,6 +3772,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const schedule = await dataStorage.getSchedule(grade.scheduleId);
             if (schedule) {
               result.schedule = schedule;
+            }
+          }
+          
+          // Если оценка связана с заданием (assignmentId указан), загружаем информацию о задании
+          if (grade.assignmentId) {
+            const assignment = await dataStorage.getAssignment(grade.assignmentId);
+            if (assignment) {
+              result.assignment = assignment;
             }
           }
           
