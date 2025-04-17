@@ -144,7 +144,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
   return (
     <div 
       className={`
-        mb-1 xs:mb-2 p-1 xs:p-2 rounded-lg cursor-pointer transition-all duration-200
+        mb-0.5 xs:mb-1 p-1 xs:p-2 rounded-lg cursor-pointer transition-all duration-200
         ${isCompleted 
           ? 'bg-green-50 border border-green-100' 
           : 'bg-emerald-50 border border-emerald-100 hover:border-emerald-200'
@@ -538,7 +538,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
   return (
     <>
-      <Card className="min-w-[170px] w-[calc(100vw-2rem)] xs:min-w-[250px] sm:w-full sm:max-w-[380px] h-[min(68vh,480px)] overflow-y-auto shadow-md">
+      <Card className="min-w-[170px] w-[calc(100vw-2rem)] xs:min-w-[250px] sm:w-full sm:max-w-[380px] h-[min(60vh,420px)] overflow-y-auto shadow-md">
         <CardHeader className="text-center py-1.5 xs:py-2 sm:py-3 bg-white sticky top-0 z-10">
           <CardTitle className="text-lg sm:text-xl">{dayName}</CardTitle>
           <div className="text-xs xs:text-sm text-gray-500">{formattedDate}</div>
