@@ -11,6 +11,7 @@ import UserRoles from "@/pages/user-roles";
 import SchedulePage from "@/pages/schedule";
 import ClassSchedulePage from "@/pages/schedule-class";
 import OverallSchedulePage from "@/pages/schedule-overall";
+import StudentSchedulePage from "@/pages/student-schedule";
 import ClassGradeDetailsPage from "@/pages/class-grade-details";
 import ClassTimeSlotsPage from "@/pages/class-time-slots";
 import Grades from "@/pages/grades";
@@ -29,7 +30,6 @@ import ClassTeacherDashboard from "./pages/class-teacher-dashboard";
 import ClassTeacherGradesPage from "./pages/class-teacher-grades";
 import TeacherClasses from "./pages/teacher-classes";
 import Subgroups from "./pages/subgroups";
-import StudentSchedulePage from "./pages/student-schedule";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 
@@ -45,6 +45,7 @@ function Router() {
       <ProtectedRoute path="/schedule-class/:classId" component={ClassSchedulePage} />
       <ProtectedRoute path="/schedule-class/:classId/time-slots" component={ClassTimeSlotsPage} />
       <ProtectedRoute path="/schedule-overall" component={OverallSchedulePage} />
+      <ProtectedRoute path="/student-schedule/:studentId" component={StudentSchedulePage} />
       <ProtectedRoute path="/class-grade-details/:classId/:subjectId/:subgroupId?" component={ClassGradeDetailsPage} />
       <ProtectedRoute path="/grades" component={Grades} />
       <ProtectedRoute path="/grading-systems" component={GradingSystems} />
@@ -62,7 +63,6 @@ function Router() {
       <ProtectedRoute path="/class-teacher-grades" component={ClassTeacherGradesPage} />
       <ProtectedRoute path="/teacher-classes" component={TeacherClasses} />
       <ProtectedRoute path="/subgroups" component={Subgroups} />
-      <ProtectedRoute path="/student-schedule/:studentId" component={StudentSchedulePage} />
       <Route component={NotFound} />
     </Switch>
   );
