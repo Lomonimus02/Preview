@@ -41,11 +41,13 @@ export function MainLayout({ children, className }: MainLayoutProps) {
         
         {/* Main Content */}
         <main 
-          className={`flex-1 bg-gray-50 p-4 pb-20 md:pb-4 transition-all duration-300 ${
-            !sidebarOpen ? 'md:w-full' : ''
-          } ${className ? className : ''}`}
+          className={`flex-1 bg-gray-50 p-4 transition-all duration-300 overflow-hidden 
+            ${!sidebarOpen ? 'md:w-full' : ''} 
+            ${className ? className : ''}`}
         >
-          {children}
+          <div className="h-full">
+            {children}
+          </div>
         </main>
       </div>
       

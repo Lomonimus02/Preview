@@ -132,7 +132,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex flex-wrap justify-between items-center mb-1 xs:mb-2 gap-1 px-1">
+      <div className="flex flex-wrap justify-between items-center mb-1 xs:mb-2 gap-1 px-1 flex-shrink-0">
         <Button 
           variant="outline" 
           onClick={goToPreviousWeek}
@@ -162,7 +162,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
       </div>
       
       <div className="overflow-hidden touch-pan-y overscroll-x-none flex-grow" ref={emblaRef}>
-        <div className="flex h-full gap-0.5 xs:gap-1 sm:gap-2 md:gap-3 pb-1">
+        <div className="flex h-full gap-0.5 xs:gap-1 sm:gap-2 md:gap-3">
           {weekDates.map((date) => (
             <div className="flex-shrink-0 h-full" key={format(date, "yyyy-MM-dd")}>
               <ScheduleDayCard
