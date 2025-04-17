@@ -131,11 +131,14 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
     }
     
     // Если нет готового имени, ищем в массиве подгрупп
-    if (schedule.subgroupId) {
+    if (schedule.subgroupId && Array.isArray(subgroups)) {
       const subgroup = subgroups.find(sg => sg.id === schedule.subgroupId);
       if (subgroup) {
-        // Отображаем только название подгруппы, без предмета
-        return subgroup.name;
+        // Сначала пробуем найти название предмета
+        const subjectName = subject?.name || "Предмет";
+        
+        // Отображаем название предмета и подгруппы вместе
+        return `${subjectName} ${subgroup.name}`;
       }
     }
     return "Подгруппа";

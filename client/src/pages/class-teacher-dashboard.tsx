@@ -132,6 +132,12 @@ export default function ClassTeacherDashboard() {
     queryKey: ["/api/homework"],
     enabled: !!user,
   });
+  
+  // Получение подгрупп
+  const { data: subgroups = [] } = useQuery({
+    queryKey: ["/api/subgroups"],
+    enabled: !!user,
+  });
 
 
 
@@ -269,6 +275,7 @@ export default function ClassTeacherDashboard() {
                 homework={homework}
                 currentUser={user}
                 isAdmin={false}
+                subgroups={subgroups}
               />
             ) : (
               <Alert>

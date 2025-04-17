@@ -22,6 +22,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Настройка статического обслуживания для загруженных файлов
   const uploadsPath = path.join(process.cwd(), 'uploads');
   app.use('/uploads', express.static(uploadsPath));
+  
+  // Вспомогательная функция для проверки доступа пользователя к классу
+  const checkUserHasAccessToClass = async (user, classId) => {
+    // Суперадмин имеет доступ ко всем классам
+    if (user.role === UserRoleEnum.SUPER_ADMIN) {
+      return true;
+    }
+    
+    // Получаем информацию о классе
+    const classInfo = await dataStorage.getClass(classId);
+    console.log("Информация о классе:", classInfo);
+    
+    if (!classInfo) {
+      return false;
+    }
+    
+    // Школьный администратор имеет доступ к классам своей школы
+    if ((user.role === UserRoleEnum.SCHOOL_ADMIN || 
+         user.role === UserRoleEnum.PRINCIPAL || 
+         user.role === UserRoleEnum.VICE_PRINCIPAL) && 
+        user.schoolId === classInfo.schoolId) {
+      return true;
+    }
+    
+    // Классный руководитель имеет доступ к своему классу
+    if (user.role === UserRoleEnum.CLASS_TEACHER) {
+      const userRoles = await dataStorage.getUserRoles(user.id);
+      console.log("Роль классного руководителя:", userRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER));
+      
+      // Проверяем, закреплен ли пользователь за данным классом как классный руководитель
+      return userRoles.some(r => 
+        r.role === UserRoleEnum.CLASS_TEACHER && 
+        (r.classId === classId || r.class_id === classId || (r.classIds && r.classIds.includes(classId)))
+      );
+    }
+    
+    // Учитель имеет доступ к классам, в которых преподает
+    if (user.role === UserRoleEnum.TEACHER) {
+      const schedules = await dataStorage.getSchedulesByTeacher(user.id);
+      
+      // Проверяем, есть ли у учителя уроки в данном классе
+      return schedules.some(s => s.classId === classId);
+    }
+    
+    return false;
+  };
 
   // Middleware to check if user is authenticated
   const isAuthenticated = (req, res, next) => {
