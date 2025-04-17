@@ -1,60 +1,61 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, useMemo } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
-import { UserRoleEnum } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
-import { DateRange } from "react-day-picker";
-import { addMonths, format, parse, isValid } from "date-fns";
-import { ru } from "date-fns/locale";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { GradeEditor } from "@/components/grades/grade-editor";
+import { useQuery } from "@tanstack/react-query";
+import { UserRoleEnum, Grade, Subject, User, Class } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BookOpenIcon, GraduationCapIcon, Calculator } from "lucide-react";
+import { format } from "date-fns";
+import { ru } from "date-fns/locale";
+import { apiRequest } from "@/lib/queryClient";
 
-type Period = "month" | "quarter" | "semester" | "year" | "custom";
-
-type StudentGrade = {
-  studentId: number;
-  firstName: string;
-  lastName: string;
-  averageGrade: number;
-};
-
-export default function ClassTeacherGrades() {
+export default function ClassTeacherGradesPage() {
   const { user } = useAuth();
-  const { isClassTeacher } = useRoleCheck();
-  const [period, setPeriod] = useState<Period>("month");
+  const { isClassTeacher, isTeacher } = useRoleCheck();
+  const { toast } = useToast();
   const [classId, setClassId] = useState<number | null>(null);
-  const [studentGrades, setStudentGrades] = useState<StudentGrade[]>([]);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(),
-    to: addMonths(new Date(), 1)
-  });
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+
+  // Проверяем права доступа пользователя (не обязательно активная роль должна быть class_teacher)
+  const hasClassTeacherAccess = () => {
+    // Достаточно, чтобы пользователь имел роль учителя, а роль class_teacher будет проверена через /api/user-roles
+    return isTeacher() || isClassTeacher();
+  };
+
+  // Проверяем, что пользователь имеет доступ к странице
+  useEffect(() => {
+    if (user && !hasClassTeacherAccess()) {
+      toast({
+        title: "Ошибка доступа",
+        description: "Эта страница доступна только для классных руководителей",
+        variant: "destructive",
+      });
+    }
+  }, [user, hasClassTeacherAccess, toast]);
 
   // Получаем роли пользователя, чтобы найти привязанный класс
   const { data: userRoles = [] } = useQuery({
     queryKey: ["/api/user-roles", user?.id],
     queryFn: async () => {
-      const res = await apiRequest(`/api/user-roles/${user?.id}`, "GET");
+      const res = await fetch(`/api/user-roles/${user?.id}`);
       if (!res.ok) throw new Error("Не удалось загрузить роли пользователя");
       return res.json();
     },
-    enabled: !!user && isClassTeacher(),
+    enabled: !!user && hasClassTeacherAccess(),
   });
 
   // Находим роль классного руководителя и получаем ID класса
   useEffect(() => {
     if (userRoles.length > 0) {
       console.log("Полученные роли:", userRoles);
-      const classTeacherRole = userRoles.find((r: any) => r.role === UserRoleEnum.CLASS_TEACHER);
+      const classTeacherRole = userRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER);
       console.log("Найдена роль классного руководителя:", classTeacherRole);
       
       if (classTeacherRole) {
@@ -74,10 +75,10 @@ export default function ClassTeacherGrades() {
   }, [userRoles]);
 
   // Получаем информацию о классе
-  const { data: classInfo } = useQuery({
+  const { data: classInfo } = useQuery<Class>({
     queryKey: ["/api/classes", classId],
     queryFn: async () => {
-      const res = await apiRequest(`/api/classes/${classId}`, "GET");
+      const res = await fetch(`/api/classes/${classId}`);
       if (!res.ok) throw new Error("Не удалось загрузить информацию о классе");
       return res.json();
     },
@@ -85,7 +86,7 @@ export default function ClassTeacherGrades() {
   });
 
   // Получаем список учеников класса
-  const { data: students = [], isLoading: studentsLoading } = useQuery({
+  const { data: students = [], isLoading: studentsLoading } = useQuery<User[]>({
     queryKey: ["/api/students-by-class", classId],
     queryFn: async () => {
       const res = await apiRequest(`/api/students-by-class/${classId}`, "GET");
@@ -95,230 +96,61 @@ export default function ClassTeacherGrades() {
     enabled: !!classId,
   });
 
-  // Получаем все оценки для класса
-  const { data: classGrades = [], isLoading: gradesLoading } = useQuery({
-    queryKey: ["/api/grades-by-class", classId],
+  // Получаем список предметов
+  const { data: subjects = [], isLoading: subjectsLoading } = useQuery<Subject[]>({
+    queryKey: ["/api/subjects"],
+    enabled: !!user,
+  });
+
+  // Получаем оценки для выбранного класса и предмета (если выбран)
+  const { data: allGrades = [], isLoading: gradesLoading } = useQuery<Grade[]>({
+    queryKey: ["/api/grades", { classId }],
     queryFn: async () => {
-      const res = await apiRequest(`/api/grades-by-class/${classId}`, "GET");
-      if (!res.ok) throw new Error("Не удалось загрузить оценки класса");
+      const res = await apiRequest(`/api/grades?classId=${classId}`, "GET");
       return res.json();
     },
     enabled: !!classId,
   });
-  
-  // Получаем список заданий для класса
-  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery({
-    queryKey: ["/api/assignments/class", classId],
-    queryFn: async () => {
-      const res = await apiRequest(`/api/assignments/class/${classId}`, "GET");
-      if (!res.ok) throw new Error("Не удалось загрузить задания");
-      return res.json();
-    },
-    enabled: !!classId,
-  });
-  
-  // QueryClient для использования в мутациях
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  
-  // Мутация для создания новой оценки
-  const createGradeMutation = useMutation({
-    mutationFn: async (gradeData: any) => {
-      const res = await apiRequest('/api/grades', 'POST', gradeData);
-      if (!res.ok) {
-        throw new Error('Не удалось создать оценку');
-      }
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/grades-by-class", classId] });
-      toast({
-        title: "Оценка создана",
-        description: "Оценка успешно добавлена",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Ошибка",
-        description: `Не удалось создать оценку: ${error.message}`,
-        variant: "destructive",
-      });
-    },
-  });
-  
-  // Мутация для обновления существующей оценки
-  const updateGradeMutation = useMutation({
-    mutationFn: async ({ gradeId, data }: { gradeId: number; data: any }) => {
-      const res = await apiRequest(`/api/grades/${gradeId}`, 'PATCH', data);
-      if (!res.ok) {
-        throw new Error('Не удалось обновить оценку');
-      }
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/grades-by-class", classId] });
-      toast({
-        title: "Оценка обновлена",
-        description: "Оценка успешно обновлена",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Ошибка",
-        description: `Не удалось обновить оценку: ${error.message}`,
-        variant: "destructive",
-      });
-    },
-  });
 
-  // Обработчик изменения периода
-  const handlePeriodChange = (value: string) => {
-    const newPeriod = value as Period;
-    setPeriod(newPeriod);
+  // Фильтруем оценки по выбранному предмету
+  const filteredGrades = useMemo(() => {
+    if (!selectedSubjectId) return allGrades;
+    return allGrades.filter(grade => grade.subjectId === selectedSubjectId);
+  }, [allGrades, selectedSubjectId]);
+
+  // Рассчитываем средний балл ученика по выбранному предмету
+  const calculateSubjectAverage = (studentId: number, subjectId: number) => {
+    const studentSubjectGrades = allGrades.filter(
+      g => g.studentId === studentId && g.subjectId === subjectId
+    );
     
-    const now = new Date();
-    let newDateRange: DateRange | undefined;
+    if (studentSubjectGrades.length === 0) return "-";
     
-    // Устанавливаем диапазон дат в зависимости от выбранного периода
-    switch (newPeriod) {
-      case "month":
-        newDateRange = {
-          from: new Date(now.getFullYear(), now.getMonth(), 1),
-          to: new Date(now.getFullYear(), now.getMonth() + 1, 0)
-        };
-        break;
-      case "quarter":
-        // Определяем текущий квартал
-        const currentQuarter = Math.floor(now.getMonth() / 3);
-        newDateRange = {
-          from: new Date(now.getFullYear(), currentQuarter * 3, 1),
-          to: new Date(now.getFullYear(), currentQuarter * 3 + 3, 0)
-        };
-        break;
-      case "semester":
-        // Определяем текущий семестр (1-й: сентябрь-январь, 2-й: февраль-июнь)
-        const isSemester1 = now.getMonth() >= 8 || now.getMonth() <= 0; // Сентябрь-Январь
-        if (isSemester1) {
-          newDateRange = {
-            from: new Date(now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1, 8, 1), // 1 сентября
-            to: new Date(now.getMonth() >= 8 ? now.getFullYear() + 1 : now.getFullYear(), 0, 31) // 31 января
-          };
-        } else {
-          newDateRange = {
-            from: new Date(now.getFullYear(), 1, 1), // 1 февраля
-            to: new Date(now.getFullYear(), 5, 30) // 30 июня
-          };
-        }
-        break;
-      case "year":
-        // Учебный год (с 1 сентября по 30 июня)
-        if (now.getMonth() >= 8) { // Если сейчас после сентября, учебный год с сентября текущего по июнь следующего
-          newDateRange = {
-            from: new Date(now.getFullYear(), 8, 1), // 1 сентября текущего года
-            to: new Date(now.getFullYear() + 1, 5, 30) // 30 июня следующего года
-          };
-        } else { // Если сейчас до сентября, учебный год с сентября прошлого по июнь текущего
-          newDateRange = {
-            from: new Date(now.getFullYear() - 1, 8, 1), // 1 сентября прошлого года
-            to: new Date(now.getFullYear(), 5, 30) // 30 июня текущего года
-          };
-        }
-        break;
-      case "custom":
-        // Сохраняем текущий выбранный диапазон
-        newDateRange = dateRange;
-        break;
-    }
+    const sum = studentSubjectGrades.reduce((total, grade) => total + grade.grade, 0);
+    const average = sum / studentSubjectGrades.length;
     
-    setDateRange(newDateRange);
+    return average.toFixed(1);
   };
 
-  // Рассчитываем средние оценки для учеников
-  useEffect(() => {
-    if (students.length > 0 && classGrades.length > 0 && dateRange?.from && dateRange?.to) {
-      // Форматируем даты для отладки
-      const fromStr = format(dateRange.from, 'yyyy-MM-dd');
-      const toStr = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : 'none';
-      console.log(`Расчет средних оценок для периода: ${fromStr} - ${toStr}`);
-
-      // Фильтруем оценки по выбранному периоду
-      const filteredGrades = classGrades.filter((grade: any) => {
-        // Проверяем, есть ли у оценки дата из расписания или дата создания
-        let gradeDate: Date | null = null;
-        
-        // Если есть расписание, берем дату из него
-        if (grade.schedule && grade.schedule.scheduleDate) {
-          const dateStr = grade.schedule.scheduleDate;
-          gradeDate = parse(dateStr, 'yyyy-MM-dd', new Date());
-        } else {
-          // Иначе используем дату создания оценки
-          if (grade.createdAt) {
-            gradeDate = new Date(grade.createdAt);
-          }
-        }
-        
-        // Если дату определить не удалось, пропускаем оценку
-        if (!gradeDate || !isValid(gradeDate)) return false;
-        
-        // Проверяем, попадает ли дата в выбранный диапазон
-        return gradeDate >= dateRange.from && 
-               (!dateRange.to || gradeDate <= dateRange.to);
-      });
-      
-      console.log(`Отфильтровано ${filteredGrades.length} оценок из ${classGrades.length}`);
-
-      // Рассчитываем средние оценки для каждого ученика
-      const grades: StudentGrade[] = students.map((student: any) => {
-        // Фильтруем оценки для конкретного ученика
-        const studentGrades = filteredGrades.filter((grade: any) => 
-          grade.studentId === student.id
-        );
-        
-        // Если есть оценки, вычисляем среднее
-        const sum = studentGrades.reduce((acc: number, grade: any) => acc + grade.grade, 0);
-        const average = studentGrades.length > 0 ? sum / studentGrades.length : 0;
-        
-        return {
-          studentId: student.id,
-          firstName: student.firstName,
-          lastName: student.lastName,
-          averageGrade: Number(average.toFixed(2))
-        };
-      });
-
-      // Сортируем учеников по фамилии
-      grades.sort((a, b) => a.lastName.localeCompare(b.lastName));
-      
-      setStudentGrades(grades);
-    } else {
-      setStudentGrades([]);
-    }
-  }, [students, classGrades, dateRange]);
-  
-  // Обработчики сохранения оценок
-  const handleSaveGrade = (gradeData: any) => {
-    if (!classId) return;
+  // Рассчитываем общий средний балл ученика по всем предметам
+  const calculateStudentOverallAverage = (studentId: number) => {
+    const studentGrades = allGrades.filter(g => g.studentId === studentId);
     
-    // Добавляем ID класса к данным
-    const fullGradeData = {
-      ...gradeData,
-      classId,
-      // Если задание имеет связь с предметом, используем его
-      subjectId: gradeData.assignmentId ? 
-                (assignments.find(a => a.id === gradeData.assignmentId)?.subjectId || null) : 
-                (assignments.length > 0 ? assignments[0].subjectId : null),
-      teacherId: user!.id,
-      gradeType: 'standard', // Тип оценки по умолчанию
-    };
+    if (studentGrades.length === 0) return "-";
     
-    createGradeMutation.mutate(fullGradeData);
-  };
-  
-  const handleUpdateGrade = (gradeId: number, gradeData: any) => {
-    updateGradeMutation.mutate({ gradeId, data: gradeData });
+    const sum = studentGrades.reduce((total, grade) => total + grade.grade, 0);
+    const average = sum / studentGrades.length;
+    
+    return average.toFixed(1);
   };
 
-  if (!user || !isClassTeacher()) {
+  // Получаем уникальные предметы, по которым есть оценки
+  const subjectsWithGrades = useMemo(() => {
+    const subjectIds = [...new Set(allGrades.map(g => g.subjectId))];
+    return subjects.filter(subject => subjectIds.includes(subject.id));
+  }, [allGrades, subjects]);
+
+  if (!user || !hasClassTeacherAccess()) {
     return (
       <MainLayout>
         <div className="container mx-auto px-4 py-6">
@@ -333,158 +165,229 @@ export default function ClassTeacherGrades() {
     );
   }
 
-  const isLoading = studentsLoading || gradesLoading || assignmentsLoading || 
-                    createGradeMutation.isPending || 
-                    updateGradeMutation.isPending;
-
   return (
     <MainLayout>
       <div className="container mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold mb-6">Журнал успеваемости класса</h1>
-        
-        {classInfo && (
-          <div className="mb-6">
-            <h2 className="text-xl font-semibold">
-              Класс: {classInfo.name}
-            </h2>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <h2 className="text-2xl font-heading font-bold text-gray-800">Журнал оценок</h2>
+            {classInfo && (
+              <p className="text-muted-foreground">
+                Класс: {classInfo.name}
+              </p>
+            )}
           </div>
-        )}
-        
-        {isLoading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-            <span>Загрузка данных...</span>
+          <div className="flex items-center gap-2">
+            <Select
+              value={selectedSubjectId?.toString() || ""}
+              onValueChange={(value) => setSelectedSubjectId(value ? parseInt(value) : null)}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Выберите предмет" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Все предметы</SelectItem>
+                {subjects.map((subject) => (
+                  <SelectItem key={subject.id} value={subject.id.toString()}>
+                    {subject.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        ) : (
-          <Tabs defaultValue="averages" className="w-full">
-            <TabsList className="mb-6">
-              <TabsTrigger value="averages">Средние баллы</TabsTrigger>
-              <TabsTrigger value="editor">Редактировать оценки</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="averages">
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle>Параметры отображения</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-6 md:grid-cols-2">
-                  <div>
-                    <Label htmlFor="period">Период</Label>
-                    <Select 
-                      value={period} 
-                      onValueChange={handlePeriodChange}
-                    >
-                      <SelectTrigger id="period">
-                        <SelectValue placeholder="Выберите период" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="month">Месяц</SelectItem>
-                        <SelectItem value="quarter">Четверть</SelectItem>
-                        <SelectItem value="semester">Семестр</SelectItem>
-                        <SelectItem value="year">Учебный год</SelectItem>
-                        <SelectItem value="custom">Произвольный период</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {period === "custom" && (
-                    <div>
-                      <Label>Выберите диапазон дат</Label>
-                      <DateRangePicker 
-                        value={dateRange}
-                        onChange={setDateRange}
-                        locale={ru}
-                        className="mt-1.5"
-                      />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
+        </div>
+
+        <Tabs defaultValue="by-subject">
+          <TabsList className="mb-4">
+            <TabsTrigger value="by-subject">
+              <BookOpenIcon className="h-4 w-4 mr-2" />
+              По предметам
+            </TabsTrigger>
+            <TabsTrigger value="overall">
+              <Calculator className="h-4 w-4 mr-2" />
+              Общая успеваемость
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="by-subject">
+            {selectedSubjectId ? (
+              // Отображение оценок для выбранного предмета
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    Средний балл учеников
-                    {dateRange?.from && (
-                      <span className="text-base font-normal ml-2">
-                        {format(dateRange.from, 'dd.MM.yyyy', { locale: ru })}
-                        {dateRange.to && ` — ${format(dateRange.to, 'dd.MM.yyyy', { locale: ru })}`}
-                      </span>
-                    )}
+                    Оценки по предмету: {subjects.find(s => s.id === selectedSubjectId)?.name}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {studentGrades.length > 0 ? (
-                    <Table>
+                  {studentsLoading || gradesLoading ? (
+                    <div className="flex justify-center py-8">Загрузка оценок...</div>
+                  ) : students.length === 0 ? (
+                    <Alert>
+                      <AlertTitle>Нет данных</AlertTitle>
+                      <AlertDescription>В классе нет учеников</AlertDescription>
+                    </Alert>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table className="border">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="bg-muted/50 w-60 sticky left-0">
+                              Ученик
+                            </TableHead>
+                            {/* Здесь можно добавить колонки для дат уроков, если необходимо */}
+                            <TableHead className="text-center font-bold">
+                              Средний балл
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {students.map(student => (
+                            <TableRow key={student.id}>
+                              <TableCell className="bg-muted/50 font-medium sticky left-0">
+                                {student.lastName} {student.firstName}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {calculateSubjectAverage(student.id, selectedSubjectId)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              // Отображение таблицы предметов и средних оценок по каждому предмету
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    Оценки учеников по всем предметам
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {studentsLoading || gradesLoading || subjectsLoading ? (
+                    <div className="flex justify-center py-8">Загрузка оценок...</div>
+                  ) : students.length === 0 ? (
+                    <Alert>
+                      <AlertTitle>Нет данных</AlertTitle>
+                      <AlertDescription>В классе нет учеников</AlertDescription>
+                    </Alert>
+                  ) : subjectsWithGrades.length === 0 ? (
+                    <Alert>
+                      <AlertTitle>Нет данных</AlertTitle>
+                      <AlertDescription>Нет предметов с оценками</AlertDescription>
+                    </Alert>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table className="border">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="bg-muted/50 w-60 sticky left-0">
+                              Ученик
+                            </TableHead>
+                            {subjectsWithGrades.map(subject => (
+                              <TableHead key={subject.id} className="text-center min-w-[100px]" title={subject.description || ""}>
+                                {subject.name}
+                              </TableHead>
+                            ))}
+                            <TableHead className="text-center font-bold bg-primary/10">
+                              Общий средний балл
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {students.map(student => (
+                            <TableRow key={student.id}>
+                              <TableCell className="bg-muted/50 font-medium sticky left-0">
+                                {student.lastName} {student.firstName}
+                              </TableCell>
+                              {subjectsWithGrades.map(subject => (
+                                <TableCell key={subject.id} className="text-center">
+                                  {calculateSubjectAverage(student.id, subject.id)}
+                                </TableCell>
+                              ))}
+                              <TableCell className="text-center font-bold bg-primary/10">
+                                {calculateStudentOverallAverage(student.id)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="overall">
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  Общая успеваемость класса
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {studentsLoading || gradesLoading ? (
+                  <div className="flex justify-center py-8">Загрузка данных...</div>
+                ) : students.length === 0 ? (
+                  <Alert>
+                    <AlertTitle>Нет данных</AlertTitle>
+                    <AlertDescription>В классе нет учеников</AlertDescription>
+                  </Alert>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table className="border">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>№</TableHead>
-                          <TableHead>Фамилия</TableHead>
-                          <TableHead>Имя</TableHead>
-                          <TableHead className="text-right">Средний балл</TableHead>
+                          <TableHead className="bg-muted/50 w-60 sticky left-0">
+                            Ученик
+                          </TableHead>
+                          <TableHead className="text-center">
+                            Средний балл
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {studentGrades.map((student, index) => (
-                          <TableRow key={student.studentId}>
-                            <TableCell className="font-medium">{index + 1}</TableCell>
-                            <TableCell>{student.lastName}</TableCell>
-                            <TableCell>{student.firstName}</TableCell>
-                            <TableCell className="text-right">
-                              <span 
-                                className={`font-medium ${
-                                  student.averageGrade > 4.5 ? 'text-green-600' :
-                                  student.averageGrade > 3.5 ? 'text-blue-600' :
-                                  student.averageGrade > 2.5 ? 'text-orange-500' :
-                                  'text-red-600'
-                                }`}
-                              >
-                                {student.averageGrade > 0 ? student.averageGrade : '—'}
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {students
+                          .slice()
+                          .sort((a, b) => {
+                            const aAvg = calculateStudentOverallAverage(a.id);
+                            const bAvg = calculateStudentOverallAverage(b.id);
+                            
+                            // Сначала сортируем по оценкам (исключая "-")
+                            if (aAvg !== "-" && bAvg !== "-") {
+                              return parseFloat(bAvg) - parseFloat(aAvg);
+                            }
+                            
+                            // Затем по фамилии
+                            if (aAvg === "-" && bAvg === "-") {
+                              return a.lastName.localeCompare(b.lastName);
+                            }
+                            
+                            // Ученики с оценками идут выше учеников без оценок
+                            return aAvg === "-" ? 1 : -1;
+                          })
+                          .map(student => (
+                            <TableRow key={student.id}>
+                              <TableCell className="bg-muted/50 font-medium sticky left-0">
+                                {student.lastName} {student.firstName}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {calculateStudentOverallAverage(student.id)}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        }
                       </TableBody>
                     </Table>
-                  ) : (
-                    <div className="text-center py-6 text-muted-foreground">
-                      {students.length > 0 
-                        ? "Нет оценок за выбранный период" 
-                        : "Нет учеников в классе"}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="editor">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Редактирование оценок</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {assignments.length > 0 && students.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <GradeEditor 
-                        students={students}
-                        assignments={assignments}
-                        grades={classGrades || []}
-                        onSaveGrade={handleSaveGrade}
-                        onUpdateGrade={handleUpdateGrade}
-                      />
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-muted-foreground">
-                      {assignments.length === 0 
-                        ? "Нет заданий для этого класса. Добавьте задания, чтобы выставлять оценки." 
-                        : "Нет учеников в классе"}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
