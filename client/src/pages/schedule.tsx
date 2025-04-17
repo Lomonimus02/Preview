@@ -391,7 +391,7 @@ export default function SchedulePage() {
   return (
     <MainLayout className="overflow-hidden">
       <div className="container mx-auto px-2 xs:px-3 py-2 h-full flex flex-col overflow-hidden schedule-container">
-        <div className="flex flex-wrap justify-center xs:justify-between items-center mb-2 xs:mb-3">
+        <div className="flex flex-wrap justify-center xs:justify-between items-center mb-2 xs:mb-3 flex-shrink-0">
           <h2 className="text-xl xs:text-2xl font-heading font-bold text-gray-800 w-full xs:w-auto text-center xs:text-left mb-2 xs:mb-0">Расписание</h2>
           
           {canEditSchedule && (
@@ -412,65 +412,67 @@ export default function SchedulePage() {
             <p>Загрузка расписания...</p>
           </div>
         ) : (
-          <ScheduleCarousel
-            schedules={
-              (() => {
-                // Базовое расписание (для учителей - только их уроки, для всех остальных - все уроки)
-                let filteredSchedules = isTeacher() ? teacherSchedules : schedules;
-                
-                // Фильтрация расписания для учеников по подгруппам
-                if (user?.role === UserRoleEnum.STUDENT) {
-                  // Получаем ID подгрупп, в которых состоит ученик
-                  const studentSubgroupIds = studentSubgroups
-                    .filter(sg => sg.studentId === user.id)
-                    .map(sg => sg.subgroupId);
+          <div className="flex-grow overflow-hidden">
+            <ScheduleCarousel
+              schedules={
+                (() => {
+                  // Базовое расписание (для учителей - только их уроки, для всех остальных - все уроки)
+                  let filteredSchedules = isTeacher() ? teacherSchedules : schedules;
                   
-                  console.log(`Ученик ID=${user.id} состоит в подгруппах:`, studentSubgroupIds);
-                  
-                  // Выводим информацию о уроках с подгруппами для отладки
-                  const schedulesWithSubgroups = filteredSchedules.filter(s => s.subgroupId !== null);
-                  console.log("Уроки с подгруппами до фильтрации:", schedulesWithSubgroups);
-                  
-                  // Фильтруем расписание: 
-                  // 1. Уроки без подгрупп (для всего класса)
-                  // 2. Уроки с подгруппами, в которых состоит ученик
-                  filteredSchedules = filteredSchedules.filter(schedule => {
-                    // Если у урока нет подгруппы, он виден всем ученикам класса
-                    if (schedule.subgroupId === null) return true;
+                  // Фильтрация расписания для учеников по подгруппам
+                  if (user?.role === UserRoleEnum.STUDENT) {
+                    // Получаем ID подгрупп, в которых состоит ученик
+                    const studentSubgroupIds = studentSubgroups
+                      .filter(sg => sg.studentId === user.id)
+                      .map(sg => sg.subgroupId);
                     
-                    // Если у урока есть подгруппа, проверяем, состоит ли ученик в этой подгруппе
-                    const isInSubgroup = studentSubgroupIds.includes(schedule.subgroupId);
-                    console.log(`Урок ID=${schedule.id}, подгруппа=${schedule.subgroupId}, ученик в подгруппе: ${isInSubgroup}`);
-                    return isInSubgroup;
-                  });
-                  
-                  console.log("Уроки после фильтрации:", filteredSchedules);
-                }
-                
-                // Добавляем названия подгрупп к расписанию
-                return filteredSchedules.map(schedule => {
-                  if (schedule.subgroupId) {
-                    const subgroup = subgroups.find(sg => sg.id === schedule.subgroupId);
-                    return {
-                      ...schedule,
-                      subgroupName: subgroup?.name || 'Подгруппа'
-                    };
+                    console.log(`Ученик ID=${user.id} состоит в подгруппах:`, studentSubgroupIds);
+                    
+                    // Выводим информацию о уроках с подгруппами для отладки
+                    const schedulesWithSubgroups = filteredSchedules.filter(s => s.subgroupId !== null);
+                    console.log("Уроки с подгруппами до фильтрации:", schedulesWithSubgroups);
+                    
+                    // Фильтруем расписание: 
+                    // 1. Уроки без подгрупп (для всего класса)
+                    // 2. Уроки с подгруппами, в которых состоит ученик
+                    filteredSchedules = filteredSchedules.filter(schedule => {
+                      // Если у урока нет подгруппы, он виден всем ученикам класса
+                      if (schedule.subgroupId === null) return true;
+                      
+                      // Если у урока есть подгруппа, проверяем, состоит ли ученик в этой подгруппе
+                      const isInSubgroup = studentSubgroupIds.includes(schedule.subgroupId);
+                      console.log(`Урок ID=${schedule.id}, подгруппа=${schedule.subgroupId}, ученик в подгруппе: ${isInSubgroup}`);
+                      return isInSubgroup;
+                    });
+                    
+                    console.log("Уроки после фильтрации:", filteredSchedules);
                   }
-                  return schedule;
-                });
-              })()
-            }
-            subjects={subjects}
-            teachers={teachers}
-            classes={classes}
-            grades={grades}
-            homework={homework}
-            currentUser={user}
-            isAdmin={canEditSchedule}
-            canView={canViewSchedule}
-            onAddSchedule={handleAddSchedule}
-            onDeleteSchedule={(scheduleId) => deleteScheduleMutation.mutate(scheduleId)}
-          />
+                  
+                  // Добавляем названия подгрупп к расписанию
+                  return filteredSchedules.map(schedule => {
+                    if (schedule.subgroupId) {
+                      const subgroup = subgroups.find(sg => sg.id === schedule.subgroupId);
+                      return {
+                        ...schedule,
+                        subgroupName: subgroup?.name || 'Подгруппа'
+                      };
+                    }
+                    return schedule;
+                  });
+                })()
+              }
+              subjects={subjects}
+              teachers={teachers}
+              classes={classes}
+              grades={grades}
+              homework={homework}
+              currentUser={user}
+              isAdmin={canEditSchedule}
+              canView={canViewSchedule}
+              onAddSchedule={handleAddSchedule}
+              onDeleteSchedule={(scheduleId) => deleteScheduleMutation.mutate(scheduleId)}
+            />
+          </div>
         )}
         
         {/* Form for adding/editing schedule */}
