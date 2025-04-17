@@ -672,63 +672,77 @@ export class DatabaseStorage implements IStorage {
   }
   
   async getUserChats(userId: number): Promise<Chat[]> {
-    // Получаем все участия в чатах для данного пользователя
-    const participations = await db.select().from(chatParticipants)
-      .where(eq(chatParticipants.userId, userId));
-    
-    if (participations.length === 0) {
+    try {
+      // Получаем все участия в чатах для данного пользователя
+      const participations = await db.select().from(chatParticipants)
+        .where(eq(chatParticipants.userId, userId));
+      
+      if (participations.length === 0) {
+        return [];
+      }
+      
+      // Извлекаем ID чатов и последние прочитанные сообщения
+      const chatIds = participations.map(p => p.chatId);
+      const participationMap = new Map(
+        participations.map(p => [p.chatId, p.lastReadMessageId])
+      );
+      
+      // Получаем чаты по их ID
+      const userChats = await db.select().from(chats)
+        .where(inArray(chats.id, chatIds))
+        .orderBy(sql`chats.last_message_at DESC NULLS LAST`);
+        
+      if (!userChats || userChats.length === 0) {
+        return [];
+      }
+        
+      // Расшифровываем поля name в чатах
+      try {
+        const decryptedChats = userChats.map(chat => decryptChat(chat)) as Chat[];
+      
+        // Для каждого чата рассчитываем количество непрочитанных сообщений
+        const result = await Promise.all(decryptedChats.map(async (chat) => {
+          // Получаем lastReadMessageId для данного пользователя в этом чате
+          const lastReadMessageId = participationMap.get(chat.id);
+          
+          // Если нет lastReadMessageId, считаем все сообщения непрочитанными
+          if (lastReadMessageId === null || lastReadMessageId === undefined) {
+            // Подсчитываем количество сообщений от других пользователей
+            const allMessages = await db.select().from(messages)
+              .where(and(
+                eq(messages.chatId, chat.id),
+                ne(messages.senderId, userId)
+              ));
+            
+            return {
+              ...chat,
+              unreadCount: allMessages.length
+            };
+          } else {
+            // Если есть lastReadMessageId, подсчитываем сообщения с id > lastReadMessageId
+            const unreadMessages = await db.select().from(messages)
+              .where(and(
+                eq(messages.chatId, chat.id),
+                ne(messages.senderId, userId),
+                gt(messages.id, lastReadMessageId)
+              ));
+            
+            return {
+              ...chat,
+              unreadCount: unreadMessages.length
+            };
+          }
+        }));
+        
+        return result;
+      } catch (decryptError) {
+        console.error('Ошибка при расшифровке чатов:', decryptError);
+        return [];
+      }
+    } catch (error) {
+      console.error('Ошибка при получении чатов пользователя:', error);
       return [];
     }
-    
-    // Извлекаем ID чатов и последние прочитанные сообщения
-    const chatIds = participations.map(p => p.chatId);
-    const participationMap = new Map(
-      participations.map(p => [p.chatId, p.lastReadMessageId])
-    );
-    
-    // Получаем чаты по их ID
-    const userChats = await db.select().from(chats)
-      .where(inArray(chats.id, chatIds))
-      .orderBy(sql`chats.last_message_at DESC NULLS LAST`);
-      
-    // Расшифровываем поля name в чатах
-    const decryptedChats = decryptChats(userChats);
-      
-    // Для каждого чата рассчитываем количество непрочитанных сообщений
-    const result = await Promise.all(decryptedChats.map(async (chat) => {
-      // Получаем lastReadMessageId для данного пользователя в этом чате
-      const lastReadMessageId = participationMap.get(chat.id);
-      
-      // Если нет lastReadMessageId, считаем все сообщения непрочитанными
-      if (lastReadMessageId === null || lastReadMessageId === undefined) {
-        // Подсчитываем количество сообщений от других пользователей
-        const allMessages = await db.select().from(messages)
-          .where(and(
-            eq(messages.chatId, chat.id),
-            ne(messages.senderId, userId)
-          ));
-        
-        return {
-          ...chat,
-          unreadCount: allMessages.length
-        };
-      } else {
-        // Если есть lastReadMessageId, подсчитываем сообщения с id > lastReadMessageId
-        const unreadMessages = await db.select().from(messages)
-          .where(and(
-            eq(messages.chatId, chat.id),
-            ne(messages.senderId, userId),
-            gt(messages.id, lastReadMessageId)
-          ));
-        
-        return {
-          ...chat,
-          unreadCount: unreadMessages.length
-        };
-      }
-    }));
-    
-    return result;
   }
   
   async getUsersChatBySchool(schoolId: number): Promise<Chat[]> {
