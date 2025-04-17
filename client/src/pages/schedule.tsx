@@ -389,7 +389,7 @@ export default function SchedulePage() {
   }, [addScheduleMutation, updateScheduleMutation, scheduleToEdit]);
 
   return (
-    <MainLayout className="overflow-hidden">
+    <MainLayout customClass="h-screen flex flex-col overflow-hidden">
       <div className="container mx-auto px-2 xs:px-3 py-2 h-full flex flex-col overflow-hidden schedule-container">
         <div className="flex flex-wrap justify-center xs:justify-between items-center mb-2 xs:mb-3">
           <h2 className="text-xl xs:text-2xl font-heading font-bold text-gray-800 w-full xs:w-auto text-center xs:text-left mb-2 xs:mb-0">Расписание</h2>
