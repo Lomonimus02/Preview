@@ -252,9 +252,12 @@ export default function ClassTeacherDashboard() {
                       <Button 
                         variant="outline" 
                         className="w-full" 
-                        onClick={() => handleSelectStudent(student.id)}
+                        asChild
                       >
-                        {selectedStudentId === student.id ? "Скрыть расписание" : "Расписание ученика"}
+                        <Link href={`/student-schedule/${student.id}`}>
+                          <CalendarIcon className="h-4 w-4 mr-2" />
+                          Расписание ученика
+                        </Link>
                       </Button>
                     </CardFooter>
                   </Card>
