@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 import { 
   startOfWeek, 
@@ -61,6 +61,23 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
 
   // Создаем массив дат для текущей недели
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
+  
+  // Обработчик колесика мыши для горизонтальной прокрутки
+  const handleWheel = useCallback(
+    (event: React.WheelEvent) => {
+      if (!emblaApi) return;
+      
+      event.preventDefault();
+      
+      // Определение направления и интенсивности прокрутки
+      const delta = event.deltaY || event.deltaX;
+      const scrollAmount = delta * 0.5; // Настраиваем чувствительность прокрутки
+      
+      // Прокрутка карусели
+      emblaApi.scrollBy(scrollAmount);
+    },
+    [emblaApi]
+  );
   
   // Обработчики переключения недель
   const goToPreviousWeek = useCallback(() => {
@@ -161,7 +178,7 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
         </Button>
       </div>
       
-      <div className="overflow-hidden touch-pan-y overscroll-x-none flex-grow" ref={emblaRef}>
+      <div className="overflow-hidden touch-pan-y overscroll-x-none flex-grow" ref={emblaRef} onWheel={handleWheel}>
         <div className="flex h-full gap-0.5 xs:gap-1 sm:gap-2 md:gap-3">
           {weekDates.map((date) => (
             <div className="flex-shrink-0 h-full w-[calc(100%/7-0.4rem)] min-w-[300px] max-w-[400px]" key={format(date, "yyyy-MM-dd")}>
