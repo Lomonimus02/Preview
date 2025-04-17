@@ -156,6 +156,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
+    // Если в запросе передан пароль, проверяем нужно ли его хешировать
+    if (user.password) {
+      // Проверяем, уже хеширован ли пароль (содержит ли он соль)
+      if (!user.password.includes(".")) {
+        console.log(`Хеширование пароля для пользователя ${id}`);
+        user.password = await this.hashPassword(user.password);
+      } else {
+        console.log(`Пароль для пользователя ${id} уже хеширован, пропускаем хеширование`);
+      }
+    }
+    
     // Шифруем чувствительные поля
     const encryptedUserData = encryptUser(user as InsertUser);
     const [updatedUser] = await db.update(users)
