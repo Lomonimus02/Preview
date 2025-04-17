@@ -22,52 +22,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Настройка статического обслуживания для загруженных файлов
   const uploadsPath = path.join(process.cwd(), 'uploads');
   app.use('/uploads', express.static(uploadsPath));
-  
-  // Вспомогательная функция для проверки доступа пользователя к классу
-  const checkUserHasAccessToClass = async (user, classId) => {
-    // Суперадмин имеет доступ ко всем классам
-    if (user.role === UserRoleEnum.SUPER_ADMIN) {
-      return true;
-    }
-    
-    // Получаем информацию о классе
-    const classInfo = await dataStorage.getClass(classId);
-    console.log("Информация о классе:", classInfo);
-    
-    if (!classInfo) {
-      return false;
-    }
-    
-    // Школьный администратор имеет доступ к классам своей школы
-    if ((user.role === UserRoleEnum.SCHOOL_ADMIN || 
-         user.role === UserRoleEnum.PRINCIPAL || 
-         user.role === UserRoleEnum.VICE_PRINCIPAL) && 
-        user.schoolId === classInfo.schoolId) {
-      return true;
-    }
-    
-    // Классный руководитель имеет доступ к своему классу
-    if (user.role === UserRoleEnum.CLASS_TEACHER) {
-      const userRoles = await dataStorage.getUserRoles(user.id);
-      console.log("Роль классного руководителя:", userRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER));
-      
-      // Проверяем, закреплен ли пользователь за данным классом как классный руководитель
-      return userRoles.some(r => 
-        r.role === UserRoleEnum.CLASS_TEACHER && 
-        (r.classId === classId || r.class_id === classId || (r.classIds && r.classIds.includes(classId)))
-      );
-    }
-    
-    // Учитель имеет доступ к классам, в которых преподает
-    if (user.role === UserRoleEnum.TEACHER) {
-      const schedules = await dataStorage.getSchedulesByTeacher(user.id);
-      
-      // Проверяем, есть ли у учителя уроки в данном классе
-      return schedules.some(s => s.classId === classId);
-    }
-    
-    return false;
-  };
 
   // Middleware to check if user is authenticated
   const isAuthenticated = (req, res, next) => {
@@ -3745,52 +3699,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching students by class:", error);
       return res.status(500).json({ message: "Failed to fetch students" });
-    }
-  });
-  
-  // Получение всех оценок для класса
-  app.get("/api/grades-by-class/:classId", isAuthenticated, async (req, res) => {
-    try {
-      const classId = parseInt(req.params.classId);
-      
-      // Проверка прав доступа
-      const userHasAccess = await checkUserHasAccessToClass(req.user, classId);
-      if (!userHasAccess) {
-        return res.status(403).json({ message: "Access denied to this class data" });
-      }
-      
-      // Получаем все оценки для класса через хранилище данных
-      const gradesData = await dataStorage.getGradesByClass(classId);
-      
-      // Загружаем информацию о расписании для каждой оценки, связанной с уроком
-      const extendedGrades = await Promise.all(
-        gradesData.map(async (grade) => {
-          let result = { ...grade };
-          
-          // Если оценка связана с уроком (scheduleId указан), загружаем информацию о расписании
-          if (grade.scheduleId) {
-            const schedule = await dataStorage.getSchedule(grade.scheduleId);
-            if (schedule) {
-              result.schedule = schedule;
-            }
-          }
-          
-          // Если оценка связана с заданием (assignmentId указан), загружаем информацию о задании
-          if (grade.assignmentId) {
-            const assignment = await dataStorage.getAssignment(grade.assignmentId);
-            if (assignment) {
-              result.assignment = assignment;
-            }
-          }
-          
-          return result;
-        })
-      );
-      
-      res.json(extendedGrades);
-    } catch (error) {
-      console.error('Error fetching class grades:', error);
-      res.status(500).json({ message: 'Failed to fetch class grades', error: error.message });
     }
   });
   
