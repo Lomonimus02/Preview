@@ -803,7 +803,8 @@ export class DatabaseStorage implements IStorage {
       attachmentType: message.attachmentType || null,
       attachmentUrl: message.attachmentUrl || null,
       isRead: false,
-      sentAt: new Date()
+      sentAt: new Date(),
+      isE2eEncrypted: true // Всегда включаем E2E шифрование для всех сообщений
     };
     
     // Шифруем данные перед сохранением
