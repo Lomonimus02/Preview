@@ -156,7 +156,7 @@ export const ScheduleItem: React.FC<ScheduleItemProps> = ({
       <div className="flex justify-between items-center">
         <div className="text-emerald-700 font-medium text-xs">
           <span className="inline-block min-w-[60px]">{schedule.startTime}</span>
-          <span className="ml-1 text-emerald-900 truncate max-w-[100px] inline-block align-middle">
+          <span className="ml-1 text-emerald-900 truncate max-w-[150px] inline-block align-middle">
             {schedule.subgroupId
               ? getSubgroupName() // Используем функцию для получения названия подгруппы
               : subject?.name || "Предмет"}
@@ -709,7 +709,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог для создания/редактирования задания */}
       <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>{selectedAssignment ? "Редактировать задание" : "Создать задание"}</DialogTitle>
             <DialogDescription>
@@ -1012,7 +1012,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог с формой для заданий (накопительная система оценок) */}
       <Dialog open={isAssignmentDialogOpen} onOpenChange={setIsAssignmentDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedAssignment ? "Редактирование задания" : "Создание задания"}
@@ -1063,7 +1063,7 @@ export const ScheduleDayCard: React.FC<ScheduleDayCardProps> = ({
 
       {/* Диалог для просмотра детальной информации об оценке */}
       <Dialog open={isGradeDialogOpen} onOpenChange={setIsGradeDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-auto">
           <DialogHeader>
             <DialogTitle>Информация об оценке</DialogTitle>
             <DialogDescription>
