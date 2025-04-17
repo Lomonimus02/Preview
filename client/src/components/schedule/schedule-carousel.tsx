@@ -62,41 +62,46 @@ export const ScheduleCarousel: React.FC<ScheduleCarouselProps> = ({
   // Создаем массив дат для текущей недели
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
   
-  // Обработчик колесика мыши для горизонтальной прокрутки
+  // Функция обработки прокрутки колесиком мыши для горизонтального скролла
   const handleWheel = useCallback(
-    (event: React.WheelEvent) => {
-      // Проверяем наличие контейнера и Embla API
-      const emblaContainer = emblaRef.current;
-      if (!emblaContainer) return;
+    (event: React.WheelEvent<HTMLDivElement>) => {
+      if (!emblaApi) return;
       
-      // Предотвращаем стандартную прокрутку страницы
+      // Предотвращаем стандартное поведение прокрутки
       event.preventDefault();
-      
-      // Получаем значение прокрутки (deltaY - вертикальная прокрутка колесика)
+
+      // Получаем значение прокрутки
       const delta = event.deltaY;
       
-      // Настраиваем чувствительность (меньшее значение = более плавная прокрутка)
-      const sensitivity = 1.5; 
+      // Настраиваем шаг прокрутки и чувствительность
+      // Если deltaY положительное - прокрутка вниз/вправо, иначе - вверх/влево
+      const scrollStep = 1; // Количество слайдов для прокрутки за один раз
+      const sensitivity = 50; // Минимальная величина прокрутки для реакции
       
-      // Вычисляем на сколько нужно прокрутить
-      const scrollStep = delta * sensitivity;
+      // Прокручиваем только если величина прокрутки превышает порог чувствительности
+      if (Math.abs(delta) < sensitivity) return;
       
-      // Получаем текущий контейнер и прокручиваем его напрямую
-      const scrollContainer = emblaContainer.querySelector(".flex");
-      if (scrollContainer) {
-        // Устанавливаем плавную прокрутку
-        scrollContainer.style.scrollBehavior = 'smooth';
+      try {
+        // Используем API Embla Carousel для перехода к следующему/предыдущему слайду
+        if (delta > 0) {
+          // Прокрутка вперед
+          for (let i = 0; i < scrollStep; i++) {
+            emblaApi.scrollNext();
+          }
+        } else {
+          // Прокрутка назад
+          for (let i = 0; i < scrollStep; i++) {
+            emblaApi.scrollPrev();
+          }
+        }
         
-        // Прокручиваем
-        scrollContainer.scrollLeft += scrollStep;
-        
-        // Сбрасываем стиль после прокрутки чтобы не мешать стандартному поведению
-        setTimeout(() => {
-          scrollContainer.style.scrollBehavior = '';
-        }, 300);
+        // Отладочное сообщение
+        console.log("Прокрутка выполнена:", delta > 0 ? "вперед" : "назад");
+      } catch (error) {
+        console.error("Ошибка при прокрутке:", error);
       }
     },
-    [emblaRef]
+    [emblaApi]
   );
   
   // Обработчики переключения недель
