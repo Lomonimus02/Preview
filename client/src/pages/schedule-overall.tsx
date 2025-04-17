@@ -17,11 +17,11 @@ import { Schedule, Class, Subject, User, Grade, Homework } from "@shared/schema"
 
 export default function OverallSchedulePage() {
   const { user } = useAuth();
-  const { isSchoolAdmin } = useRoleCheck();
+  const { isSchoolAdmin, isPrincipal } = useRoleCheck();
   const [selectedFilter, setSelectedFilter] = useState<string>("all");
   
-  // Проверка доступа (только администраторы школы должны иметь доступ)
-  if (!isSchoolAdmin()) {
+  // Проверка доступа (администраторы школы и директор имеют доступ)
+  if (!isSchoolAdmin() && !isPrincipal()) {
     return (
       <MainLayout>
         <div className="container mx-auto py-8">
