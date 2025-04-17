@@ -6,10 +6,9 @@ import { MobileNav } from "./mobile-nav";
 interface MainLayoutProps {
   children: ReactNode;
   className?: string;
-  customClass?: string;
 }
 
-export function MainLayout({ children, className, customClass }: MainLayoutProps) {
+export function MainLayout({ children, className }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   
@@ -33,7 +32,7 @@ export function MainLayout({ children, className, customClass }: MainLayoutProps
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
   
   return (
-    <div className={`w-full flex flex-col h-screen bg-gray-50 overflow-hidden ${customClass || ''}`}>
+    <div className="w-full flex flex-col h-screen bg-gray-50 overflow-hidden">
       <Header toggleSidebar={toggleSidebar} />
       
       <div className="flex flex-1 overflow-hidden">
