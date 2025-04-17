@@ -1,58 +1,37 @@
 import { useState, useEffect } from "react";
-import { useLocation, useRoute, Link } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
-import { UserRoleEnum, User } from "@shared/schema";
-import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Loader2 } from "lucide-react";
-import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
+import { ChevronLeftIcon } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function StudentSchedulePage() {
   const { user } = useAuth();
-  const { isClassTeacher, isTeacher, isPrincipal, isSchoolAdmin } = useRoleCheck();
-  const { toast } = useToast();
+  const { isClassTeacher, isTeacher, isAdmin } = useRoleCheck();
   const [, params] = useRoute<{ studentId: string }>("/student-schedule/:studentId");
   const [, setLocation] = useLocation();
   
   const studentId = params ? parseInt(params.studentId) : null;
   
-  // Проверяем права доступа пользователя
-  const hasAccess = () => {
-    return isClassTeacher() || isTeacher() || isPrincipal() || isSchoolAdmin();
-  };
-
-  useEffect(() => {
-    if (user && !hasAccess()) {
-      toast({
-        title: "Ошибка доступа",
-        description: "У вас нет прав для просмотра этой страницы",
-        variant: "destructive",
-      });
-      
-      // Перенаправляем на главную страницу
-      setLocation("/");
-    }
-  }, [user, hasAccess, toast, setLocation]);
-
-  // Получаем информацию о выбранном ученике
-  const { data: studentInfo, isLoading: studentLoading } = useQuery<User>({
+  // Получение информации о студенте
+  const { data: student, isLoading: studentLoading } = useQuery({
     queryKey: ["/api/users", studentId],
     queryFn: async () => {
-      if (!studentId) throw new Error("ID ученика не указан");
+      if (!studentId) return null;
       const res = await apiRequest(`/api/users/${studentId}`, "GET");
-      if (!res.ok) throw new Error("Не удалось загрузить информацию об ученике");
+      if (!res.ok) throw new Error("Не удалось загрузить информацию о студенте");
       return res.json();
     },
-    enabled: !!studentId && hasAccess(),
+    enabled: !!studentId,
   });
 
-  // Получаем расписание выбранного ученика
+  // Получаем расписание студента
   const { data: studentSchedule = [], isLoading: scheduleLoading } = useQuery({
     queryKey: ["/api/student-schedules", studentId],
     queryFn: async () => {
@@ -61,104 +40,104 @@ export default function StudentSchedulePage() {
       if (!res.ok) throw new Error("Не удалось загрузить расписание ученика");
       return res.json();
     },
-    enabled: !!studentId && hasAccess(),
+    enabled: !!studentId,
   });
 
   // Получение дополнительных данных для отображения расписания
   const { data: subjects = [] } = useQuery({
     queryKey: ["/api/subjects"],
-    enabled: !!user && hasAccess(),
+    enabled: !!user,
   });
 
   const { data: teachers = [] } = useQuery({
-    queryKey: ["/api/users", { role: UserRoleEnum.TEACHER }],
-    enabled: !!user && hasAccess(),
+    queryKey: ["/api/users"],
+    enabled: !!user,
   });
 
   const { data: classes = [] } = useQuery({
     queryKey: ["/api/classes"],
-    enabled: !!user && hasAccess(),
+    enabled: !!user,
   });
 
   const { data: grades = [] } = useQuery({
     queryKey: ["/api/grades"],
-    enabled: !!user && hasAccess(),
+    enabled: !!user,
   });
 
   const { data: homework = [] } = useQuery({
     queryKey: ["/api/homework"],
-    enabled: !!user && hasAccess(),
+    enabled: !!user,
   });
 
-  if (!user || !hasAccess()) {
-    return (
-      <MainLayout>
-        <div className="container mx-auto px-4 py-6">
-          <Alert variant="destructive">
-            <AlertTitle>Ошибка доступа</AlertTitle>
-            <AlertDescription>
-              У вас нет прав для просмотра этой страницы
-            </AlertDescription>
-          </Alert>
-        </div>
-      </MainLayout>
-    );
-  }
+  // Проверка доступа
+  const canViewStudentSchedule = () => {
+    if (!user || !student) return false;
+    
+    // Классный руководитель и администратор могут просматривать любое расписание
+    if (isClassTeacher() || isTeacher() || isAdmin()) return true;
+    
+    // Ученик может просматривать только свое расписание
+    if (user.id === student.id) return true;
+    
+    return false;
+  };
 
-  if (studentLoading || scheduleLoading) {
-    return (
-      <MainLayout>
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
-            <span>Загрузка данных...</span>
-          </div>
-        </div>
-      </MainLayout>
-    );
-  }
-
-  if (!studentInfo) {
-    return (
-      <MainLayout>
-        <div className="container mx-auto px-4 py-6">
-          <Alert variant="destructive">
-            <AlertTitle>Ошибка</AlertTitle>
-            <AlertDescription>
-              Информация об ученике не найдена
-            </AlertDescription>
-          </Alert>
-          <Button className="mt-4" onClick={() => setLocation("/class-teacher-dashboard")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Вернуться к панели классного руководителя
-          </Button>
-        </div>
-      </MainLayout>
-    );
-  }
+  // Возврат к предыдущей странице
+  const handleGoBack = () => {
+    if (isClassTeacher()) {
+      setLocation('/class-teacher-dashboard');
+    } else {
+      setLocation('/');
+    }
+  };
 
   return (
     <MainLayout className="overflow-hidden">
-      <div className="container mx-auto px-4 py-6 h-full flex flex-col overflow-hidden">
-        <div className="flex justify-between items-center mb-6 flex-shrink-0">
-          <div>
-            <Button variant="outline" onClick={() => setLocation("/class-teacher-dashboard")} className="mb-2">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Вернуться к панели классного руководителя
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex flex-col space-y-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleGoBack} 
+              className="mr-2"
+            >
+              <ChevronLeftIcon className="h-4 w-4 mr-1" />
+              Назад
             </Button>
-            <h2 className="text-2xl font-heading font-bold text-gray-800">
-              Расписание ученика
-            </h2>
-            <p className="text-muted-foreground">
-              {studentInfo.lastName} {studentInfo.firstName} {studentInfo.patronymic || ""}
-            </p>
+            
+            {studentLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-[250px]" />
+                <Skeleton className="h-4 w-[200px]" />
+              </div>
+            ) : student ? (
+              <div>
+                <h1 className="text-2xl font-bold">
+                  Расписание ученика
+                </h1>
+                <p className="text-muted-foreground">
+                  {student.lastName} {student.firstName} 
+                  {student.patronymic && ` ${student.patronymic}`}
+                </p>
+              </div>
+            ) : (
+              <h1 className="text-2xl font-bold">Ученик не найден</h1>
+            )}
           </div>
-        </div>
 
-        <Separator className="mb-4 flex-shrink-0" />
-        
-        <div className="flex-grow overflow-hidden">
-          {studentSchedule.length > 0 ? (
+          {!canViewStudentSchedule() ? (
+            <Alert variant="destructive">
+              <AlertTitle>Ошибка доступа</AlertTitle>
+              <AlertDescription>
+                У вас нет прав для просмотра расписания этого ученика.
+              </AlertDescription>
+            </Alert>
+          ) : scheduleLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-[500px] w-full" />
+            </div>
+          ) : studentSchedule.length > 0 ? (
             <ScheduleCarousel
               schedules={studentSchedule}
               subjects={subjects}

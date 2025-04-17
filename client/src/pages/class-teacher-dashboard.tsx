@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
@@ -9,9 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UserIcon, UsersIcon, CalendarIcon, GraduationCapIcon, BookOpenIcon } from "lucide-react";
+import { UsersIcon, CalendarIcon, GraduationCapIcon, BookOpenIcon } from "lucide-react";
 import { ScheduleCarousel } from "@/components/schedule/schedule-carousel";
-import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -19,8 +18,10 @@ export default function ClassTeacherDashboard() {
   const { user } = useAuth();
   const { isClassTeacher, isTeacher } = useRoleCheck();
   const { toast } = useToast();
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [classId, setClassId] = useState<number | null>(null);
+  
+  // Хук для навигации
+  const [, setLocation] = useLocation();
   
   // Проверяем права доступа пользователя (не обязательно активная роль должна быть class_teacher)
   const hasClassTeacherAccess = () => {
@@ -53,7 +54,7 @@ export default function ClassTeacherDashboard() {
   useEffect(() => {
     if (userRoles.length > 0) {
       console.log("Полученные роли:", userRoles);
-      const classTeacherRole = userRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER);
+      const classTeacherRole = userRoles.find((r: any) => r.role === UserRoleEnum.CLASS_TEACHER);
       console.log("Найдена роль классного руководителя:", classTeacherRole);
       
       if (classTeacherRole) {
@@ -94,18 +95,6 @@ export default function ClassTeacherDashboard() {
     enabled: !!classId,
   });
 
-  // Получаем расписание выбранного ученика или расписание класса
-  const { data: studentSchedule = [], isLoading: scheduleLoading } = useQuery({
-    queryKey: ["/api/student-schedules", selectedStudentId],
-    queryFn: async () => {
-      if (!selectedStudentId) return [];
-      const res = await apiRequest(`/api/student-schedules/${selectedStudentId}`, "GET");
-      if (!res.ok) throw new Error("Не удалось загрузить расписание ученика");
-      return res.json();
-    },
-    enabled: !!selectedStudentId,
-  });
-
   // Получаем расписание всего класса
   const { data: classSchedule = [] } = useQuery({
     queryKey: ["/api/schedules", { classId }],
@@ -114,7 +103,7 @@ export default function ClassTeacherDashboard() {
       if (!res.ok) throw new Error("Не удалось загрузить расписание класса");
       return res.json();
     },
-    enabled: !!classId && !selectedStudentId,
+    enabled: !!classId,
   });
 
   // Получение дополнительных данных для отображения расписания
@@ -143,9 +132,9 @@ export default function ClassTeacherDashboard() {
     enabled: !!user,
   });
 
-  // Выбор ученика для просмотра его расписания
+  // Перенаправление на страницу расписания ученика
   const handleSelectStudent = (studentId: number) => {
-    setSelectedStudentId(studentId === selectedStudentId ? null : studentId);
+    setLocation(`/student-schedule/${studentId}`);
   };
 
   if (!user || !isClassTeacher()) {
@@ -175,14 +164,6 @@ export default function ClassTeacherDashboard() {
               </p>
             )}
           </div>
-          {selectedStudentId && (
-            <Button 
-              variant="outline" 
-              onClick={() => setSelectedStudentId(null)}
-            >
-              Вернуться к классу
-            </Button>
-          )}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -223,7 +204,7 @@ export default function ClassTeacherDashboard() {
                 <p>Загрузка списка учеников...</p>
               ) : students.length > 0 ? (
                 students.map(student => (
-                  <Card key={student.id} className={`hover:border-primary transition-all ${selectedStudentId === student.id ? 'border-primary' : ''}`}>
+                  <Card key={student.id} className="hover:border-primary transition-all">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-lg">{student.lastName} {student.firstName}</CardTitle>
                       {student.patronymic && (
@@ -254,7 +235,7 @@ export default function ClassTeacherDashboard() {
                         className="w-full" 
                         onClick={() => handleSelectStudent(student.id)}
                       >
-                        {selectedStudentId === student.id ? "Скрыть расписание" : "Расписание ученика"}
+                        Расписание ученика
                       </Button>
                     </CardFooter>
                   </Card>
@@ -268,39 +249,6 @@ export default function ClassTeacherDashboard() {
                 </Card>
               )}
             </div>
-            
-            {selectedStudentId && (
-              <>
-                <Separator className="my-6" />
-                <div className="mb-4">
-                  <h3 className="text-xl font-semibold mb-2">
-                    Расписание ученика: {students.find(s => s.id === selectedStudentId)?.lastName} {students.find(s => s.id === selectedStudentId)?.firstName}
-                  </h3>
-                </div>
-                
-                {scheduleLoading ? (
-                  <p>Загрузка расписания ученика...</p>
-                ) : studentSchedule.length > 0 ? (
-                  <ScheduleCarousel
-                    schedules={studentSchedule}
-                    subjects={subjects}
-                    teachers={teachers}
-                    classes={classes}
-                    grades={grades}
-                    homework={homework}
-                    currentUser={user}
-                    isAdmin={false}
-                  />
-                ) : (
-                  <Alert>
-                    <AlertTitle>Расписание отсутствует</AlertTitle>
-                    <AlertDescription>
-                      Для этого ученика нет активного расписания
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </>
-            )}
           </TabsContent>
           
           <TabsContent value="schedule">
