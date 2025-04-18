@@ -748,13 +748,30 @@ export class MemStorage implements IStorage {
   
   // Student-Subgroup operations
   async getStudentSubgroups(studentId: number): Promise<Subgroup[]> {
+    // Если studentId некорректный, вернуть пустой массив
+    if (!studentId) {
+      console.warn(`getStudentSubgroups: получен некорректный studentId: ${studentId}`);
+      return [];
+    }
+    
     // Get all subgroup IDs that this student belongs to
     const subgroupIds = Array.from(this.studentSubgroups.keys())
       .filter(key => key.startsWith(`${studentId}-`))
-      .map(key => parseInt(key.split('-')[1]));
+      .map(key => parseInt(key.split('-')[1]))
+      .filter(id => !isNaN(id) && id > 0); // Проверка на валидные ID
     
-    // Get all subgroups
-    return subgroupIds.map(id => this.subgroups.get(id)).filter(Boolean) as Subgroup[];
+    console.log(`Найдены ID подгрупп для ученика ${studentId}:`, subgroupIds);
+    
+    // Get all subgroups with explicit checking for undefined
+    const subgroups: Subgroup[] = [];
+    for (const id of subgroupIds) {
+      const subgroup = this.subgroups.get(id);
+      if (subgroup) {
+        subgroups.push(subgroup);
+      }
+    }
+    
+    return subgroups;
   }
   
   async getSubgroupStudents(subgroupId: number): Promise<User[]> {
@@ -800,12 +817,23 @@ export class MemStorage implements IStorage {
   }
   
   async getClassStudents(classId: number): Promise<User[]> {
+    // Проверка на валидный classId
+    if (!classId) {
+      console.warn(`getClassStudents: получен некорректный classId: ${classId}`);
+      return [];
+    }
+
+    // Получаем ID учеников этого класса
     const studentIds = Array.from(this.studentClasses.keys())
       .filter(key => key.endsWith(`-${classId}`))
-      .map(key => parseInt(key.split('-')[0]));
-      
+      .map(key => parseInt(key.split('-')[0]))
+      .filter(id => !isNaN(id) && id > 0); // Проверка на валидные ID
+    
+    console.log(`Найдены ID учеников для класса ${classId}:`, studentIds);
+    
+    // Находим пользователей по ID
     return Array.from(this.users.values()).filter(user => 
-      user.role === UserRoleEnum.STUDENT && studentIds.includes(user.id)
+      user && user.id && user.role === UserRoleEnum.STUDENT && studentIds.includes(user.id)
     );
   }
   

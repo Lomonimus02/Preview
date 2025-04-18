@@ -2127,15 +2127,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const studentId = student.id;
         result[studentId] = {};
         
-        // Фильтруем оценки для этого ученика
-        const studentGrades = filteredGrades.filter(g => g.studentId === studentId);
+        // Фильтруем оценки для этого ученика и проверяем на null/undefined
+        const studentGrades = filteredGrades.filter(g => g && g.studentId === studentId);
         
         // Получаем подгруппы ученика
         const studentSubgroups = await dataStorage.getStudentSubgroups(studentId);
-        const studentSubgroupIds = studentSubgroups.map(sg => sg.id || 0);
+        const studentSubgroupIds = studentSubgroups
+          .filter(sg => sg !== null && sg !== undefined)
+          .map(sg => sg.id || 0);
+        
+        console.log(`Получены ID подгрупп для ученика ${studentId}:`, studentSubgroupIds);
         
         // Получаем предметы, по которым у ученика есть оценки
-        const studentSubjectIds = Array.from(new Set(studentGrades.map(g => g.subjectId)));
+        const studentSubjectIds = Array.from(new Set(studentGrades.filter(g => g && g.subjectId).map(g => g.subjectId)));
         
         // Для каждого предмета рассчитываем средний балл
         for (const subjectId of studentSubjectIds) {
