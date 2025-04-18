@@ -219,74 +219,152 @@ export default function ClassTeacherGradesPage() {
     }
   }, [isError, error, toast]);
   
+  // Интерфейс для объекта среднего балла
+  interface AverageGradeResult {
+    average: string; // Средний балл в формате строки
+    percentage: string; // Процент в формате строки
+    rawAverage: number; // Числовое значение среднего балла
+    rawPercentage: number; // Числовое значение процента
+    gradeCount: number; // Количество оценок
+    error?: string; // Ошибка, если есть
+  }
+
   // Рассчитываем средний балл ученика по выбранному предмету в выбранном периоде
-  const calculateSubjectAverage = (studentId: number, subjectId: number) => {
-    // Проверяем, есть ли данные от API
-    if (averages[studentId.toString()] && averages[studentId.toString()][subjectId.toString()]) {
-      const data = averages[studentId.toString()][subjectId.toString()];
-      
-      // Формат вывода зависит от системы оценивания класса
-      if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
-        // Для накопительной системы выводим процент
-        return `${data.percentage}`;
+  const calculateSubjectAverage = (studentId: number, subjectId: number): AverageGradeResult => {
+    // Результат по умолчанию (если нет оценок)
+    const defaultResult: AverageGradeResult = {
+      average: "-", 
+      percentage: "-",
+      rawAverage: 0,
+      rawPercentage: 0,
+      gradeCount: 0
+    };
+    
+    try {
+      // Проверяем, есть ли данные от API
+      if (averages[studentId.toString()] && averages[studentId.toString()][subjectId.toString()]) {
+        const data = averages[studentId.toString()][subjectId.toString()];
+        
+        // Преобразуем строковые значения в числа для визуализации
+        const rawAverage = parseFloat(data.average || '0') || 0;
+        const rawPercentage = parseFloat(data.percentage || '0') || 0;
+        
+        return {
+          average: data.average || "-",
+          percentage: data.percentage ? `${data.percentage}%` : "-",
+          rawAverage,
+          rawPercentage,
+          gradeCount: data.gradeCount || 0
+        };
       }
       
-      // Для 5-балльной системы выводим средний балл
-      return data.average;
+      // Запасной вариант: выполняем расчет на стороне клиента, если API не вернуло данные
+      const studentSubjectGrades = gradesInDateRange.filter(
+        g => g.studentId === studentId && g.subjectId === subjectId
+      );
+      
+      if (studentSubjectGrades.length === 0) return defaultResult;
+      
+      const sum = studentSubjectGrades.reduce((total, grade) => total + grade.grade, 0);
+      const rawAverage = sum / studentSubjectGrades.length;
+      
+      // В зависимости от системы оценивания рассчитываем процент и формат
+      let average, percentage, rawPercentage;
+      
+      if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+        // Для накопительной системы средний балл является процентом
+        rawPercentage = rawAverage;
+        percentage = `${Math.round(rawAverage * 10) / 10}%`;
+        average = percentage;
+      } else {
+        // Для 5-балльной системы рассчитываем процент от максимального балла (5)
+        rawPercentage = (rawAverage / 5) * 100;
+        percentage = `${Math.round(rawPercentage)}%`;
+        average = rawAverage.toFixed(1);
+      }
+      
+      return {
+        average,
+        percentage,
+        rawAverage,
+        rawPercentage,
+        gradeCount: studentSubjectGrades.length
+      };
+    } catch (error) {
+      console.error(`Ошибка при расчете среднего балла (студент: ${studentId}, предмет: ${subjectId}):`, error);
+      return {
+        ...defaultResult,
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+      };
     }
-    
-    // Запасной вариант: выполняем расчет на стороне клиента, если API не вернуло данные
-    const studentSubjectGrades = gradesInDateRange.filter(
-      g => g.studentId === studentId && g.subjectId === subjectId
-    );
-    
-    if (studentSubjectGrades.length === 0) return "-";
-    
-    const sum = studentSubjectGrades.reduce((total, grade) => total + grade.grade, 0);
-    const average = sum / studentSubjectGrades.length;
-    
-    // Формат вывода зависит от системы оценивания класса
-    if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      // Для накопительной системы выводим процент
-      return `${Math.round(average * 10) / 10}%`;
-    }
-    
-    // Для 5-балльной системы выводим средний балл с одним знаком после запятой
-    return average.toFixed(1);
   };
 
   // Рассчитываем общий средний балл ученика по всем предметам в выбранном периоде
-  const calculateStudentOverallAverage = (studentId: number) => {
-    // Проверяем, есть ли данные от API (общий средний)
-    if (averages[studentId.toString()] && averages[studentId.toString()]['overall']) {
-      const data = averages[studentId.toString()]['overall'];
-      
-      // Формат вывода зависит от системы оценивания класса
-      if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
-        // Для накопительной системы выводим процент
-        return `${data.percentage}`;
+  const calculateStudentOverallAverage = (studentId: number): AverageGradeResult => {
+    // Результат по умолчанию (если нет оценок)
+    const defaultResult: AverageGradeResult = {
+      average: "-", 
+      percentage: "-",
+      rawAverage: 0,
+      rawPercentage: 0,
+      gradeCount: 0
+    };
+    
+    try {
+      // Проверяем, есть ли данные от API (общий средний)
+      if (averages[studentId.toString()] && averages[studentId.toString()]['overall']) {
+        const data = averages[studentId.toString()]['overall'];
+        
+        // Преобразуем строковые значения в числа для визуализации
+        const rawAverage = parseFloat(data.average || '0') || 0;
+        const rawPercentage = parseFloat(data.percentage || '0') || 0;
+        
+        return {
+          average: data.average || "-",
+          percentage: data.percentage ? `${data.percentage}%` : "-",
+          rawAverage,
+          rawPercentage,
+          gradeCount: data.gradeCount || 0
+        };
       }
       
-      // Для 5-балльной системы выводим средний балл
-      return data.average;
+      // Запасной вариант: расчет на стороне клиента
+      const studentGrades = gradesInDateRange.filter(g => g.studentId === studentId);
+      
+      if (studentGrades.length === 0) return defaultResult;
+      
+      const sum = studentGrades.reduce((total, grade) => total + grade.grade, 0);
+      const rawAverage = sum / studentGrades.length;
+      
+      // В зависимости от системы оценивания рассчитываем процент и формат
+      let average, percentage, rawPercentage;
+      
+      if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+        // Для накопительной системы средний балл является процентом
+        rawPercentage = rawAverage;
+        percentage = `${Math.round(rawAverage * 10) / 10}%`;
+        average = percentage;
+      } else {
+        // Для 5-балльной системы рассчитываем процент от максимального балла (5)
+        rawPercentage = (rawAverage / 5) * 100;
+        percentage = `${Math.round(rawPercentage)}%`;
+        average = rawAverage.toFixed(1);
+      }
+      
+      return {
+        average,
+        percentage,
+        rawAverage,
+        rawPercentage,
+        gradeCount: studentGrades.length
+      };
+    } catch (error) {
+      console.error(`Ошибка при расчете общего среднего балла (студент: ${studentId}):`, error);
+      return {
+        ...defaultResult,
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка'
+      };
     }
-    
-    // Запасной вариант: расчет на стороне клиента
-    const studentGrades = gradesInDateRange.filter(g => g.studentId === studentId);
-    
-    if (studentGrades.length === 0) return "-";
-    
-    const sum = studentGrades.reduce((total, grade) => total + grade.grade, 0);
-    const average = sum / studentGrades.length;
-    
-    // Формат вывода зависит от системы оценивания класса
-    if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      // Для накопительной системы выводим процент
-      return `${Math.round(average * 10) / 10}%`;
-    }
-    
-    // Для 5-балльной системы выводим средний балл с одним знаком после запятой
-    return average.toFixed(1);
   };
 
   // Получаем уникальные предметы, по которым есть оценки
@@ -414,7 +492,47 @@ export default function ClassTeacherGradesPage() {
                                 {student.lastName} {student.firstName}
                               </TableCell>
                               <TableCell className="text-center">
-                                {typeof selectedSubjectId === 'number' ? calculateSubjectAverage(student.id, selectedSubjectId) : "-"}
+                                {typeof selectedSubjectId === 'number' ? (
+                                  <div className="flex flex-col items-center justify-center">
+                                    {(() => {
+                                      const result = calculateSubjectAverage(student.id, selectedSubjectId);
+                                      if (result.gradeCount === 0) return "-";
+                                      
+                                      // Выбираем цвет в зависимости от процента успеваемости
+                                      const getColorClass = (percentage: number) => {
+                                        if (percentage >= 85) return "text-green-600";
+                                        if (percentage >= 70) return "text-emerald-600";
+                                        if (percentage >= 50) return "text-amber-600";
+                                        return "text-red-600";
+                                      };
+                                      
+                                      return (
+                                        <>
+                                          <div className={`font-medium ${getColorClass(result.rawPercentage)}`}>
+                                            {classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE
+                                              ? result.percentage 
+                                              : result.average}
+                                          </div>
+                                          
+                                          {result.gradeCount > 0 && (
+                                            <div className="mt-1 flex items-center justify-center w-full">
+                                              <div className="h-1.5 w-full max-w-24 bg-gray-200 rounded-full overflow-hidden">
+                                                <div 
+                                                  className={`h-full ${getColorClass(result.rawPercentage)} bg-current`} 
+                                                  style={{ width: `${Math.min(100, result.rawPercentage)}%` }}
+                                                />
+                                              </div>
+                                            </div>
+                                          )}
+                                          
+                                          <div className="text-xs text-gray-500 mt-1">
+                                            ({result.gradeCount} оц.)
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                ) : "-"}
                               </TableCell>
                             </TableRow>
                           ))}
