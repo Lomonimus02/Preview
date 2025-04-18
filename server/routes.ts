@@ -2060,7 +2060,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const parsedStudentId = parseInt(studentId as string);
         students = [await dataStorage.getUser(parsedStudentId)];
       } else {
-        students = await dataStorage.getStudentsByClass(parsedClassId);
+        // В нашей системе используется функция getStudentsByClassId вместо getStudentsByClass
+        students = await dataStorage.getStudentsByClassId(parsedClassId);
       }
       
       console.log(`Получено ${students.length} учеников`);
