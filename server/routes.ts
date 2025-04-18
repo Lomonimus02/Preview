@@ -2026,6 +2026,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { classId, studentId, fromDate, toDate } = req.query;
       console.log("Запрос к API /api/student-subject-averages с параметрами:", req.query);
       
+      // Проверяем права доступа
+      const allowedRoles = [
+        UserRoleEnum.TEACHER, 
+        UserRoleEnum.CLASS_TEACHER, 
+        UserRoleEnum.SCHOOL_ADMIN, 
+        UserRoleEnum.PRINCIPAL, 
+        UserRoleEnum.VICE_PRINCIPAL
+      ];
+      
+      console.log("Роль пользователя:", req.user.role, "Активная роль:", req.user.activeRole);
+      
+      // Проверка доступа с учетом как основной, так и активной роли
+      const hasAccess = 
+        allowedRoles.includes(req.user.role) || 
+        (req.user.activeRole && allowedRoles.includes(req.user.activeRole));
+      
+      if (!hasAccess) {
+        console.error("Доступ запрещен для роли:", req.user.role, req.user.activeRole);
+        return res.status(403).json({ message: "Доступ запрещен" });
+      }
+      
       // Проверяем наличие класса
       let parsedClassId;
       

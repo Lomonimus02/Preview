@@ -162,7 +162,7 @@ export default function ClassTeacherGradesPage() {
   }, [gradesInDateRange, selectedSubjectId]);
 
   // Получаем детальный расчет среднего балла студента по предмету через API
-  const { data: averages = {} } = useQuery<Record<string, Record<string, { average: string, percentage: string }>>>({
+  const { data: averages = {}, isError, error } = useQuery<Record<string, Record<string, { average: string, percentage: string }>>>({
     queryKey: ["/api/student-subject-averages", classId, dateRange],
     queryFn: async () => {
       try {
@@ -172,17 +172,42 @@ export default function ClassTeacherGradesPage() {
         
         // Получаем средние баллы через API, чтобы использовать серверную логику расчета
         const res = await apiRequest(`/api/student-subject-averages?classId=${classId}&fromDate=${fromDate}&toDate=${toDate}`, "GET");
+        
+        if (!res.ok) {
+          // Обрабатываем ошибку ответа
+          const errorData = await res.json();
+          console.error("Ошибка API при запросе средних баллов:", {
+            status: res.status, 
+            statusText: res.statusText,
+            errorData
+          });
+          throw new Error(`Ошибка API: ${res.status} ${res.statusText} - ${errorData.message || 'Неизвестная ошибка'}`);
+        }
+        
         console.log("Ответ API при запросе средних баллов:", { status: res.status, statusText: res.statusText });
         const data = await res.json();
         console.log("Полученные средние баллы:", data);
         return data;
       } catch (error) {
         console.error("Ошибка при получении средних баллов:", error);
-        return {};
+        // Пробрасываем ошибку, чтобы React Query мог её обработать
+        throw error;
       }
     },
     enabled: !!classId && !!dateRange.from && !!dateRange.to,
+    retry: 1, // Ограничиваем количество повторных запросов
   });
+  
+  // Отображаем ошибку, если запрос не удался
+  useEffect(() => {
+    if (isError) {
+      toast({
+        title: "Ошибка при загрузке данных",
+        description: `Не удалось получить средние баллы: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`,
+        variant: "destructive",
+      });
+    }
+  }, [isError, error, toast]);
   
   // Рассчитываем средний балл ученика по выбранному предмету в выбранном периоде
   const calculateSubjectAverage = (studentId: number, subjectId: number) => {
