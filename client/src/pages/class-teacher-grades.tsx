@@ -3,18 +3,20 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { useAuth } from "@/hooks/use-auth";
 import { useRoleCheck } from "@/hooks/use-role-check";
 import { useQuery } from "@tanstack/react-query";
-import { UserRoleEnum, Grade, Subject, User, Class } from "@shared/schema";
+import { UserRoleEnum, Grade, Subject, User, Class, GradingSystemEnum } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BookOpenIcon, GraduationCapIcon, Calculator } from "lucide-react";
-import { format } from "date-fns";
+import { BookOpenIcon, GraduationCapIcon, Calculator, CalendarRange } from "lucide-react";
+import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 import { apiRequest } from "@/lib/queryClient";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { Label } from "@/components/ui/label";
 
 export default function ClassTeacherGradesPage() {
   const { user } = useAuth();
@@ -22,6 +24,16 @@ export default function ClassTeacherGradesPage() {
   const { toast } = useToast();
   const [classId, setClassId] = useState<number | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  
+  // Добавляем выбор периода для фильтрации оценок
+  const currentDate = new Date();
+  const [dateRange, setDateRange] = useState<{
+    from: Date;
+    to: Date;
+  }>({
+    from: subMonths(startOfMonth(currentDate), 1), // С 1-го числа предыдущего месяца
+    to: endOfMonth(currentDate), // До конца текущего месяца
+  });
 
   // Проверяем права доступа пользователя (не обязательно активная роль должна быть class_teacher)
   const hasClassTeacherAccess = () => {
@@ -112,15 +124,33 @@ export default function ClassTeacherGradesPage() {
     enabled: !!classId,
   });
 
-  // Фильтруем оценки по выбранному предмету
-  const filteredGrades = useMemo(() => {
-    if (!selectedSubjectId) return allGrades;
-    return allGrades.filter(grade => grade.subjectId === selectedSubjectId);
-  }, [allGrades, selectedSubjectId]);
+  // Фильтруем оценки по выбранному периоду
+  const gradesInDateRange = useMemo(() => {
+    if (!dateRange.from || !dateRange.to) return allGrades;
+    
+    return allGrades.filter(grade => {
+      // Если у оценки есть дата создания или дата урока, используем ее для фильтрации
+      const gradeDate = grade.createdAt ? new Date(grade.createdAt) : 
+                       (grade.scheduleId && grade.scheduleDate ? new Date(grade.scheduleDate) : null);
+      
+      if (!gradeDate) return true; // Если даты нет, включаем оценку в результат
+      
+      return isWithinInterval(gradeDate, {
+        start: dateRange.from,
+        end: dateRange.to
+      });
+    });
+  }, [allGrades, dateRange]);
 
-  // Рассчитываем средний балл ученика по выбранному предмету
+  // Фильтруем оценки по выбранному предмету и периоду
+  const filteredGrades = useMemo(() => {
+    if (!selectedSubjectId) return gradesInDateRange;
+    return gradesInDateRange.filter(grade => grade.subjectId === selectedSubjectId);
+  }, [gradesInDateRange, selectedSubjectId]);
+
+  // Рассчитываем средний балл ученика по выбранному предмету в выбранном периоде
   const calculateSubjectAverage = (studentId: number, subjectId: number) => {
-    const studentSubjectGrades = allGrades.filter(
+    const studentSubjectGrades = gradesInDateRange.filter(
       g => g.studentId === studentId && g.subjectId === subjectId
     );
     
@@ -129,17 +159,27 @@ export default function ClassTeacherGradesPage() {
     const sum = studentSubjectGrades.reduce((total, grade) => total + grade.grade, 0);
     const average = sum / studentSubjectGrades.length;
     
+    // Формат вывода зависит от системы оценивания класса
+    if (classInfo?.gradingSystem === GradingSystemEnum.PERCENTAGE) {
+      return `${Math.round(average)}%`;
+    }
+    
     return average.toFixed(1);
   };
 
-  // Рассчитываем общий средний балл ученика по всем предметам
+  // Рассчитываем общий средний балл ученика по всем предметам в выбранном периоде
   const calculateStudentOverallAverage = (studentId: number) => {
-    const studentGrades = allGrades.filter(g => g.studentId === studentId);
+    const studentGrades = gradesInDateRange.filter(g => g.studentId === studentId);
     
     if (studentGrades.length === 0) return "-";
     
     const sum = studentGrades.reduce((total, grade) => total + grade.grade, 0);
     const average = sum / studentGrades.length;
+    
+    // Формат вывода зависит от системы оценивания класса
+    if (classInfo?.gradingSystem === GradingSystemEnum.PERCENTAGE) {
+      return `${Math.round(average)}%`;
+    }
     
     return average.toFixed(1);
   };
@@ -174,26 +214,41 @@ export default function ClassTeacherGradesPage() {
             {classInfo && (
               <p className="text-muted-foreground">
                 Класс: {classInfo.name}
+                {classInfo.gradingSystem && (
+                  <> • Система оценивания: {classInfo.gradingSystem === GradingSystemEnum.PERCENTAGE ? 'процентная' : 
+                                           classInfo.gradingSystem === GradingSystemEnum.CUMULATIVE ? 'накопительная' : 
+                                           'пятибалльная'}</>
+                )}
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <Select
-              value={selectedSubjectId?.toString() || ""}
-              onValueChange={(value) => setSelectedSubjectId(value ? parseInt(value) : null)}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Выберите предмет" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Все предметы</SelectItem>
-                {subjects.map((subject) => (
-                  <SelectItem key={subject.id} value={subject.id.toString()}>
-                    {subject.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 min-w-[180px]">
+            <div className="w-full sm:w-auto">
+              <Label htmlFor="date-range" className="mb-1 block">Период</Label>
+              <DateRangePicker 
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+              />
+            </div>
+            <div>
+              <Label htmlFor="subject-select" className="mb-1 block">Предмет</Label>
+              <Select
+                value={selectedSubjectId?.toString() || ""}
+                onValueChange={(value) => setSelectedSubjectId(value ? parseInt(value) : null)}
+              >
+                <SelectTrigger id="subject-select" className="w-[180px]">
+                  <SelectValue placeholder="Выберите предмет" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Все предметы</SelectItem>
+                  {subjects.map((subject) => (
+                    <SelectItem key={subject.id} value={subject.id.toString()}>
+                      {subject.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
