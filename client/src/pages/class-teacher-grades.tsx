@@ -589,11 +589,73 @@ export default function ClassTeacherGradesPage() {
                               </TableCell>
                               {subjectsWithGrades.map(subject => (
                                 <TableCell key={subject.id} className="text-center">
-                                  {calculateSubjectAverage(student.id, subject.id)}
+                                  <div className="flex flex-col items-center justify-center">
+                                    {(() => {
+                                      const result = calculateSubjectAverage(student.id, subject.id);
+                                      if (result.gradeCount === 0) return "-";
+                                      
+                                      // Выбираем цвет в зависимости от процента успеваемости
+                                      const getColorClass = (percentage: number) => {
+                                        if (percentage >= 85) return "text-green-600";
+                                        if (percentage >= 70) return "text-emerald-600";
+                                        if (percentage >= 50) return "text-amber-600";
+                                        return "text-red-600";
+                                      };
+                                      
+                                      return (
+                                        <>
+                                          <div className={`font-medium ${getColorClass(result.rawPercentage)}`}>
+                                            {classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE
+                                              ? result.percentage 
+                                              : result.average}
+                                          </div>
+                                          <div className="text-xs text-gray-500">
+                                            ({result.gradeCount})
+                                          </div>
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
                                 </TableCell>
                               ))}
                               <TableCell className="text-center font-bold bg-primary/10">
-                                {calculateStudentOverallAverage(student.id)}
+                                <div className="flex flex-col items-center justify-center">
+                                  {(() => {
+                                    const result = calculateStudentOverallAverage(student.id);
+                                    if (result.gradeCount === 0) return "-";
+                                    
+                                    // Выбираем цвет в зависимости от процента успеваемости
+                                    const getColorClass = (percentage: number) => {
+                                      if (percentage >= 85) return "text-green-600";
+                                      if (percentage >= 70) return "text-emerald-600";
+                                      if (percentage >= 50) return "text-amber-600";
+                                      return "text-red-600";
+                                    };
+                                    
+                                    return (
+                                      <>
+                                        <div className={`font-medium ${getColorClass(result.rawPercentage)}`}>
+                                          {classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE
+                                            ? result.percentage 
+                                            : result.average}
+                                        </div>
+                                        
+                                        <div className="mt-1 flex items-center justify-center w-full">
+                                          <div className="h-1.5 w-full max-w-24 bg-gray-200 rounded-full overflow-hidden">
+                                            <div 
+                                              className={`h-full ${getColorClass(result.rawPercentage)} bg-current`} 
+                                              style={{ width: `${Math.min(100, result.rawPercentage)}%` }}
+                                            />
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          ({result.gradeCount} оц.)
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -641,18 +703,18 @@ export default function ClassTeacherGradesPage() {
                             const aAvg = calculateStudentOverallAverage(a.id);
                             const bAvg = calculateStudentOverallAverage(b.id);
                             
-                            // Сначала сортируем по оценкам (исключая "-")
-                            if (aAvg !== "-" && bAvg !== "-") {
-                              return parseFloat(bAvg) - parseFloat(aAvg);
+                            // Сначала сортируем по оценкам (исключая те, у которых нет оценок)
+                            if (aAvg.gradeCount > 0 && bAvg.gradeCount > 0) {
+                              return bAvg.rawAverage - aAvg.rawAverage;
                             }
                             
-                            // Затем по фамилии
-                            if (aAvg === "-" && bAvg === "-") {
+                            // Затем по фамилии, если оба без оценок
+                            if (aAvg.gradeCount === 0 && bAvg.gradeCount === 0) {
                               return a.lastName.localeCompare(b.lastName);
                             }
                             
                             // Ученики с оценками идут выше учеников без оценок
-                            return aAvg === "-" ? 1 : -1;
+                            return aAvg.gradeCount === 0 ? 1 : -1;
                           })
                           .map(student => (
                             <TableRow key={student.id}>
@@ -660,7 +722,43 @@ export default function ClassTeacherGradesPage() {
                                 {student.lastName} {student.firstName}
                               </TableCell>
                               <TableCell className="text-center">
-                                {calculateStudentOverallAverage(student.id)}
+                                <div className="flex flex-col items-center justify-center">
+                                  {(() => {
+                                    const result = calculateStudentOverallAverage(student.id);
+                                    if (result.gradeCount === 0) return "-";
+                                    
+                                    // Выбираем цвет в зависимости от процента успеваемости
+                                    const getColorClass = (percentage: number) => {
+                                      if (percentage >= 85) return "text-green-600";
+                                      if (percentage >= 70) return "text-emerald-600";
+                                      if (percentage >= 50) return "text-amber-600";
+                                      return "text-red-600";
+                                    };
+                                    
+                                    return (
+                                      <>
+                                        <div className={`font-medium ${getColorClass(result.rawPercentage)}`}>
+                                          {classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE
+                                            ? result.percentage 
+                                            : result.average}
+                                        </div>
+                                        
+                                        <div className="mt-1 flex items-center justify-center w-full">
+                                          <div className="h-1.5 w-full max-w-24 bg-gray-200 rounded-full overflow-hidden">
+                                            <div 
+                                              className={`h-full ${getColorClass(result.rawPercentage)} bg-current`} 
+                                              style={{ width: `${Math.min(100, result.rawPercentage)}%` }}
+                                            />
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="text-xs text-gray-500 mt-1">
+                                          ({result.gradeCount} оц.)
+                                        </div>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
                               </TableCell>
                             </TableRow>
                           ))
