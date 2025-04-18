@@ -1970,8 +1970,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (req.query.classId) {
       const classId = parseInt(req.query.classId as string);
       
-      // Teachers, school admins, principals, and vice principals can view class grades
-      if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+      // Teachers, class teachers, school admins, principals, and vice principals can view class grades
+      if ([UserRoleEnum.TEACHER, UserRoleEnum.CLASS_TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
         // Если указан также subjectId, фильтруем оценки по предмету и классу
         if (req.query.subjectId) {
           const subjectId = parseInt(req.query.subjectId as string);
@@ -1986,13 +1986,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (req.query.subjectId) {
       // Если указан только subjectId, получаем все оценки по этому предмету
       const subjectId = parseInt(req.query.subjectId as string);
-      if ([UserRoleEnum.TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
+      if ([UserRoleEnum.TEACHER, UserRoleEnum.CLASS_TEACHER, UserRoleEnum.SCHOOL_ADMIN, UserRoleEnum.PRINCIPAL, UserRoleEnum.VICE_PRINCIPAL].includes(req.user.role)) {
         grades = await dataStorage.getGradesBySubject(subjectId);
       } else {
         return res.status(403).json({ message: "Forbidden" });
       }
     } else if (req.user.role === UserRoleEnum.STUDENT) {
       grades = await dataStorage.getGradesByStudent(req.user.id);
+    } else if (req.user.role === UserRoleEnum.CLASS_TEACHER) {
+      // Классный руководитель может видеть все оценки своего класса
+      // Получаем информацию о том, какого класса он руководитель
+      const classTeacherRoles = await dataStorage.getUserRoles(req.user.id);
+      const classTeacherRole = classTeacherRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER);
+      
+      if (classTeacherRole && classTeacherRole.classId) {
+        // Если найден класс, получаем все оценки для него
+        grades = await dataStorage.getGradesByClass(classTeacherRole.classId);
+      }
     }
     
     res.json(grades);
