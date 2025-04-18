@@ -24,7 +24,10 @@ import {
   Info,
   Award,
   BarChart,
-  Percent 
+  Percent,
+  AlertCircle,
+  Loader2,
+  ShieldAlert
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +52,7 @@ import {
   CardTitle,
   CardContent,
   CardDescription,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Tabs,
@@ -67,6 +71,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  Alert,
+  AlertTitle,
+  AlertDescription 
+} from "@/components/ui/alert";
 
 // Интерфейс для отображения оценок в гриде по дням
 interface GradesByDate {
@@ -232,16 +242,41 @@ export default function StudentGrades() {
   // Объект для хранения средних оценок по предметам из API
   const [subjectAverages, setSubjectAverages] = useState<Record<string, SubjectAverage>>({});
   
+  // Состояние для отслеживания ошибок загрузки данных
+  const [loadingErrors, setLoadingErrors] = useState<{
+    auth?: string;
+    averages?: string;
+    subjects?: string;
+    grades?: string;
+  }>({});
+  
+  const { toast } = useToast();
+  
   // Эффект для предварительной загрузки средних оценок для всех предметов
   useEffect(() => {
-    if (!user || user.role !== UserRoleEnum.STUDENT || !subjects.length) return;
+    if (!user) {
+      setLoadingErrors(prev => ({ ...prev, auth: "Требуется авторизация для просмотра оценок" }));
+      return;
+    }
+    
+    if (user.role !== UserRoleEnum.STUDENT) {
+      setLoadingErrors(prev => ({ ...prev, auth: "Доступ к оценкам разрешен только для учеников" }));
+      return;
+    }
+    
+    if (!subjects || !subjects.length) {
+      return; // Предметы еще не загружены, ждем
+    }
     
     const fetchSubjectAverages = async () => {
       const averagesData: Record<string, SubjectAverage> = {};
+      let hasErrors = false;
       
       // Загружаем данные для всех предметов
       for (const subject of subjects) {
         try {
+          if (!subject || !subject.id) continue; // Пропускаем невалидные предметы
+          
           const subjectId = subject.id;
           const cacheKey = (subject as any).customId || `${subjectId}`;
           
@@ -249,24 +284,64 @@ export default function StudentGrades() {
           const url = `/api/student-subject-average?studentId=${user.id}&subjectId=${subjectId}`;
           const response = await fetch(url);
           
+          if (response.status === 401) {
+            setLoadingErrors(prev => ({ ...prev, auth: "Проблема с авторизацией. Возможно, сессия истекла" }));
+            hasErrors = true;
+            break;
+          }
+          
+          if (response.status === 403) {
+            setLoadingErrors(prev => ({ ...prev, auth: "Недостаточно прав для просмотра оценок" }));
+            hasErrors = true;
+            break;
+          }
+          
           if (response.ok) {
             const data = await response.json();
-            averagesData[cacheKey] = data;
+            // Проверка на валидность данных
+            if (data && (data.average !== undefined || data.percentage !== undefined)) {
+              averagesData[cacheKey] = data;
+            }
+          } else {
+            console.warn(`Ошибка при загрузке средней оценки для предмета ${subject.name}:`, response.statusText);
           }
         } catch (error) {
           console.error(`Ошибка при загрузке средней оценки для предмета:`, error);
+          hasErrors = true;
         }
       }
       
-      // Обновляем состояние
-      setSubjectAverages(prev => ({
-        ...prev,
-        ...averagesData
-      }));
+      // Обновляем состояние только если не было критических ошибок
+      if (!hasErrors) {
+        setLoadingErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.averages;
+          return newErrors;
+        });
+        
+        setSubjectAverages(prev => ({
+          ...prev,
+          ...averagesData
+        }));
+      } else {
+        // Если были ошибки, но нам удалось загрузить хотя бы часть оценок
+        if (Object.keys(averagesData).length > 0) {
+          setSubjectAverages(prev => ({
+            ...prev,
+            ...averagesData
+          }));
+          
+          // Уведомляем пользователя о частичной загрузке
+          toast({
+            title: "Внимание",
+            description: "Загружены не все средние оценки. Пожалуйста, обновите страницу или обратитесь к администратору."
+          });
+        }
+      }
     };
     
     fetchSubjectAverages();
-  }, [user, subjects]);
+  }, [user, subjects, toast]);
   
   // Определяем систему оценивания класса
   const gradingSystem = useMemo(() => {
@@ -904,15 +979,66 @@ export default function StudentGrades() {
     return Array.from(subjectSubgroupMap.values());
   }, [grades, subjects]);
   
+  // Функция для отображения состояния ошибок
+  const renderErrorState = () => {
+    if (!user) {
+      return (
+        <Alert variant="destructive" className="mb-6">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Ошибка доступа</AlertTitle>
+          <AlertDescription>
+            Требуется авторизация для просмотра оценок. Пожалуйста, войдите в систему.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    
+    if (user.role !== UserRoleEnum.STUDENT) {
+      return (
+        <Alert variant="destructive" className="mb-6">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Недостаточно прав</AlertTitle>
+          <AlertDescription>
+            Журнал оценок доступен только для учеников. Ваша роль: {user.role}
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    
+    if (loadingErrors.auth) {
+      return (
+        <Alert variant="destructive" className="mb-6">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Ошибка доступа</AlertTitle>
+          <AlertDescription>
+            {loadingErrors.auth}
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    
+    return null;
+  };
+  
+  // Проверка на наличие ошибок, требующих блокировки страницы
+  const hasBlockingErrors = !user || user.role !== UserRoleEnum.STUDENT || !!loadingErrors.auth;
+  
   return (
     <MainLayout>
+      {/* Отображение ошибок доступа */}
+      {renderErrorState()}
+      
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-heading font-bold text-gray-800">Оценки</h2>
         
         {/* Переключатели периодов */}
         <div className="flex items-center space-x-2">
           {/* Переключатель типа периода */}
-          <Select value={displayPeriod} onValueChange={(value) => setDisplayPeriod(value as QuarterType)}>
+          <Select 
+            value={displayPeriod} 
+            onValueChange={(value) => setDisplayPeriod(value as QuarterType)}
+            disabled={hasBlockingErrors}
+          >
             <SelectTrigger className="h-9 w-[180px]">
               <SelectValue placeholder="Период" />
             </SelectTrigger>
@@ -934,6 +1060,7 @@ export default function StudentGrades() {
               size="icon"
               onClick={goToPreviousYear}
               className="h-7 w-7"
+              disabled={hasBlockingErrors}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -976,11 +1103,23 @@ export default function StudentGrades() {
               <CardTitle>Успеваемость за {periodLabel}</CardTitle>
             </CardHeader>
             <CardContent>
-              {gradesLoading ? (
-                <div className="text-center py-10">Загрузка оценок...</div>
+              {hasBlockingErrors ? (
+                <div className="text-center py-10 text-red-500">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-2" />
+                  <div className="text-lg font-medium">Доступ запрещен</div>
+                  <p className="text-sm opacity-80">У вас нет прав для просмотра журнала оценок</p>
+                </div>
+              ) : gradesLoading ? (
+                <div className="text-center py-10">
+                  <Loader2 className="h-12 w-12 mx-auto mb-2 animate-spin text-primary" />
+                  <div className="text-lg font-medium">Загрузка оценок...</div>
+                  <p className="text-sm text-gray-500">Пожалуйста, подождите</p>
+                </div>
               ) : subjectsWithGrades.length === 0 ? (
                 <div className="text-center py-10 text-gray-500">
-                  За выбранный период оценок нет
+                  <Info className="h-12 w-12 mx-auto mb-2" />
+                  <div className="text-lg font-medium">Нет данных</div>
+                  <p className="text-sm opacity-80">За выбранный период оценок нет</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
