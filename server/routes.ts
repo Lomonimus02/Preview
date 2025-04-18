@@ -2118,6 +2118,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Для каждого ученика рассчитываем средние баллы по каждому предмету
       for (const student of students) {
+        // Проверка, что student не undefined и имеет id
+        if (!student || !student.id) {
+          console.error(`Пропускаем undefined или incomplete student в расчете средних баллов`);
+          continue;
+        }
+        
         const studentId = student.id;
         result[studentId] = {};
         
@@ -2126,7 +2132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Получаем подгруппы ученика
         const studentSubgroups = await dataStorage.getStudentSubgroups(studentId);
-        const studentSubgroupIds = studentSubgroups.map(sg => sg.id);
+        const studentSubgroupIds = studentSubgroups.map(sg => sg.id || 0);
         
         // Получаем предметы, по которым у ученика есть оценки
         const studentSubjectIds = Array.from(new Set(studentGrades.map(g => g.subjectId)));
