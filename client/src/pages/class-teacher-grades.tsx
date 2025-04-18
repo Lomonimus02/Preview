@@ -24,7 +24,7 @@ export default function ClassTeacherGradesPage() {
   const { isClassTeacher, isTeacher } = useRoleCheck();
   const { toast } = useToast();
   const [classId, setClassId] = useState<number | null>(null);
-  const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number | string | null>(null);
   
   // Добавляем выбор периода для фильтрации оценок
   const currentDate = new Date();
@@ -132,16 +132,22 @@ export default function ClassTeacherGradesPage() {
       
       if (!gradeDate) return true; // Если даты нет, включаем оценку в результат
       
-      return isWithinInterval(gradeDate, {
-        start: dateRange.from,
-        end: dateRange.to
-      });
+      const from = dateRange.from as Date | undefined;
+      const to = dateRange.to as Date | undefined;
+      
+      if (from && to) {
+        return isWithinInterval(gradeDate, {
+          start: from,
+          end: to
+        });
+      }
+      return true;
     });
   }, [allGrades, dateRange]);
 
   // Фильтруем оценки по выбранному предмету и периоду
   const filteredGrades = useMemo(() => {
-    if (!selectedSubjectId) return gradesInDateRange;
+    if (!selectedSubjectId || selectedSubjectId === 'all') return gradesInDateRange;
     return gradesInDateRange.filter(grade => grade.subjectId === selectedSubjectId);
   }, [gradesInDateRange, selectedSubjectId]);
 
@@ -230,13 +236,21 @@ export default function ClassTeacherGradesPage() {
               <Label htmlFor="subject-select" className="mb-1 block">Предмет</Label>
               <Select
                 value={selectedSubjectId?.toString() || ""}
-                onValueChange={(value) => setSelectedSubjectId(value ? parseInt(value) : null)}
+                onValueChange={(value) => {
+                  if (value === 'all') {
+                    setSelectedSubjectId('all');
+                  } else if (value) {
+                    setSelectedSubjectId(parseInt(value));
+                  } else {
+                    setSelectedSubjectId(null);
+                  }
+                }}
               >
                 <SelectTrigger id="subject-select" className="w-[180px]">
                   <SelectValue placeholder="Выберите предмет" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Все предметы</SelectItem>
+                  <SelectItem value="all">Все предметы</SelectItem>
                   {subjects.map((subject) => (
                     <SelectItem key={subject.id} value={subject.id.toString()}>
                       {subject.name}
@@ -261,12 +275,12 @@ export default function ClassTeacherGradesPage() {
           </TabsList>
 
           <TabsContent value="by-subject">
-            {selectedSubjectId ? (
+            {selectedSubjectId && selectedSubjectId !== 'all' ? (
               // Отображение оценок для выбранного предмета
               <Card>
                 <CardHeader>
                   <CardTitle>
-                    Оценки по предмету: {subjects.find(s => s.id === selectedSubjectId)?.name}
+                    Оценки по предмету: {typeof selectedSubjectId === 'number' ? subjects.find(s => s.id === selectedSubjectId)?.name : ''}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -298,7 +312,7 @@ export default function ClassTeacherGradesPage() {
                                 {student.lastName} {student.firstName}
                               </TableCell>
                               <TableCell className="text-center">
-                                {calculateSubjectAverage(student.id, selectedSubjectId)}
+                                {typeof selectedSubjectId === 'number' ? calculateSubjectAverage(student.id, selectedSubjectId) : "-"}
                               </TableCell>
                             </TableRow>
                           ))}
