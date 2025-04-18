@@ -17,6 +17,7 @@ import { ru } from "date-fns/locale";
 import { apiRequest } from "@/lib/queryClient";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Label } from "@/components/ui/label";
+import { DateRange } from "react-day-picker";
 
 export default function ClassTeacherGradesPage() {
   const { user } = useAuth();
@@ -27,10 +28,7 @@ export default function ClassTeacherGradesPage() {
   
   // Добавляем выбор периода для фильтрации оценок
   const currentDate = new Date();
-  const [dateRange, setDateRange] = useState<{
-    from: Date;
-    to: Date;
-  }>({
+  const [dateRange, setDateRange] = useState<DateRange>({
     from: subMonths(startOfMonth(currentDate), 1), // С 1-го числа предыдущего месяца
     to: endOfMonth(currentDate), // До конца текущего месяца
   });
@@ -67,7 +65,7 @@ export default function ClassTeacherGradesPage() {
   useEffect(() => {
     if (userRoles.length > 0) {
       console.log("Полученные роли:", userRoles);
-      const classTeacherRole = userRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER);
+      const classTeacherRole = userRoles.find((r: any) => r.role === UserRoleEnum.CLASS_TEACHER);
       console.log("Найдена роль классного руководителя:", classTeacherRole);
       
       if (classTeacherRole) {
@@ -129,9 +127,8 @@ export default function ClassTeacherGradesPage() {
     if (!dateRange.from || !dateRange.to) return allGrades;
     
     return allGrades.filter(grade => {
-      // Если у оценки есть дата создания или дата урока, используем ее для фильтрации
-      const gradeDate = grade.createdAt ? new Date(grade.createdAt) : 
-                       (grade.scheduleId && grade.scheduleDate ? new Date(grade.scheduleDate) : null);
+      // Если у оценки есть дата создания, используем ее для фильтрации
+      const gradeDate = grade.createdAt ? new Date(grade.createdAt) : null;
       
       if (!gradeDate) return true; // Если даты нет, включаем оценку в результат
       
@@ -160,8 +157,8 @@ export default function ClassTeacherGradesPage() {
     const average = sum / studentSubjectGrades.length;
     
     // Формат вывода зависит от системы оценивания класса
-    if (classInfo?.gradingSystem === GradingSystemEnum.PERCENTAGE) {
-      return `${Math.round(average)}%`;
+    if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+      return `${Math.round(average * 100) / 100}`;
     }
     
     return average.toFixed(1);
@@ -177,8 +174,8 @@ export default function ClassTeacherGradesPage() {
     const average = sum / studentGrades.length;
     
     // Формат вывода зависит от системы оценивания класса
-    if (classInfo?.gradingSystem === GradingSystemEnum.PERCENTAGE) {
-      return `${Math.round(average)}%`;
+    if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+      return `${Math.round(average * 100) / 100}`;
     }
     
     return average.toFixed(1);
@@ -186,7 +183,7 @@ export default function ClassTeacherGradesPage() {
 
   // Получаем уникальные предметы, по которым есть оценки
   const subjectsWithGrades = useMemo(() => {
-    const subjectIds = [...new Set(allGrades.map(g => g.subjectId))];
+    const subjectIds = Array.from(new Set(allGrades.map(g => g.subjectId)));
     return subjects.filter(subject => subjectIds.includes(subject.id));
   }, [allGrades, subjects]);
 
