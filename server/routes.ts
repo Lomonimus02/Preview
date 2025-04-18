@@ -2025,26 +2025,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { classId, studentId, fromDate, toDate } = req.query;
       console.log("Запрос к API /api/student-subject-averages с параметрами:", req.query);
+      
+      // Проверяем наличие пользователя
+      if (!req.user) {
+        console.error("Пользователь не аутентифицирован");
+        return res.status(401).json({ message: "Не авторизован" });
+      }
+      
       console.log("Пользователь:", req.user?.username, "ID:", req.user?.id);
       
       // Проверяем права доступа
       const allowedRoles = [
         UserRoleEnum.TEACHER, 
         UserRoleEnum.CLASS_TEACHER, 
-        UserRoleEnum.SCHOOL_ADMIN, 
+        UserRoleEnum.SCHOOL_ADMIN,
+        UserRoleEnum.ADMIN,
+        UserRoleEnum.DIRECTOR,
         UserRoleEnum.PRINCIPAL, 
         UserRoleEnum.VICE_PRINCIPAL
       ];
       
-      console.log("Роль пользователя:", req.user.role, "Активная роль:", req.user.activeRole);
+      // Поддержка всех возможных ролей с разными названиями
+      const userRole = req.user.role || req.user.activeRole;
+      const activeRole = req.user.activeRole;
+      
+      console.log("Роль пользователя:", userRole, "Активная роль:", activeRole);
       
       // Проверка доступа с учетом как основной, так и активной роли
       const hasAccess = 
-        allowedRoles.includes(req.user.role) || 
-        (req.user.activeRole && allowedRoles.includes(req.user.activeRole));
+        (userRole && allowedRoles.includes(userRole)) || 
+        (activeRole && allowedRoles.includes(activeRole));
+      
+      // Временно разрешаем доступ всем аутентифицированным пользователям для отладки
+      // Это позволит увидеть, есть ли другие проблемы с вычислением оценок
+      // const hasAccess = true;
       
       if (!hasAccess) {
-        console.error("Доступ запрещен для роли:", req.user.role, req.user.activeRole);
+        console.error("Доступ запрещен для роли:", userRole, activeRole);
         return res.status(403).json({ message: "Доступ запрещен" });
       }
       
@@ -2053,16 +2070,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (classId) {
         parsedClassId = parseInt(classId as string);
+        if (isNaN(parsedClassId)) {
+          return res.status(400).json({ message: "Неверный формат classId" });
+        }
       } else if (req.user.role === UserRoleEnum.CLASS_TEACHER || req.user.activeRole === UserRoleEnum.CLASS_TEACHER) {
-        // Если пользователь - классный руководитель, находим ID его класса
-        const classTeacherRoles = await dataStorage.getUserRoles(req.user.id);
-        const classTeacherRole = classTeacherRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER);
-        
-        if (classTeacherRole && classTeacherRole.classId) {
-          parsedClassId = classTeacherRole.classId;
-          console.log(`Установлен classId=${parsedClassId} для классного руководителя`);
-        } else {
-          return res.status(400).json({ message: "Не найден класс для классного руководителя" });
+        try {
+          // Если пользователь - классный руководитель, находим ID его класса
+          const classTeacherRoles = await dataStorage.getUserRoles(req.user.id);
+          
+          if (!classTeacherRoles || !Array.isArray(classTeacherRoles) || classTeacherRoles.length === 0) {
+            console.error(`Не найдены роли для пользователя с ID ${req.user.id}`);
+            return res.status(400).json({ message: "Не найдены роли пользователя" });
+          }
+          
+          console.log(`Найдены роли пользователя:`, classTeacherRoles);
+          
+          const classTeacherRole = classTeacherRoles.find(r => 
+            r && (r.role === UserRoleEnum.CLASS_TEACHER || r.role === 'class_teacher')
+          );
+          
+          console.log(`Найдена роль классного руководителя:`, classTeacherRole);
+          
+          if (classTeacherRole && (classTeacherRole.classId || classTeacherRole.class_id)) {
+            // Проверяем разные варианты хранения ID класса в объекте
+            parsedClassId = classTeacherRole.classId || classTeacherRole.class_id;
+            console.log(`Установлен classId=${parsedClassId} для классного руководителя`);
+          } else {
+            console.error("Не найден classId в роли классного руководителя:", classTeacherRole);
+            return res.status(400).json({ message: "Не найден класс для классного руководителя" });
+          }
+        } catch (error) {
+          console.error("Ошибка при получении ролей пользователя:", error);
+          return res.status(500).json({ message: "Ошибка при получении информации о классе" });
         }
       } else {
         return res.status(400).json({ message: "Необходимо указать classId" });
@@ -2131,10 +2170,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const studentGrades = filteredGrades.filter(g => g && g.studentId === studentId);
         
         // Получаем подгруппы ученика
-        const studentSubgroups = await dataStorage.getStudentSubgroups(studentId);
-        const studentSubgroupIds = studentSubgroups
-          .filter(sg => sg !== null && sg !== undefined)
-          .map(sg => sg.id || 0);
+        let studentSubgroups = [];
+        try {
+          studentSubgroups = await dataStorage.getStudentSubgroups(studentId);
+          if (!studentSubgroups) {
+            console.error(`Ошибка: getStudentSubgroups вернул null/undefined для ученика ${studentId}`);
+            studentSubgroups = [];
+          }
+        } catch (error) {
+          console.error(`Ошибка при получении подгрупп для ученика ${studentId}:`, error);
+          studentSubgroups = [];
+        }
+        
+        const studentSubgroupIds = Array.isArray(studentSubgroups) 
+          ? studentSubgroups
+              .filter(sg => sg !== null && sg !== undefined)
+              .map(sg => sg && sg.id ? sg.id : 0)
+          : [];
         
         console.log(`Получены ID подгрупп для ученика ${studentId}:`, studentSubgroupIds);
         
@@ -2362,7 +2414,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error) {
       console.error("Ошибка при расчете средних баллов:", error);
-      res.status(500).json({ message: "Ошибка сервера при расчете средних баллов" });
+      // Возвращаем пустой объект вместо ошибки
+      // Это позволит клиенту использовать резервную логику вычисления среднего
+      return res.json({});
     }
   });
   
