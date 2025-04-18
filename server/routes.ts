@@ -2174,9 +2174,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 result[studentId][subjectId] = { average: "0", percentage: "0%" };
               } else {
                 const percentage = (totalEarnedScore / totalMaxScore) * 100;
+                const cappedPercentage = Math.min(percentage, 100);
                 result[studentId][subjectId] = {
                   average: totalEarnedScore.toFixed(1),
-                  percentage: `${Math.round(percentage * 10) / 10}%`
+                  percentage: `${cappedPercentage.toFixed(1)}%`
                 };
               }
             } else {
@@ -2252,9 +2253,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               result[studentId]['overall'] = { average: "0", percentage: "0%" };
             } else {
               const percentage = (totalEarnedScore / totalMaxScore) * 100;
+              const cappedPercentage = Math.min(percentage, 100);
               result[studentId]['overall'] = {
                 average: totalEarnedScore.toFixed(1),
-                percentage: `${Math.round(percentage * 10) / 10}%`
+                percentage: `${cappedPercentage.toFixed(1)}%`
               };
             }
           } else {
