@@ -235,7 +235,7 @@ export default function ClassTeacherGradesPage() {
 
   // Фильтруем оценки по выбранному периоду
   const gradesInDateRange = useMemo(() => {
-    if (!dateRange.from || !dateRange.to) return allGrades;
+    if (!startDate || !endDate) return allGrades;
     
     return allGrades.filter(grade => {
       // Если у оценки есть дата создания, используем ее для фильтрации
@@ -243,18 +243,12 @@ export default function ClassTeacherGradesPage() {
       
       if (!gradeDate) return true; // Если даты нет, включаем оценку в результат
       
-      const from = dateRange.from as Date | undefined;
-      const to = dateRange.to as Date | undefined;
-      
-      if (from && to) {
-        return isWithinInterval(gradeDate, {
-          start: from,
-          end: to
-        });
-      }
-      return true;
+      return isWithinInterval(gradeDate, {
+        start: startDate,
+        end: endDate
+      });
     });
-  }, [allGrades, dateRange]);
+  }, [allGrades, startDate, endDate]);
 
   // Фильтруем оценки по выбранному предмету и периоду
   const filteredGrades = useMemo(() => {
@@ -263,13 +257,13 @@ export default function ClassTeacherGradesPage() {
   }, [gradesInDateRange, selectedSubjectId]);
 
   // Получаем детальный расчет среднего балла студента по предмету через API
-  const { data: averages = {}, isError, error } = useQuery<Record<string, Record<string, { average: string, percentage: string }>>>({
-    queryKey: ["/api/student-subject-averages", classId, dateRange],
+  const { data: averages = {}, isError, error } = useQuery<Record<string, Record<string, { average: string, percentage: string, gradeCount: number }>>>({
+    queryKey: ["/api/student-subject-averages", classId, startDate, endDate],
     queryFn: async () => {
       try {
         // Преобразуем даты в строки для запроса
-        const fromDate = dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
-        const toDate = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
+        const fromDate = startDate ? format(startDate, 'yyyy-MM-dd') : '';
+        const toDate = endDate ? format(endDate, 'yyyy-MM-dd') : '';
         
         // Получаем средние баллы через API, чтобы использовать серверную логику расчета
         console.log(`Запрос к API /api/student-subject-averages с параметрами: { classId: '${classId}', fromDate: '${fromDate}', toDate: '${toDate}' }`);
@@ -305,7 +299,7 @@ export default function ClassTeacherGradesPage() {
         return {}; // Возвращаем пустой объект, запасной расчет сработает
       }
     },
-    enabled: !!classId && !!dateRange.from && !!dateRange.to,
+    enabled: !!classId && !!startDate && !!endDate,
     retry: 1, // Ограничиваем количество повторных запросов
   });
   
@@ -535,11 +529,52 @@ export default function ClassTeacherGradesPage() {
           </div>
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 min-w-[180px]">
             <div className="w-full sm:w-auto">
-              <Label htmlFor="date-range" className="mb-1 block">Период</Label>
-              <DateRangePicker 
-                dateRange={dateRange}
-                onDateRangeChange={setDateRange}
-              />
+              <Label htmlFor="period-select" className="mb-1 block">Период</Label>
+              <div className="flex items-center space-x-2">
+                {/* Переключатель типа периода */}
+                <Select 
+                  value={displayPeriod} 
+                  onValueChange={(value) => setDisplayPeriod(value as QuarterType)}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Период" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="quarter1">1 четверть</SelectItem>
+                    <SelectItem value="quarter2">2 четверть</SelectItem>
+                    <SelectItem value="quarter3">3 четверть</SelectItem>
+                    <SelectItem value="quarter4">4 четверть</SelectItem>
+                    <SelectItem value="semester1">1 полугодие</SelectItem>
+                    <SelectItem value="semester2">2 полугодие</SelectItem>
+                    <SelectItem value="year">Учебный год</SelectItem>
+                  </SelectContent>
+                </Select>
+                
+                {/* Навигация по периодам */}
+                <div className="flex items-center space-x-2 border rounded-md p-1">
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={goToPreviousYear}
+                    className="h-7 w-7"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <span className="text-sm font-medium px-1">
+                    {periodLabel}
+                  </span>
+                  
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={goToNextYear}
+                    className="h-7 w-7"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             </div>
             <div>
               <Label htmlFor="subject-select" className="mb-1 block">Предмет</Label>
