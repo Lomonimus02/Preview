@@ -215,8 +215,7 @@ export default function ClassTeacherGradesPage() {
               <p className="text-muted-foreground">
                 Класс: {classInfo.name}
                 {classInfo.gradingSystem && (
-                  <> • Система оценивания: {classInfo.gradingSystem === GradingSystemEnum.PERCENTAGE ? 'процентная' : 
-                                           classInfo.gradingSystem === GradingSystemEnum.CUMULATIVE ? 'накопительная' : 
+                  <> • Система оценивания: {classInfo.gradingSystem === GradingSystemEnum.CUMULATIVE ? 'накопительная' : 
                                            'пятибалльная'}</>
                 )}
               </p>
