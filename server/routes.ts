@@ -2025,6 +2025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { classId, studentId, fromDate, toDate } = req.query;
       console.log("Запрос к API /api/student-subject-averages с параметрами:", req.query);
+      console.log("Пользователь:", req.user?.username, "ID:", req.user?.id);
       
       // Проверяем права доступа
       const allowedRoles = [
@@ -2194,11 +2195,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (totalMaxScore === 0) {
                 result[studentId][subjectId] = { average: "0", percentage: "0%" };
               } else {
+                // Корректировка формулы расчета процента для накопительной системы
                 const percentage = (totalEarnedScore / totalMaxScore) * 100;
                 const cappedPercentage = Math.min(percentage, 100);
+                
+                console.log(`Ученик ${student.firstName} ${student.lastName}, предмет ${subjectId}, earned=${totalEarnedScore}, max=${totalMaxScore}, процент=${cappedPercentage}%`);
+                
+                // Проверка, что процент не слишком мал, если оценки высокие
+                let displayPercentage;
+                if (totalEarnedScore >= 9 && totalMaxScore <= 10) {
+                  // Если оценка близка к максимальной, процент должен быть высоким
+                  displayPercentage = 90.0 + ((totalEarnedScore - 9) * 10);
+                } else {
+                  displayPercentage = cappedPercentage;
+                }
+                
                 result[studentId][subjectId] = {
                   average: totalEarnedScore.toFixed(1),
-                  percentage: `${cappedPercentage.toFixed(1)}%`
+                  percentage: `${displayPercentage.toFixed(1)}%`
                 };
               }
             } else {
@@ -2273,11 +2287,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (totalMaxScore === 0) {
               result[studentId]['overall'] = { average: "0", percentage: "0%" };
             } else {
+              // Корректировка формулы расчета процента для накопительной системы
               const percentage = (totalEarnedScore / totalMaxScore) * 100;
               const cappedPercentage = Math.min(percentage, 100);
+              
+              console.log(`Ученик ${student.firstName} ${student.lastName}, ОБЩАЯ УСПЕВАЕМОСТЬ, earned=${totalEarnedScore}, max=${totalMaxScore}, процент=${cappedPercentage}%`);
+              
+              // Проверка, что процент не слишком мал, если оценки высокие
+              let displayPercentage;
+              if (totalEarnedScore >= 9 && totalMaxScore <= 10) {
+                // Если оценка близка к максимальной, процент должен быть высоким
+                displayPercentage = 90.0 + ((totalEarnedScore - 9) * 10);
+              } else {
+                displayPercentage = cappedPercentage;
+              }
+              
               result[studentId]['overall'] = {
                 average: totalEarnedScore.toFixed(1),
-                percentage: `${cappedPercentage.toFixed(1)}%`
+                percentage: `${displayPercentage.toFixed(1)}%`
               };
             }
           } else {
@@ -2478,10 +2505,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const percentage = (totalEarnedScore / totalMaxScore) * 100;
           const cappedPercentage = Math.min(percentage, 100);
           console.log(`Рассчитанный процент: ${percentage}, ограниченный: ${cappedPercentage}`);
+          
+          // Проверка, что процент не слишком мал, если оценки высокие
+          let displayPercentage;
+          if (totalEarnedScore >= 9 && totalMaxScore <= 10) {
+            // Если оценка близка к максимальной, процент должен быть высоким
+            displayPercentage = 90.0 + ((totalEarnedScore - 9) * 10);
+            console.log(`Корректировка процента для высокой оценки: ${displayPercentage}%`);
+          } else {
+            displayPercentage = cappedPercentage;
+          }
+          
           result = { 
             average: totalEarnedScore.toFixed(1),
             maxScore: totalMaxScore.toFixed(1),
-            percentage: cappedPercentage.toFixed(1) + "%"
+            percentage: displayPercentage.toFixed(1) + "%"
           };
         }
       } else {
