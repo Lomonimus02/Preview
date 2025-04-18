@@ -171,17 +171,27 @@ export default function ClassTeacherGradesPage() {
         const toDate = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
         
         // Получаем средние баллы через API, чтобы использовать серверную логику расчета
+        console.log(`Запрос к API /api/student-subject-averages с параметрами: { classId: '${classId}', fromDate: '${fromDate}', toDate: '${toDate}' }`);
+        
         const res = await apiRequest(`/api/student-subject-averages?classId=${classId}&fromDate=${fromDate}&toDate=${toDate}`, "GET");
         
         if (!res.ok) {
           // Обрабатываем ошибку ответа
-          const errorData = await res.json();
+          let errorData;
+          try {
+            errorData = await res.json();
+          } catch (e) {
+            errorData = { message: "Не удалось прочитать ответ" };
+          }
+          
           console.error("Ошибка API при запросе средних баллов:", {
             status: res.status, 
             statusText: res.statusText,
             errorData
           });
-          throw new Error(`Ошибка API: ${res.status} ${res.statusText} - ${errorData.message || 'Неизвестная ошибка'}`);
+          
+          // Пробуем получить текст ошибки
+          throw new Error(`Ошибка при расчете средних баллов: ${errorData.message || `${res.status} ${res.statusText}`}`);
         }
         
         console.log("Ответ API при запросе средних баллов:", { status: res.status, statusText: res.statusText });
@@ -190,8 +200,8 @@ export default function ClassTeacherGradesPage() {
         return data;
       } catch (error) {
         console.error("Ошибка при получении средних баллов:", error);
-        // Пробрасываем ошибку, чтобы React Query мог её обработать
-        throw error;
+        // Используем запасной вариант, чтобы не блокировать пользовательский интерфейс
+        return {}; // Возвращаем пустой объект, запасной расчет сработает
       }
     },
     enabled: !!classId && !!dateRange.from && !!dateRange.to,

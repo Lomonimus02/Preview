@@ -2242,12 +2242,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (classInfo.gradingSystem === 'cumulative') {
             // Для накопительной системы считаем общий процент по всем оценкам
             // Получаем все задания для оценок этого ученика
-            const subjectIds = Array.from(new Set(studentGrades.map(g => g.subjectId)));
+            const subjectIds = Array.from(new Set(studentGrades
+              .filter(g => g && g.subjectId) // Фильтрация undefined значений
+              .map(g => g.subjectId)));
+            
+            console.log(`Найдены ID предметов для ученика ${studentId}:`, subjectIds);
             let allAssignments = [];
             
             for (const subjectId of subjectIds) {
+              if (!subjectId) continue; // Пропускаем undefined subjectId
               const subjectAssignments = await dataStorage.getAssignmentsBySubject(subjectId);
-              allAssignments = allAssignments.concat(subjectAssignments);
+              if (subjectAssignments && Array.isArray(subjectAssignments)) {
+                allAssignments = allAssignments.concat(subjectAssignments);
+              }
             }
             
             let totalEarnedScore = 0;
@@ -2262,13 +2269,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               if (grade.scheduleId) {
                 // Находим связанные задания
-                const relatedAssignments = allAssignments.filter(a => a.scheduleId === grade.scheduleId);
+                // Проверяем наличие scheduleId в объекте grade
+                if (!grade.scheduleId) {
+                  console.log(`Пропускаем оценку без scheduleId: ${grade.id}, ${grade.grade}`);
+                  continue;
+                }
+                
+                // Фильтруем задания и проверяем на null/undefined
+                const relatedAssignments = allAssignments.filter(a => a && a.scheduleId === grade.scheduleId);
+                console.log(`Связанные задания для scheduleId ${grade.scheduleId}:`, relatedAssignments.length);
                 
                 if (relatedAssignments.length > 0) {
-                  // Находим конкретное задание (по ID или берем первое)
-                  const assignment = grade.assignmentId ? 
-                    relatedAssignments.find(a => a.id === grade.assignmentId) : 
-                    relatedAssignments[0];
+                  // Находим конкретное задание (по ID или берем первое) с проверкой на undefined
+                  let assignment = null;
+                  if (grade.assignmentId) {
+                    assignment = relatedAssignments.find(a => a && a.id === grade.assignmentId);
+                  }
+                  if (!assignment && relatedAssignments.length > 0) {
+                    assignment = relatedAssignments[0];
+                  }
                   
                   if (assignment) {
                     // Получаем информацию о расписании, чтобы проверить статус урока
