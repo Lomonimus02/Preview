@@ -11,11 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BookOpenIcon, GraduationCapIcon, Calculator, CalendarRange } from "lucide-react";
-import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO } from "date-fns";
+import { BookOpenIcon, GraduationCapIcon, Calculator, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
+import { format, isWithinInterval, eachDayOfInterval } from "date-fns";
 import { ru } from "date-fns/locale";
 import { apiRequest } from "@/lib/queryClient";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Label } from "@/components/ui/label";
 import { DateRange } from "react-day-picker";
 
@@ -26,12 +25,114 @@ export default function ClassTeacherGradesPage() {
   const [classId, setClassId] = useState<number | null>(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | string | null>(null);
   
-  // Добавляем выбор периода для фильтрации оценок
-  const currentDate = new Date();
-  const [dateRange, setDateRange] = useState<DateRange>({
-    from: subMonths(startOfMonth(currentDate), 1), // С 1-го числа предыдущего месяца
-    to: endOfMonth(currentDate), // До конца текущего месяца
-  });
+  // Определение типов четвертей и полугодий
+  type QuarterType = 'quarter1' | 'quarter2' | 'quarter3' | 'quarter4' | 'semester1' | 'semester2' | 'year';
+  
+  // Период отображения: четверти, полугодия и год (как в журнале ученика)
+  const [displayPeriod, setDisplayPeriod] = useState<QuarterType>('quarter1');
+  const [currentYear, setCurrentYear] = useState<number>(new Date().getFullYear());
+  
+  // Получаем диапазон дат на основе выбранного периода
+  const { startDate, endDate, periodLabel } = useMemo(() => {
+    let start: Date;
+    let end: Date;
+    let label = '';
+    
+    // Функция для получения учебного года
+    const getAcademicYear = (year: number) => {
+      const currentMonth = new Date().getMonth();
+      // Если текущий месяц сентябрь и позже, то учебный год начинается в текущем году
+      // Иначе учебный год начался в предыдущем году
+      return currentMonth >= 8 ? year : year - 1;
+    };
+    
+    const academicYear = getAcademicYear(currentYear);
+    
+    switch (displayPeriod) {
+      case 'quarter1': // 1 четверть: сентябрь - октябрь
+        start = new Date(academicYear, 8, 1); // 1 сентября
+        end = new Date(academicYear, 9, 31); // 31 октября
+        label = `1 четверть (сентябрь - октябрь ${academicYear})`;
+        break;
+        
+      case 'quarter2': // 2 четверть: ноябрь - декабрь
+        start = new Date(academicYear, 10, 1); // 1 ноября
+        end = new Date(academicYear, 11, 31); // 31 декабря
+        label = `2 четверть (ноябрь - декабрь ${academicYear})`;
+        break;
+        
+      case 'quarter3': // 3 четверть: январь - март
+        start = new Date(academicYear + 1, 0, 1); // 1 января
+        end = new Date(academicYear + 1, 2, 31); // 31 марта
+        label = `3 четверть (январь - март ${academicYear + 1})`;
+        break;
+        
+      case 'quarter4': // 4 четверть: апрель - июнь
+        start = new Date(academicYear + 1, 3, 1); // 1 апреля
+        end = new Date(academicYear + 1, 5, 30); // 30 июня
+        label = `4 четверть (апрель - июнь ${academicYear + 1})`;
+        break;
+        
+      case 'semester1': // 1 полугодие: сентябрь - декабрь
+        start = new Date(academicYear, 8, 1); // 1 сентября
+        end = new Date(academicYear, 11, 31); // 31 декабря
+        label = `1 полугодие (сентябрь - декабрь ${academicYear})`;
+        break;
+        
+      case 'semester2': // 2 полугодие: январь - июнь
+        start = new Date(academicYear + 1, 0, 1); // 1 января
+        end = new Date(academicYear + 1, 5, 30); // 30 июня
+        label = `2 полугодие (январь - июнь ${academicYear + 1})`;
+        break;
+        
+      case 'year': // Учебный год: сентябрь - июнь
+        start = new Date(academicYear, 8, 1); // 1 сентября
+        end = new Date(academicYear + 1, 5, 30); // 30 июня
+        label = `Учебный год ${academicYear}-${academicYear + 1}`;
+        break;
+        
+      default:
+        start = new Date(academicYear, 8, 1);
+        end = new Date(academicYear, 9, 31);
+        label = `1 четверть (сентябрь - октябрь ${academicYear})`;
+    }
+    
+    return { 
+      startDate: start, 
+      endDate: end, 
+      periodLabel: label 
+    };
+  }, [currentYear, displayPeriod]);
+  
+  // Для совместимости с существующим кодом
+  const dateRange: DateRange = useMemo(() => ({
+    from: startDate,
+    to: endDate,
+  }), [startDate, endDate]);
+  
+  // Функции для переключения года
+  const goToPreviousYear = () => {
+    setCurrentYear(prevYear => prevYear - 1);
+  };
+  
+  // Переключение на следующий учебный год
+  const goToNextYear = () => {
+    const nextYear = currentYear + 1;
+    const currentDate = new Date();
+    
+    // Не позволяем выбирать будущие учебные годы
+    // Если текущий месяц сентябрь или позже, то можно выбрать текущий год
+    if (nextYear <= currentDate.getFullYear()) {
+      setCurrentYear(nextYear);
+    } else if (nextYear === currentDate.getFullYear() + 1 && currentDate.getMonth() >= 8) {
+      setCurrentYear(nextYear);
+    } else {
+      toast({
+        title: "Ограничение выбора",
+        description: "Нельзя выбрать будущий учебный год",
+      });
+    }
+  };
 
   // Проверяем права доступа пользователя (не обязательно активная роль должна быть class_teacher)
   const hasClassTeacherAccess = () => {
