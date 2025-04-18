@@ -1939,6 +1939,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Grades API
   app.get("/api/grades", isAuthenticated, async (req, res) => {
+    // Добавляем отладочные логи
+    console.log(`Запрос оценок от пользователя ${req.user.username}, роль: ${req.user.role}, активная роль: ${req.user.activeRole}`);
+    console.log("Параметры запроса:", req.query);
+    
     let grades = [];
     
     if (req.query.studentId) {
@@ -1993,15 +1997,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } else if (req.user.role === UserRoleEnum.STUDENT) {
       grades = await dataStorage.getGradesByStudent(req.user.id);
-    } else if (req.user.role === UserRoleEnum.CLASS_TEACHER) {
+    } else if (req.user.role === UserRoleEnum.CLASS_TEACHER || req.user.activeRole === UserRoleEnum.CLASS_TEACHER) {
       // Классный руководитель может видеть все оценки своего класса
       // Получаем информацию о том, какого класса он руководитель
+      console.log(`Пользователь ${req.user.username} имеет роль CLASS_TEACHER, проверяем классы`);
       const classTeacherRoles = await dataStorage.getUserRoles(req.user.id);
+      console.log(`Полученные роли:`, classTeacherRoles);
+      
       const classTeacherRole = classTeacherRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER);
+      console.log(`Найдена роль классного руководителя:`, classTeacherRole);
       
       if (classTeacherRole && classTeacherRole.classId) {
+        console.log(`Найден classId:`, classTeacherRole.classId);
         // Если найден класс, получаем все оценки для него
         grades = await dataStorage.getGradesByClass(classTeacherRole.classId);
+        console.log(`Получено ${grades.length} оценок для класса ${classTeacherRole.classId}`);
+      } else {
+        console.error(`Не найден classId для классного руководителя ${req.user.username}`);
       }
     }
     
