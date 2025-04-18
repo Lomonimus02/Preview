@@ -161,8 +161,46 @@ export default function ClassTeacherGradesPage() {
     return gradesInDateRange.filter(grade => grade.subjectId === selectedSubjectId);
   }, [gradesInDateRange, selectedSubjectId]);
 
+  // Получаем детальный расчет среднего балла студента по предмету через API
+  const { data: averages = {} } = useQuery<Record<string, Record<string, { average: string, percentage: string }>>>({
+    queryKey: ["/api/student-subject-averages", classId, dateRange],
+    queryFn: async () => {
+      try {
+        // Преобразуем даты в строки для запроса
+        const fromDate = dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+        const toDate = dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
+        
+        // Получаем средние баллы через API, чтобы использовать серверную логику расчета
+        const res = await apiRequest(`/api/student-subject-averages?classId=${classId}&fromDate=${fromDate}&toDate=${toDate}`, "GET");
+        console.log("Ответ API при запросе средних баллов:", { status: res.status, statusText: res.statusText });
+        const data = await res.json();
+        console.log("Полученные средние баллы:", data);
+        return data;
+      } catch (error) {
+        console.error("Ошибка при получении средних баллов:", error);
+        return {};
+      }
+    },
+    enabled: !!classId && !!dateRange.from && !!dateRange.to,
+  });
+  
   // Рассчитываем средний балл ученика по выбранному предмету в выбранном периоде
   const calculateSubjectAverage = (studentId: number, subjectId: number) => {
+    // Проверяем, есть ли данные от API
+    if (averages[studentId.toString()] && averages[studentId.toString()][subjectId.toString()]) {
+      const data = averages[studentId.toString()][subjectId.toString()];
+      
+      // Формат вывода зависит от системы оценивания класса
+      if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+        // Для накопительной системы выводим процент
+        return `${data.percentage}`;
+      }
+      
+      // Для 5-балльной системы выводим средний балл
+      return data.average;
+    }
+    
+    // Запасной вариант: выполняем расчет на стороне клиента, если API не вернуло данные
     const studentSubjectGrades = gradesInDateRange.filter(
       g => g.studentId === studentId && g.subjectId === subjectId
     );
@@ -184,6 +222,21 @@ export default function ClassTeacherGradesPage() {
 
   // Рассчитываем общий средний балл ученика по всем предметам в выбранном периоде
   const calculateStudentOverallAverage = (studentId: number) => {
+    // Проверяем, есть ли данные от API (общий средний)
+    if (averages[studentId.toString()] && averages[studentId.toString()]['overall']) {
+      const data = averages[studentId.toString()]['overall'];
+      
+      // Формат вывода зависит от системы оценивания класса
+      if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
+        // Для накопительной системы выводим процент
+        return `${data.percentage}`;
+      }
+      
+      // Для 5-балльной системы выводим средний балл
+      return data.average;
+    }
+    
+    // Запасной вариант: расчет на стороне клиента
     const studentGrades = gradesInDateRange.filter(g => g.studentId === studentId);
     
     if (studentGrades.length === 0) return "-";

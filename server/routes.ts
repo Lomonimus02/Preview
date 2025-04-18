@@ -2020,6 +2020,272 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(grades);
   });
   
+  // API для получения средних баллов для всех учеников класса или конкретного ученика
+  app.get("/api/student-subject-averages", isAuthenticated, async (req, res) => {
+    try {
+      const { classId, studentId, fromDate, toDate } = req.query;
+      console.log("Запрос к API /api/student-subject-averages с параметрами:", req.query);
+      
+      // Проверяем наличие класса
+      let parsedClassId;
+      
+      if (classId) {
+        parsedClassId = parseInt(classId as string);
+      } else if (req.user.role === UserRoleEnum.CLASS_TEACHER || req.user.activeRole === UserRoleEnum.CLASS_TEACHER) {
+        // Если пользователь - классный руководитель, находим ID его класса
+        const classTeacherRoles = await dataStorage.getUserRoles(req.user.id);
+        const classTeacherRole = classTeacherRoles.find(r => r.role === UserRoleEnum.CLASS_TEACHER);
+        
+        if (classTeacherRole && classTeacherRole.classId) {
+          parsedClassId = classTeacherRole.classId;
+          console.log(`Установлен classId=${parsedClassId} для классного руководителя`);
+        } else {
+          return res.status(400).json({ message: "Не найден класс для классного руководителя" });
+        }
+      } else {
+        return res.status(400).json({ message: "Необходимо указать classId" });
+      }
+      
+      // Получаем информацию о классе для определения системы оценивания
+      const classInfo = await dataStorage.getClass(parsedClassId);
+      if (!classInfo) {
+        return res.status(404).json({ message: "Класс не найден" });
+      }
+      
+      console.log(`Система оценивания для класса: ${classInfo.gradingSystem}`);
+      
+      // Получаем список учеников класса
+      let students;
+      if (studentId) {
+        const parsedStudentId = parseInt(studentId as string);
+        students = [await dataStorage.getUser(parsedStudentId)];
+      } else {
+        students = await dataStorage.getStudentsByClass(parsedClassId);
+      }
+      
+      console.log(`Получено ${students.length} учеников`);
+      
+      // Обрабатываем даты фильтрации, если указаны
+      let startDate, endDate;
+      if (fromDate && toDate) {
+        startDate = new Date(fromDate as string);
+        endDate = new Date(toDate as string);
+        endDate.setHours(23, 59, 59); // До конца дня
+      }
+      
+      // Получаем все оценки для класса
+      const allClassGrades = await dataStorage.getGradesByClass(parsedClassId);
+      
+      // Фильтруем оценки по дате, если указан период
+      const filteredGrades = startDate && endDate
+        ? allClassGrades.filter(grade => {
+            if (!grade.createdAt) return true;
+            const gradeDate = new Date(grade.createdAt);
+            return gradeDate >= startDate && gradeDate <= endDate;
+          })
+        : allClassGrades;
+      
+      console.log(`Получено ${allClassGrades.length} оценок, после фильтрации: ${filteredGrades.length}`);
+      
+      // Получаем все предметы
+      const subjects = await dataStorage.getSubjects();
+      
+      // Создаем результирующий объект
+      const result = {};
+      
+      // Для каждого ученика рассчитываем средние баллы по каждому предмету
+      for (const student of students) {
+        const studentId = student.id;
+        result[studentId] = {};
+        
+        // Фильтруем оценки для этого ученика
+        const studentGrades = filteredGrades.filter(g => g.studentId === studentId);
+        
+        // Получаем подгруппы ученика
+        const studentSubgroups = await dataStorage.getStudentSubgroups(studentId);
+        const studentSubgroupIds = studentSubgroups.map(sg => sg.id);
+        
+        // Получаем предметы, по которым у ученика есть оценки
+        const studentSubjectIds = Array.from(new Set(studentGrades.map(g => g.subjectId)));
+        
+        // Для каждого предмета рассчитываем средний балл
+        for (const subjectId of studentSubjectIds) {
+          // Фильтруем оценки по предмету
+          const subjectGrades = studentGrades.filter(g => {
+            // Учитываем только оценки по этому предмету
+            if (g.subjectId !== subjectId) return false;
+            
+            // Проверяем, имеет ли ученик доступ к оценке подгруппы
+            if (g.subgroupId && !studentSubgroupIds.includes(g.subgroupId)) {
+              return false; // Пропускаем оценки подгрупп, к которым ученик не принадлежит
+            }
+            
+            return true;
+          });
+          
+          // Если есть оценки по предмету
+          if (subjectGrades.length > 0) {
+            // Рассчитываем средний балл в зависимости от системы оценивания
+            if (classInfo.gradingSystem === 'cumulative') {
+              // Для накопительной системы получаем все задания для предмета
+              const assignments = await dataStorage.getAssignmentsBySubject(subjectId);
+              
+              let totalEarnedScore = 0;
+              let totalMaxScore = 0;
+              
+              // Проходим по всем оценкам и учитываем максимальные баллы заданий
+              for (const grade of subjectGrades) {
+                if (grade.scheduleId) {
+                  // Находим связанные задания
+                  const relatedAssignments = assignments.filter(a => a.scheduleId === grade.scheduleId);
+                  
+                  if (relatedAssignments.length > 0) {
+                    // Находим конкретное задание (по ID или берем первое)
+                    const assignment = grade.assignmentId ? 
+                      relatedAssignments.find(a => a.id === grade.assignmentId) : 
+                      relatedAssignments[0];
+                    
+                    if (assignment) {
+                      // Получаем информацию о расписании, чтобы проверить статус урока
+                      const schedule = await dataStorage.getSchedule(grade.scheduleId);
+                      
+                      // Учитываем оценку если:
+                      // 1. задание не запланировано или
+                      // 2. задание запланировано, но урок уже проведен
+                      if (!assignment.plannedFor || (assignment.plannedFor && schedule && schedule.status === 'conducted')) {
+                        totalEarnedScore += grade.grade;
+                        totalMaxScore += Number(assignment.maxScore);
+                      }
+                    }
+                  } else {
+                    // Если для урока нет заданий, создаем virtual maxScore = 10.0
+                    totalEarnedScore += grade.grade;
+                    totalMaxScore += 10.0;
+                  }
+                } else {
+                  // Для оценок без привязки к расписанию также maxScore = 10.0
+                  totalEarnedScore += grade.grade;
+                  totalMaxScore += 10.0;
+                }
+              }
+              
+              if (totalMaxScore === 0) {
+                result[studentId][subjectId] = { average: "0", percentage: "0%" };
+              } else {
+                const percentage = (totalEarnedScore / totalMaxScore) * 100;
+                result[studentId][subjectId] = {
+                  average: totalEarnedScore.toFixed(1),
+                  percentage: `${Math.round(percentage * 10) / 10}%`
+                };
+              }
+            } else {
+              // Для 5-балльной системы просто средний арифметический
+              const sum = subjectGrades.reduce((total, grade) => total + grade.grade, 0);
+              const average = sum / subjectGrades.length;
+              result[studentId][subjectId] = {
+                average: average.toFixed(1),
+                percentage: "-"
+              };
+            }
+          }
+        }
+        
+        // Рассчитываем общий средний балл ученика
+        if (studentGrades.length > 0) {
+          if (classInfo.gradingSystem === 'cumulative') {
+            // Для накопительной системы считаем общий процент по всем оценкам
+            // Получаем все задания для оценок этого ученика
+            const subjectIds = Array.from(new Set(studentGrades.map(g => g.subjectId)));
+            let allAssignments = [];
+            
+            for (const subjectId of subjectIds) {
+              const subjectAssignments = await dataStorage.getAssignmentsBySubject(subjectId);
+              allAssignments = allAssignments.concat(subjectAssignments);
+            }
+            
+            let totalEarnedScore = 0;
+            let totalMaxScore = 0;
+            
+            // Проходим по всем оценкам и учитываем максимальные баллы заданий
+            for (const grade of studentGrades) {
+              // Проверяем, имеет ли ученик доступ к оценке подгруппы
+              if (grade.subgroupId && !studentSubgroupIds.includes(grade.subgroupId)) {
+                continue; // Пропускаем оценки подгрупп, к которым ученик не принадлежит
+              }
+              
+              if (grade.scheduleId) {
+                // Находим связанные задания
+                const relatedAssignments = allAssignments.filter(a => a.scheduleId === grade.scheduleId);
+                
+                if (relatedAssignments.length > 0) {
+                  // Находим конкретное задание (по ID или берем первое)
+                  const assignment = grade.assignmentId ? 
+                    relatedAssignments.find(a => a.id === grade.assignmentId) : 
+                    relatedAssignments[0];
+                  
+                  if (assignment) {
+                    // Получаем информацию о расписании, чтобы проверить статус урока
+                    const schedule = await dataStorage.getSchedule(grade.scheduleId);
+                    
+                    // Учитываем оценку если:
+                    // 1. задание не запланировано или
+                    // 2. задание запланировано, но урок уже проведен
+                    if (!assignment.plannedFor || (assignment.plannedFor && schedule && schedule.status === 'conducted')) {
+                      totalEarnedScore += grade.grade;
+                      totalMaxScore += Number(assignment.maxScore);
+                    }
+                  }
+                } else {
+                  // Если для урока нет заданий, создаем virtual maxScore = 10.0
+                  totalEarnedScore += grade.grade;
+                  totalMaxScore += 10.0;
+                }
+              } else {
+                // Для оценок без привязки к расписанию также maxScore = 10.0
+                totalEarnedScore += grade.grade;
+                totalMaxScore += 10.0;
+              }
+            }
+            
+            if (totalMaxScore === 0) {
+              result[studentId]['overall'] = { average: "0", percentage: "0%" };
+            } else {
+              const percentage = (totalEarnedScore / totalMaxScore) * 100;
+              result[studentId]['overall'] = {
+                average: totalEarnedScore.toFixed(1),
+                percentage: `${Math.round(percentage * 10) / 10}%`
+              };
+            }
+          } else {
+            // Для 5-балльной системы просто средний арифметический
+            const validGrades = studentGrades.filter(g => 
+              !g.subgroupId || studentSubgroupIds.includes(g.subgroupId)
+            );
+            
+            if (validGrades.length > 0) {
+              const sum = validGrades.reduce((total, grade) => total + grade.grade, 0);
+              const average = sum / validGrades.length;
+              result[studentId]['overall'] = {
+                average: average.toFixed(1),
+                percentage: "-"
+              };
+            } else {
+              result[studentId]['overall'] = { average: "-", percentage: "-" };
+            }
+          }
+        } else {
+          result[studentId]['overall'] = { average: "-", percentage: "-" };
+        }
+      }
+      
+      console.log(`Рассчитаны средние баллы для ${students.length} учеников`);
+      res.json(result);
+    } catch (error) {
+      console.error("Ошибка при расчете средних баллов:", error);
+      res.status(500).json({ message: "Ошибка сервера при расчете средних баллов" });
+    }
+  });
+  
   // API для получения среднего балла по предмету и ученику - точно как в журнале учителя
   app.get("/api/student-subject-average", isAuthenticated, async (req, res) => {
     try {
