@@ -116,8 +116,18 @@ export default function ClassTeacherGradesPage() {
   const { data: allGrades = [], isLoading: gradesLoading } = useQuery<Grade[]>({
     queryKey: ["/api/grades", { classId }],
     queryFn: async () => {
-      const res = await apiRequest(`/api/grades?classId=${classId}`, "GET");
-      return res.json();
+      try {
+        // Для роли CLASS_TEACHER в API добавлена специальная логика, которая 
+        // автоматически определяет classId на сервере
+        const res = await apiRequest(`/api/grades`, "GET");
+        console.log("Ответ API при запросе оценок:", { status: res.status, statusText: res.statusText });
+        const data = await res.json();
+        console.log(`Получено ${data.length} оценок`);
+        return data;
+      } catch (error) {
+        console.error("Ошибка при получении оценок:", error);
+        throw error;
+      }
     },
     enabled: !!classId,
   });
@@ -164,9 +174,11 @@ export default function ClassTeacherGradesPage() {
     
     // Формат вывода зависит от системы оценивания класса
     if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      return `${Math.round(average * 100) / 100}`;
+      // Для накопительной системы выводим процент
+      return `${Math.round(average * 10) / 10}%`;
     }
     
+    // Для 5-балльной системы выводим средний балл с одним знаком после запятой
     return average.toFixed(1);
   };
 
@@ -181,9 +193,11 @@ export default function ClassTeacherGradesPage() {
     
     // Формат вывода зависит от системы оценивания класса
     if (classInfo?.gradingSystem === GradingSystemEnum.CUMULATIVE) {
-      return `${Math.round(average * 100) / 100}`;
+      // Для накопительной системы выводим процент
+      return `${Math.round(average * 10) / 10}%`;
     }
     
+    // Для 5-балльной системы выводим средний балл с одним знаком после запятой
     return average.toFixed(1);
   };
 
