@@ -549,31 +549,6 @@ export default function ClassTeacherGradesPage() {
                     <SelectItem value="year">Учебный год</SelectItem>
                   </SelectContent>
                 </Select>
-                
-                {/* Навигация по периодам */}
-                <div className="flex items-center space-x-2 border rounded-md p-1">
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={goToPreviousYear}
-                    className="h-7 w-7"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  
-                  <span className="text-sm font-medium px-1">
-                    {periodLabel}
-                  </span>
-                  
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={goToNextYear}
-                    className="h-7 w-7"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
               </div>
             </div>
             <div>
@@ -659,6 +634,12 @@ export default function ClassTeacherGradesPage() {
                                 {typeof selectedSubjectId === 'number' ? (
                                   <div className="flex flex-col items-center justify-center">
                                     {(() => {
+                                      // Получаем оценки студента по предмету только за выбранный период
+                                      const studentSubjectGradesInPeriod = gradesInDateRange.filter(
+                                        g => g.studentId === student.id && g.subjectId === selectedSubjectId
+                                      );
+                                      if (studentSubjectGradesInPeriod.length === 0) return "-";
+                                      
                                       const result = calculateSubjectAverage(student.id, selectedSubjectId);
                                       if (result.gradeCount === 0) return "-";
                                       
@@ -755,6 +736,12 @@ export default function ClassTeacherGradesPage() {
                                 <TableCell key={subject.id} className="text-center">
                                   <div className="flex flex-col items-center justify-center">
                                     {(() => {
+                                      // Получаем оценки студента по предмету только за выбранный период
+                                      const studentSubjectGradesInPeriod = gradesInDateRange.filter(
+                                        g => g.studentId === student.id && g.subjectId === subject.id
+                                      );
+                                      if (studentSubjectGradesInPeriod.length === 0) return "-";
+                                      
                                       const result = calculateSubjectAverage(student.id, subject.id);
                                       if (result.gradeCount === 0) return "-";
                                       
@@ -785,6 +772,10 @@ export default function ClassTeacherGradesPage() {
                               <TableCell className="text-center font-bold bg-primary/10">
                                 <div className="flex flex-col items-center justify-center">
                                   {(() => {
+                                    // Получаем оценки студента только за выбранный период
+                                    const studentGradesInPeriod = gradesInDateRange.filter(g => g.studentId === student.id);
+                                    if (studentGradesInPeriod.length === 0) return "-";
+                                    
                                     const result = calculateStudentOverallAverage(student.id);
                                     if (result.gradeCount === 0) return "-";
                                     
@@ -864,21 +855,23 @@ export default function ClassTeacherGradesPage() {
                         {students
                           .slice()
                           .sort((a, b) => {
-                            const aAvg = calculateStudentOverallAverage(a.id);
-                            const bAvg = calculateStudentOverallAverage(b.id);
+                            // Получаем оценки за выбранный период
+                            const aGrades = gradesInDateRange.filter(g => g.studentId === a.id);
+                            const bGrades = gradesInDateRange.filter(g => g.studentId === b.id);
                             
-                            // Сначала сортируем по оценкам (исключая те, у которых нет оценок)
-                            if (aAvg.gradeCount > 0 && bAvg.gradeCount > 0) {
-                              return bAvg.rawAverage - aAvg.rawAverage;
-                            }
+                            // Если у студента нет оценок в выбранном периоде, сразу перемещаем его вниз
+                            if (aGrades.length === 0 && bGrades.length > 0) return 1;
+                            if (aGrades.length > 0 && bGrades.length === 0) return -1;
                             
-                            // Затем по фамилии, если оба без оценок
-                            if (aAvg.gradeCount === 0 && bAvg.gradeCount === 0) {
+                            // Если у обоих нет оценок, сортируем по фамилии
+                            if (aGrades.length === 0 && bGrades.length === 0) {
                               return a.lastName.localeCompare(b.lastName);
                             }
                             
-                            // Ученики с оценками идут выше учеников без оценок
-                            return aAvg.gradeCount === 0 ? 1 : -1;
+                            // В остальных случаях сортируем по среднему баллу
+                            const aAvg = calculateStudentOverallAverage(a.id);
+                            const bAvg = calculateStudentOverallAverage(b.id);
+                            return bAvg.rawAverage - aAvg.rawAverage;
                           })
                           .map(student => (
                             <TableRow key={student.id}>
@@ -888,6 +881,10 @@ export default function ClassTeacherGradesPage() {
                               <TableCell className="text-center">
                                 <div className="flex flex-col items-center justify-center">
                                   {(() => {
+                                    // Получаем оценки студента только за выбранный период
+                                    const studentGradesInPeriod = gradesInDateRange.filter(g => g.studentId === student.id);
+                                    if (studentGradesInPeriod.length === 0) return "-";
+                                    
                                     const result = calculateStudentOverallAverage(student.id);
                                     if (result.gradeCount === 0) return "-";
                                     
